@@ -4,8 +4,8 @@
 // @version      4.4
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
-// @updateURL    
-// @downloadURL  
+// @updateURL    https://cdn.jsdelivr.net/gh/wojciech-g/Jalapeno-Pepper@main/jalapeno.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/wojciech-g/Jalapeno-Pepper@main/jalapeno.user.js
 // @match        *://*.pepper.pl/admin-v2/moderation/*
 // @match        *://*.pepper.pl/admin/inspector/users/*
 // @grant        GM_xmlhttpRequest
