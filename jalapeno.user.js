@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño - PepperModPL add-on
 // @namespace    http://tampermonkey.net/
-// @version      4.4
+// @version      4.5
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @updateURL    https://cdn.jsdelivr.net/gh/wojciech-g/Jalapeno-Pepper@main/jalapeno.user.js
@@ -47,7 +47,9 @@
         histShowDate: true,
         histShowAuthor: true,
         histShowMerchant: true,
-        enableAutoHoldNote: false
+        enableAutoHoldNote: true,
+        enableMessageTemplates: true
+        //enableAutoInfractionNote: true
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -72,8 +74,11 @@
             mHist: "Historia",
             mMeta: "Sklep i Temp",
             mFall: "Fallback słów kluczowych",
-            mAutoAmz: "Podp. wysyłki (Amazon i Allegro)",
+            mAutoAmz: "Podp. wysyłki (Amazon, Allegro, Zalando Lounge)",
             mAutoLoc: "Auto markety",
+            mHoldNote: "Auto Notatka (Hold)",
+            mTemplates: "Szablony wiad. (Hold)",
+            mInfracNote: "Auto Notatka (Kary/Usunięcia)",
             hStatus: "Status (Aktywna/Wygasła/Skasowana)",
             hPrice: "Cena",
             hTemp: "Temperatura",
@@ -101,6 +106,7 @@
             promptFakePromo: "Dodać to Fake Promo?\n\nWzorzec:",
             promptPrice: "Cena alarmowa:",
             alertFakePromo: "⚠️ UWAGA! Prawdopodobieństwo cyklicznej okazji (Fake Promo).",
+            lblNotFoundLookingForSimilar: "⚠️ Nie znaleziono identycznych produktów. Kategorie oparte na haśle: ",
             alertStdPrice: "Standardowa cena to ok.",
             alertCurrent: "obecna:",
             alertEntry: "Wpis:",
@@ -131,8 +137,11 @@
             mHist: "History",
             mMeta: "Store & Temp info",
             mFall: "Keyword fallback",
-            mAutoAmz: "Shipping helper (Amazon)",
+            mAutoAmz: "Shipping helper (Amazon, Allegro, Zalando Lounge)",
             mAutoLoc: "Auto local stores",
+            mHoldNote: "Auto Hold Note",
+            mTemplates: "Hold Msg Templates",
+            mInfracNote: "Auto Infraction Note",
             hStatus: "Status (Active/Expired/Deleted)",
             hPrice: "Price",
             hTemp: "Temperature",
@@ -160,6 +169,7 @@
             promptFakePromo: "Add to Fake Promo DB?\n\nPattern:",
             promptPrice: "Alert price:",
             alertFakePromo: "⚠️ WARNING! Likely a cyclic deal (Fake Promo).",
+            lblNotFoundLookingForSimilar: "⚠️ No identical products found. Categories based on keyword: ",
             alertStdPrice: "Standard price is approx.",
             alertCurrent: "current:",
             alertEntry: "Entry:",
@@ -222,19 +232,45 @@
                 /* Zmienne dla Asystenta Wysyłki */
                 --jp-alert-field-bg: ${isDark ? '#423600' : '#fff9c4'};
                 --jp-alert-field-co: ${isDark ? '#ffeb3b' : '#333'};
+
+                /* Przyciski szablonów wiadomości */
+                --jp-template-btn-bg: ${isDark ? '#1a233a' : '#e3f2fd'};
+                --jp-template-btn-hover: ${isDark ? '#23304c' : '#bbdefb'};
+                --jp-template-btn-border: ${isDark ? '#2a3b5c' : '#90caf9'};
             }
 
             .jp-shipping-alert {
-                background-color: var(--jp-alert-field-bg) !important;
-                color: var(--jp-alert-field-co) !important;
                 border: 2px dashed #ff5252 !important;
+                box-shadow: 0 0 5px rgba(255, 82, 82, 0.3) !important;
                 transition: all 0.3s ease;
             }
 
             .jp-shipping-alert::placeholder {
-                color: var(--jp-alert-field-co) !important;
-                opacity: 0.5 !important;
-                font-weight: normal !important;
+                ccolor: #ff5252 !important;
+                opacity: 0.8 !important;
+                font-weight: 500 !important;
+            }
+
+            .jp-template-btn {
+                background-color: var(--jp-template-btn-bg);
+                color: var(--jp-text);
+                border: 1px solid var(--jp-template-btn-border);
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 11px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: background-color 0.2s;
+                white-space: nowrap;
+            }
+            .jp-template-btn:hover {
+                background-color: var(--jp-template-btn-hover);
+            }
+            .jp-templates-container {
+                display: flex;
+                gap: 8px;
+                margin-top: 10px;
+                flex-wrap: wrap;
             }
         `;
         GM_addStyle(cssVars);
@@ -275,7 +311,8 @@
                         <label style="font-weight:normal"><input type="checkbox" id="set-fallback" ${settings.enableKeywordFallback ? 'checked' : ''}> ${t('mFall')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-auto-amazon" ${settings.enableAutoAmazonShipping ? 'checked' : ''}> ${t('mAutoAmz')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-auto-local" ${settings.enableAutoLocalStore ? 'checked' : ''}> ${t('mAutoLoc')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> Auto Notatka (Hold)</label>
+                        <label style="font-weight:normal"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
+                        <label style="font-weight:normal"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
                     </div>
                 </div>
 
@@ -384,7 +421,9 @@
                 histShowDate: document.getElementById('set-h-date').checked,
                 histShowAuthor: document.getElementById('set-h-author').checked,
                 histShowMerchant: document.getElementById('set-h-merchant').checked,
-                enableAutoHoldNote: document.getElementById('set-hold-note').checked
+                enableAutoHoldNote: document.getElementById('set-hold-note').checked,
+                enableMessageTemplates: document.getElementById('set-templates').checked,
+                //enableAutoInfractionNote: document.getElementById('set-infrac-note').checked
             });
         };
 
@@ -851,13 +890,98 @@
                     if(validDeals.length === 0) html += `<li style="color: var(--jp-text-muted); margin-top: 5px;">${t('lblNoResults')}</li>`;
                     html += `</ul>`;
                 } else if (isFallback) {
-                     html += `<div style="color:var(--jp-text-muted); font-size:11px; margin-top: 5px;">⚠️ Nie znaleziono identycznych produktów. Kategorie oparte na haśle: <b style="color:var(--jp-input-text);">${query}</b></div>`;
+                     html += `<div style="color:var(--jp-text-muted); font-size:11px; margin-top: 5px;">${t('lblNotFoundLookingForSimilar')} <b style="color:var(--jp-input-text);">${query}</b></div>`;
                 } else {
                     html += `<div style="color:var(--jp-text-muted); font-size:11px; margin-top: 5px;">${t('lblHistDisabled')}</div>`;
                 }
                 containerNode.innerHTML = html;
             }
         });
+    }
+
+    function checkMessageTemplates() {
+        if (!settings.enableMessageTemplates) return;
+
+        let userMsgTa = document.querySelector('textarea[placeholder="Message for the user"]');
+        if (!userMsgTa) return;
+
+        if (document.getElementById('jp-hold-templates-wrapper')) return;
+
+        let parentContainer = userMsgTa.closest('.v-input') || userMsgTa.parentElement;
+
+        // Szablony - tytuł przycisku (label) oraz treść (text), która wpadnie po dwukropku
+        const templates = [
+            { label: "Termin", text: "podaj proszę w tytule / opisie okazji termin przydatności do spożycia produktu, którego dotyczy okazja." },
+            { label: "Cena", text: "jak uzyskać taką cenę? Jakiego kodu należy użyć / jaki produkt należy dobrać w celu uzyskania podanej ceny?" },
+            { label: "Monety", text: "cena podana w okazji musi być ceną możliwą do uzyskania bez wykorzystania monet. Popraw to proszę dodając prawidłową cenę w tytule / opisie okazji (cena w obcej walucie) oraz polu cena (cena w PLN)." },
+            { label: "Waluta", text: "dodaj proszę cenę w EURO / USD / GBP w tytule i/lub opisie okazji." },
+            { label: "Dostępność", text: "podaj proszę w opisie / tytule okazji ilość produktów dostępnych w promocji." },
+            { label: "Link nie działa", text: "link nie działa / nie prowadzi bezpośrednio do produktu. Popraw proszę link w swojej okazji." },
+            { label: "Kod nie działa", text: "kod rabatowy podany w publikacji nie działa. Być może wygasł, zużyto pulę dostępnych kodów lub produkt nie spełnia wymagań. Podaj proszę alternatywny kod / powiedz co zrobić, aby kod zadziałał." },
+            { label: "Kod - źródło", text: "podaj proszę źródło kodu wraz z jego potwierdzeniem (np. link do strony informującej o kodzie, screenshot maila / wiadomości SMS etc.)."},
+        ];
+
+        let templatesWrapper = document.createElement('div');
+        templatesWrapper.id = 'jp-hold-templates-wrapper';
+        templatesWrapper.className = 'jp-templates-container';
+
+        const insertTextToVue = (element, newText) => {
+            element.focus();
+            let valueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+            valueSetter.call(element, newText);
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+
+            element.blur();
+            element.focus();
+        };
+
+        templates.forEach(tpl => {
+            let btn = document.createElement('button');
+            btn.className = 'jp-template-btn';
+            btn.innerText = tpl.label;
+
+            btn.onclick = (e) => {
+                e.preventDefault();
+                let currentText = userMsgTa.value;
+
+                let anchor = "następujące informacje:";
+                let tailAnchor = "Nie możemy się doczekać";
+
+                let newText = currentText;
+
+                if (currentText.includes(anchor) && currentText.includes(tailAnchor)) {
+                    let parts = currentText.split(anchor);
+                    let beforeText = parts[0] + anchor;
+                    let afterText = parts[1];
+
+                    let tailIndex = afterText.indexOf(tailAnchor);
+                    let middleText = afterText.substring(0, tailIndex);
+                    let tailText = afterText.substring(tailIndex);
+
+                    middleText = middleText.trim();
+                    if (middleText.length > 0) {
+                         middleText += "\n- " + tpl.text;
+                    } else {
+                         middleText = "- " + tpl.text;
+                    }
+
+                    newText = beforeText + "\n\n" + middleText + "\n\n" + tailText;
+                } else {
+                    newText = currentText + (currentText.endsWith("\n") ? "" : "\n") + "- " + tpl.text;
+                }
+
+                insertTextToVue(userMsgTa, newText);
+            };
+
+            templatesWrapper.appendChild(btn);
+        });
+
+        if (parentContainer.nextSibling) {
+            parentContainer.parentNode.insertBefore(templatesWrapper, parentContainer.nextSibling);
+        } else {
+            parentContainer.parentNode.appendChild(templatesWrapper);
+        }
     }
 
     function checkHoldNoteAutomator() {
@@ -893,7 +1017,7 @@
                 customText = customText.trim();
 
                 if (customText.length > 0) {
-                    extractedNote = customText.length > 270 ? customText.substring(0, 70) + "..." : customText;
+                    extractedNote = customText.length > 270 ? customText.substring(0, 270) + "..." : customText;
                 }
             }
         }
@@ -912,6 +1036,95 @@
             }
         }
     }
+
+/*
+    function getCleanNoteFromReason(reason) {
+        if (!reason) return "";
+        let r = reason.toLowerCase();
+
+        if (r.includes("potraktowane jako spam")) return "Spam";
+        if (r.includes("potraktowane jako autopromocja")) return "Autopromocja";
+        if (r.includes("potraktowane jako obraźliwe zachowanie")) return "Obraźliwe zachowanie";
+        if (r.includes("zdublowałeś istniejącą okazję")) return "Dubel";
+        if (r.includes("zawiera niekompletne informacje")) return "Uzupełnienie informacji";
+        if (r.includes("oferty polecające/reflinki")) return "Oferty polecające / reflinki";
+        if (r.includes("treści powiązane z polityką")) return "Polityka";
+        if (r.includes("wyłącznie z Twoim kontem")) return "Decyzje moderacji";
+        if (r.includes("propozycję sprzedaży"))return "Sprzedaż / Wspólne zakupy / Wymiany / Rodzinka";
+        if (r.includes("Dotyczy to punktów mówiących")) return "Naruszenie regulaminu";
+        if (r.includes("niestandardowy")) return "Niestandardowe naruszenie:";
+*/
+//      let cleaned = reason.replace(/^(Okazja|Komentarz)\s*[-–]\s*/i, '').trim();
+/*
+        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+
+    function checkInfractionNoteAutomator() {
+        if (!settings.enableInfractionNote) return;
+
+        let reasonText = "";
+        let noteInput = null;
+        let messageText = ""
+
+        if (window.location.href.includes('/inspector/')) {
+            let angularSelect = document.querySelector('select#type, select[name="type"]');
+            if (angularSelect && angularSelect.selectedIndex > 0) {
+                reasonText = angularSelect.options[angularSelect.selectedIndex].textContent.trim();
+            }
+            noteInput = document.querySelector('textarea#notes, textarea[name="notes"]');
+
+            let textareas = Array.from(document.querySelectorAll('textarea'));
+            let msgTa = textareas.find(t => t.value.includes("Poprzez tę wiadomość"));
+            if (msgTa) messageText = msgTa.value;
+        }
+        else {
+            let activeModal = document.querySelector('.v-dialog--active') || document.querySelector('[role="dialog"]');
+            if (activeModal) {
+                let vuetifySelect = activeModal.querySelector('.v-select__selection');
+                if (vuetifySelect) reasonText = vuetifySelect.textContent.trim();
+
+                noteInput = document.querySelector('input[placeholder="Leave a note for moderators"]');
+                let msgTa = activeModal.querySelector('textarea[aria-label="Message for the user"]');
+                if (msgTa) messageText = msgTa.value;
+            }
+        }
+
+        if (reasonText && noteInput) {
+            let cleanNote = getCleanNoteFromReason(reasonText);
+
+            if (cleanNote === "Niestandardowe naruszenie" && messageText) {
+                let urlAnchor = "code-of-conduct";
+                let botAnchor = "Poprzez tę wiadomość";
+
+                if (messageText.includes(urlAnchor) && messageText.includes(botAnchor)) {
+                    let extracted = messageText.split(urlAnchor)[1].split(botAnchor)[0].trim();
+*/
+//                    extracted = extracted.replace(/\*\*\*Niestandardowy opis\*\*\*/g, '').trim();
+/*
+                    if (extracted.length > 0) {
+                        cleanNote = extracted.length > 150 ? extracted.substring(0, 150) + "..." : extracted;
+                    }
+                }
+            }
+
+            if (cleanNote && noteInput.dataset.jpLastReason !== cleanNote) {
+
+                let setNativeValue = (element, value) => {
+                    let proto = Object.getPrototypeOf(element);
+                    let valueSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                    valueSetter.call(element, value);
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                };
+
+                if (noteInput.value === "" || noteInput.value === (noteInput.dataset.jpLastReason || "")) {
+                    setNativeValue(noteInput, cleanNote);
+                    noteInput.dataset.jpLastReason = cleanNote;
+                }
+            }
+        }
+    }
+*/
 
     function checkInfractionModal() {
         if (window.location.href.includes('/inspector/')) return;
@@ -1231,6 +1444,11 @@
 
                 input.dispatchEvent(new Event('change', { bubbles: true }));
                 input.blur();
+
+                input.classList.remove('jp-shipping-alert');
+                input.style.color = "";
+                input.style.backgroundColor = "";
+
                 console.log("✅ Shipping set:", input.value);
             };
             //test
@@ -1311,7 +1529,7 @@
                                 freeDelLabel.style.backgroundColor = "";
                                 freeDelLabel.style.color = "";
                             }
-//test
+                            //test
                             //highlightShippingField("8,99");
                             setTimeout(() => {
                                 if (!window.jpUserEditedShipping) {
@@ -1326,9 +1544,35 @@
                 if (settings.enableAutoAmazonShipping && linkToCheck.includes('allegro.pl') && !window.jpUserEditedShipping) {
                     let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
                     if (shipInput && shipInput.value.trim() === "") {
+                        setTimeout(() => {
+                            if (!window.jpUserEditedShipping) {
+                                setShippingCost("10,49");
+                            }
+                        }, 150);
+                    }
+                }
+
+                // Auto Wysyłka Zalando Lounge
+                if (settings.enableAutoAmazonShipping && linkToCheck.includes('zalando-lounge.pl') && !window.jpUserEditedShipping) {
+                    let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
+                    if (shipInput && shipInput.value.trim() === "") {
+                        setTimeout(() => {
+                            if (!window.jpUserEditedShipping) {
+                                setShippingCost("9,95");
+                            }
+                        }, 150);
+                    }
+                }
+
+                // Allegro
+                /*
+                if (settings.enableAutoAmazonShipping && linkToCheck.includes('allegro.pl') && !window.jpUserEditedShipping) {
+                    let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
+                    if (shipInput && shipInput.value.trim() === "") {
                         highlightShippingField("10,49");
                     }
                 }
+                */
 
                 // Auto Markety
                 if (settings.enableAutoLocalStore) {
@@ -1350,7 +1594,11 @@
                         { keys: ['intermarche'], url: 'https://intermarche.pl/', local: true },
                         { keys: ['selgros'], url: 'https://www.selgros.pl/', local: true },
                         { keys: ['lewiatan'], url: 'https://lewiatan.pl/', local: true },
-                        { keys: ['topaz', 'topaz24'], url: 'https://topaz24.pl/', local: true }
+                        { keys: ['topaz', 'topaz24'], url: 'https://topaz24.pl/', local: true },
+                        { keys: ['Leroy Merlin'], url: 'https://www.leroymerlin.pl/', local: false },
+                        { keys: ['Castorama'], url: 'https://www.castorama.pl/', local: false },
+                        { keys: ['Obi', 'OBI'], url: 'https://www.obi.pl/', local: false },
+                        { keys: ['sinsay'], url: 'https://www.sinsay.com/pl/pl/', local: false },
                     ];
 
                     matchedStore = marketDB.find(store => {
@@ -1602,6 +1850,8 @@
         checkInfractionModal();
         checkInspectorModal();
         checkHoldNoteAutomator();
+        checkMessageTemplates();
+        //checkInfractionNoteAutomator();
 
     }, 300);
 
