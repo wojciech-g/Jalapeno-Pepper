@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño - PepperModPL add-on
 // @namespace    http://tampermonkey.net/
-// @version      4.5
+// @version      4.6
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @updateURL    https://cdn.jsdelivr.net/gh/wojciech-g/Jalapeno-Pepper@main/jalapeno.user.js
@@ -48,7 +48,10 @@
         histShowAuthor: true,
         histShowMerchant: true,
         enableAutoHoldNote: true,
-        enableMessageTemplates: true
+        enableMessageTemplates: true,
+        enableFloatingButton: true,
+        customFloatingText: ' - Spersonalizuj mnie!',
+        floatingButtonAutoFreeDelivery: false
         //enableAutoInfractionNote: true
     };
 
@@ -79,6 +82,9 @@
             mHoldNote: "Auto Notatka (Hold)",
             mTemplates: "Szablony wiad. (Hold)",
             mInfracNote: "Auto Notatka (Kary/Usunięcia)",
+            mFloatingBtn: "Latający przycisk (Szybki dopisek)",
+            lblFloatingText: "Personalizacja - Latający przycisk. Podaj tekst do doklejenia w tytule:",
+            lblFloatingFreeDel: "Włącz też darmową dostawę",
             hStatus: "Status (Aktywna/Wygasła/Skasowana)",
             hPrice: "Cena",
             hTemp: "Temperatura",
@@ -142,6 +148,9 @@
             mHoldNote: "Auto Hold Note",
             mTemplates: "Hold Msg Templates",
             mInfracNote: "Auto Infraction Note",
+            mFloatingBtn: "Floating Button (Quick append)",
+            lblFloatingText: "Personalization - Floating button. Enter text to append to title:",
+            lblFloatingFreeDel: "Also enable Free Delivery",
             hStatus: "Status (Active/Expired/Deleted)",
             hPrice: "Price",
             hTemp: "Temperature",
@@ -272,6 +281,33 @@
                 margin-top: 10px;
                 flex-wrap: wrap;
             }
+
+            .mod-floating-btn {
+                position: absolute;
+                top: 50%;
+                right: -18px;
+                transform: translateY(-50%);
+                background-color: var(--jp-btn-bg);
+                color: var(--jp-link);
+                border: 2px solid var(--jp-border);
+                border-radius: 50%;
+                width: 36px;
+                height: 36px;
+                font-size: 16px;
+                cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                z-index: 100;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            }
+            .mod-floating-btn:hover {
+                background-color: var(--jp-link);
+                color: white;
+                border-color: var(--jp-link);
+                transform: translateY(-50%) scale(1.1);
+            }
         `;
         GM_addStyle(cssVars);
     }
@@ -313,6 +349,19 @@
                         <label style="font-weight:normal"><input type="checkbox" id="set-auto-local" ${settings.enableAutoLocalStore ? 'checked' : ''}> ${t('mAutoLoc')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
+                        <label style="font-weight:normal"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
+                    </div>
+                </div>
+
+                <div class="settings-row" style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: end;">
+                    <div>
+                        <label>${t('lblFloatingText')}</label>
+                        <input type="text" id="set-floating-text" value="${settings.customFloatingText}" placeholder="np.  | Smart! Okazja" style="width:100%">
+                    </div>
+                    <div>
+                        <label style="font-weight:normal; display:flex; align-items:center; gap:5px; height: 35px; margin-bottom: 2px;">
+                            <input type="checkbox" id="set-floating-freedel" ${settings.floatingButtonAutoFreeDelivery ? 'checked' : ''}> ${t('lblFloatingFreeDel')}
+                        </label>
                     </div>
                 </div>
 
@@ -423,6 +472,9 @@
                 histShowMerchant: document.getElementById('set-h-merchant').checked,
                 enableAutoHoldNote: document.getElementById('set-hold-note').checked,
                 enableMessageTemplates: document.getElementById('set-templates').checked,
+                enableFloatingButton: document.getElementById('set-floating-btn').checked,
+                customFloatingText: document.getElementById('set-floating-text').value,
+                floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked
                 //enableAutoInfractionNote: document.getElementById('set-infrac-note').checked
             });
         };
@@ -948,6 +1000,7 @@
                 let anchor = "następujące informacje:";
                 let tailAnchor = "Nie możemy się doczekać";
 
+                let newToInsert = "- " + tpl.text;
                 let newText = currentText;
 
                 if (currentText.includes(anchor) && currentText.includes(tailAnchor)) {
@@ -956,21 +1009,19 @@
                     let afterText = parts[1];
 
                     let tailIndex = afterText.indexOf(tailAnchor);
-                    let middleText = afterText.substring(0, tailIndex);
                     let tailText = afterText.substring(tailIndex);
 
-                    middleText = middleText.trim();
-                    if (middleText.length > 0) {
-                         middleText += "\n- " + tpl.text;
-                    } else {
-                         middleText = "- " + tpl.text;
-                    }
-
-                    newText = beforeText + "\n\n" + middleText + "\n\n" + tailText;
+                    newText = beforeText + "\n\n" + newToInsert + "\n\n" + tailText;
                 } else {
-                    newText = currentText + (currentText.endsWith("\n") ? "" : "\n") + "- " + tpl.text;
+                    let lastInserted = userMsgTa.dataset.jpLastInsertedTemplate;
+                    if (lastInserted && currentText.includes(lastInserted)) {
+                        newText = currentText.replace(lastInserted, newToInsert);
+                    } else {
+                        newText = currentText + (currentText.endsWith("\n") ? "" : "\n") + newToInsert;
+                    }
                 }
 
+                userMsgTa.dataset.jpLastInsertedTemplate = newToInsert;
                 insertTextToVue(userMsgTa, newText);
             };
 
@@ -1261,6 +1312,25 @@
         if (settings.enableFakePromo) checkFakePromoWarning();
 
         if (!document.querySelector('.mod-tools-container')) {
+
+            const triggerVueInput = async (element, value) => {
+                if (!element) return;
+                element.focus();
+                element.value = '';
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+
+                for (let char of value) {
+                    element.value += char;
+                    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                    await new Promise(r => setTimeout(r, 10));
+                }
+
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                element.blur();
+            };
+
             let toolsBox = document.createElement('div');
             toolsBox.className = "mod-tools-container";
             toolsBox.style.position = 'relative';
@@ -1271,6 +1341,32 @@
             settingsBtn.style.cssText = "position: absolute; top: 5px; right: 5px; z-index: 10;";
             settingsBtn.onclick = (e) => { e.preventDefault(); openSettings(); };
             toolsBox.appendChild(settingsBtn);
+
+            // --- LATAJĄCY PRZYCISK (Dopisywanie do tytułu) ---
+            if (settings.enableFloatingButton) {
+                let floatBtn = document.createElement('button');
+                floatBtn.innerHTML = "✨";
+                floatBtn.className = "mod-floating-btn";
+                floatBtn.title = "Dodaj tekst: " + settings.customFloatingText;
+
+                floatBtn.onclick = async (e) => {
+                    e.preventDefault();
+                    let titleInput = document.querySelector('input[placeholder="Thread title"]');
+                    if (titleInput && settings.customFloatingText) {
+                        let currentVal = titleInput.value;
+                        if (!currentVal.includes(settings.customFloatingText.trim())) {
+                            await triggerVueInput(titleInput, currentVal + settings.customFloatingText);
+                        }
+                    }
+                    if (settings.floatingButtonAutoFreeDelivery) {
+                        setVuetifyCheckbox("Free Delivery", true, true);
+                    }
+
+                    floatBtn.innerHTML = "✅";
+                    setTimeout(() => { floatBtn.innerHTML = "✨"; }, 1500);
+                };
+                toolsBox.appendChild(floatBtn);
+            }
 
             let leftCol = document.createElement('div');
             leftCol.className = "mod-left-col";
@@ -1734,7 +1830,7 @@
                             inputAmt.addEventListener('input', updateResult);
                             selFrom.addEventListener('change', updateResult);
                             updateResult();
-
+                            /*
                             const triggerVueInput = async (element, value) => {
                                 if (!element) {
                                     console.warn("❌ brak elementu");
@@ -1763,6 +1859,7 @@
 
                                 console.log("✅ Final value:", element.value);
                             };
+                            */
 
                             btnPrice.onclick = (e) => {
                                 e.preventDefault();
