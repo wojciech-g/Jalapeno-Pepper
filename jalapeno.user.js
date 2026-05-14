@@ -4,6 +4,8 @@
 // @version      4.6.1
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
+// @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
+// @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
 // @updateURL    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
 // @downloadURL  https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
 // @match        *://*.pepper.pl/admin-v2/moderation/*
