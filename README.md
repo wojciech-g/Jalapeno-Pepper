@@ -45,7 +45,7 @@ No more manual currency conversions in new tabs.
 * Converts the amount to PLN based on always up-to-date exchange rates (API).
 * **Action buttons:** You will see a "Paste PLN" button (replaces the price in the form) and a "Title + currency" button (automatically appends the original price to the title, e.g., ` | 45.99€`).
 
-<img width="1318" height="815" alt="Zrzut ekranu 2026-05-14 o 09 49 48" src="https://github.com/user-attachments/assets/d1f7a8a3-9dd9-4a58-9fe6-534e4427f3d3" />
+<img width="1163" height="537" alt="Zrzut ekranu 2026-05-14 o 16 21 15" src="https://github.com/user-attachments/assets/be6ebee4-0822-45b9-adaa-1dc2c61f207a" />
 
 
 ### 🤖 4. Shipping & Local Stores Assistant (Automation)
@@ -68,6 +68,9 @@ A small, discreet button next to the title field that allows you to append your 
 A dedicated panel with buttons to instantly check the product on:
 * Ceneo, Keepa, GG.deals, PerfumeHub, LubimyCzytać, UpolujEbooka, Promoklocki, DekuDeals, Google.
 *(You can hide any unneeded buttons in the settings).*
+
+<img width="1223" height="324" alt="image" src="https://github.com/user-attachments/assets/47765551-18c8-4be9-971a-c59bb6903309" />
+
 
 ---
 
