@@ -26,7 +26,7 @@ Automatically analyzes added links and titles, warning you with a prominent red 
 * **Quick add:** You can add a new "fake deal" along with its standard price to the database with a single click.
 * *Requires a connected Google Apps Script backend.*
 
-![Screenshot: Fake Promo warning banner]<img width="1207" height="357" alt="image" src="https://github.com/user-attachments/assets/7940918d-c92d-4969-b3c6-4f99621387a6" />
+<img width="1207" height="357" alt="image" src="https://github.com/user-attachments/assets/7940918d-c92d-4969-b3c6-4f99621387a6" />
 
 
 ### 📊 2. Similar Deals & History (Pepper Search Engine)
@@ -36,7 +36,7 @@ Instead of manually searching for duplicates, Jalapeño does it for you live!
 * **Category distribution:** Displays a percentage breakdown of categories, making it easier to assign the correct one.
 * **Keyword fallback:** If no exact match is found, it falls back to searching by general categories (e.g., "tv", "laptop").
 
-![Screenshot: History and similar deals panel]<img width="1221" height="324" alt="Zrzut ekranu 2026-05-14 o 16 16 54" src="https://github.com/user-attachments/assets/b548748e-0607-447f-8588-30bd18d5ef57" />
+<img width="1221" height="324" alt="Zrzut ekranu 2026-05-14 o 16 16 54" src="https://github.com/user-attachments/assets/b548748e-0607-447f-8588-30bd18d5ef57" />
 
 
 ### 💱 3. Built-in Currency Calculator (EUR / USD / GBP)
@@ -45,7 +45,7 @@ No more manual currency conversions in new tabs.
 * Converts the amount to PLN based on always up-to-date exchange rates (API).
 * **Action buttons:** You will see a "Paste PLN" button (replaces the price in the form) and a "Title + currency" button (automatically appends the original price to the title, e.g., ` | 45.99€`).
 
-![Screenshot: Currency calculator]<img width="1318" height="815" alt="Zrzut ekranu 2026-05-14 o 09 49 48" src="https://github.com/user-attachments/assets/d1f7a8a3-9dd9-4a58-9fe6-534e4427f3d3" />
+<img width="1318" height="815" alt="Zrzut ekranu 2026-05-14 o 09 49 48" src="https://github.com/user-attachments/assets/d1f7a8a3-9dd9-4a58-9fe6-534e4427f3d3" />
 
 
 ### 🤖 4. Shipping & Local Stores Assistant (Automation)
@@ -58,7 +58,7 @@ Stop typing the same thing over and over—use quick buttons instead!
 * **Auto-Note for Moderators:** The script analyzes what you send to the user and automatically enters the reason for the Hold procedure (e.g., "Confirmation", "Source") into the moderator note field for the rest of the team.
 * Automatically formats texts in warning/ban windows.
 
-![Screenshot: Hold message templates] <img width="1006" height="649" alt="Zrzut ekranu 2026-05-14 o 16 24 51" src="https://github.com/user-attachments/assets/8bb10dad-103e-42d8-8761-c98c4795791f" />
+<img width="1006" height="649" alt="Zrzut ekranu 2026-05-14 o 16 24 51" src="https://github.com/user-attachments/assets/8bb10dad-103e-42d8-8761-c98c4795791f" />
 
 
 ### ✨ 6. "Quick Append" Floating Button
@@ -81,7 +81,7 @@ The script features a powerful, graphical configuration UI accessible by clickin
 * 🎛️ **Full history customization:** Choose exactly what data points (Author, Temperature, Store, Copy Button) should be displayed in the history list (includes a live preview in the settings menu!).
 * 🛑 **Stop Words:** Define custom words that the script should ignore when analyzing the title for search queries.
 
-![Screenshot: Jalapeno settings window] <img width="2012" height="1514" alt="image" src="https://github.com/user-attachments/assets/a0584a05-e5f0-403e-91e5-431798d3fa32" />
+<img width="2012" height="1514" alt="image" src="https://github.com/user-attachments/assets/a0584a05-e5f0-403e-91e5-431798d3fa32" />
 
 
 ---
