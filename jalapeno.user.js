@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño - PepperModPL add-on
 // @namespace    http://tampermonkey.net/
-// @version      4.6.1
+// @version      4.6.2
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
