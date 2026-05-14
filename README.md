@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Tampermonkey%20%7C%20Violentmonkey-orange)
 ![For](https://img.shields.io/badge/For-Pepper.pl%20Moderation-blue)
 
-**Jalapeño** is a powerful, unofficial extension designed to facilitate and speed up the daily workflow of Pepper.pl moderators. The script automates repetitive tasks, provides essential contextual information, and protects against approving fake or cyclic promotions (Fake Promo).
+**Jalapeño** is a powerful, unofficial extension designed to facilitate and speed up the daily workflow of Pepper.pl moderators. The script automates repetitive tasks, provides essential contextual information, and protects against approving fake or cyclic promotions.
 
 ---
 
@@ -86,6 +86,17 @@ The script features a powerful, graphical configuration UI accessible by clickin
 
 <img width="2012" height="1514" alt="image" src="https://github.com/user-attachments/assets/a0584a05-e5f0-403e-91e5-431798d3fa32" />
 
+---
+
+## 💎 Advanced Features & QoL Improvements
+
+Jalapeño works quietly in the background to prevent human errors and streamline the workflow with several smart tweaks:
+
+* 🧱 **Smart LEGO Matching:** Dedicated logic for LEGO sets. If the script detects the word "LEGO" and a set number (e.g., `75313`) in the title, it isolates the ID to generate perfectly accurate history and external link queries, bypassing irrelevant keywords.
+* 🚨 **Amazon Delivery Fail-safe:** If an Amazon deal is priced under 65 PLN but the "Free Delivery" box is checked, the script highlights the delivery label in bright red with a tooltip warning you to uncheck it and apply shipping costs.
+* ⚖️ **Infraction & Warning Auto-formatting:** The script actively monitors the inspector/infraction modal. It checks whether you've selected "Warning only" or assigned penalty points, and flawlessly updates the boilerplate placeholder (e.g., automatically replacing `***ostrzeżenie / punkty karne:` with `Poprzez tę wiadomość otrzymujesz punkty karne (2).`).
+* ✂️ **Smart Hold Note Extractor:** If you type a custom message to the user during a Hold procedure, the script neatly extracts your custom text, safely truncates it to 270 characters (to prevent cutting off), and pastes it into the moderator notes field for your team to see.
+* ✋ **Manual Intervention Detection:** Jalapeño respects your manual inputs. If you manually type a shipping cost or click the free delivery checkbox, the script flags it and stops "fighting" you with its automations, giving you full control.
 
 ---
 
