@@ -60,14 +60,13 @@ Stop typing the same thing over and over—use quick buttons instead!
 
 <img width="1006" height="649" alt="Zrzut ekranu 2026-05-14 o 16 24 51" src="https://github.com/user-attachments/assets/8bb10dad-103e-42d8-8761-c98c4795791f" />
 
-
-### ✨ 6. "Quick Append" Floating Button
-A small, discreet button next to the title field that allows you to append your customized text (e.g., ` | Smart! Okazja`) to the title and optionally check/uncheck free delivery with a single click.
-
-### 🔗 7. Quick Links (External Search Engines)
+### 🔗 6. Quick Links (External Search Engines)
 A dedicated panel with buttons to instantly check the product on:
 * Ceneo, Keepa, GG.deals, PerfumeHub, LubimyCzytać, UpolujEbooka, Promoklocki, DekuDeals, Google.
 *(You can hide any unneeded buttons in the settings).*
+
+### ✨ 7. "Quick Append" Floating Button
+A small, discreet button next to the title field that allows you to append your customized text (e.g., ` | Smart! Okazja`) to the title and optionally check/uncheck free delivery with a single click.
 
 <img width="1223" height="324" alt="image" src="https://github.com/user-attachments/assets/47765551-18c8-4be9-971a-c59bb6903309" />
 
