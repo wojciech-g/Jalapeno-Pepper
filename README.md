@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Tampermonkey%20%7C%20Violentmonkey-orange)
 ![For](https://img.shields.io/badge/For-Pepper.pl%20Moderation-blue)
 
-**Jalapeño** is a powerful, unofficial extension (UserScript) designed to facilitate and speed up the daily workflow of Pepper.pl moderators. The script automates repetitive tasks, provides essential contextual information, and protects against approving fake or cyclic promotions (Fake Promo).
+**Jalapeño** is a powerful, unofficial extension designed to facilitate and speed up the daily workflow of Pepper.pl moderators. The script automates repetitive tasks, provides essential contextual information, and protects against approving fake or cyclic promotions (Fake Promo).
 
 ---
 
