@@ -91,7 +91,6 @@ The script features a powerful, graphical configuration UI accessible by clickin
 
 Jalapeño works quietly in the background to prevent human errors and streamline the workflow with several smart tweaks:
 
-* 🧱 **Smart LEGO Matching:** Dedicated logic for LEGO sets. If the script detects the word "LEGO" and a set number (e.g., `75313`) in the title, it isolates the ID to generate perfectly accurate history and external link queries, bypassing irrelevant keywords.
 * 🚨 **Amazon Delivery Fail-safe:** If an Amazon deal is priced under 65 PLN but the "Free Delivery" box is checked, the script highlights the delivery label in bright red with a tooltip warning you to uncheck it and apply shipping costs.
 * ⚖️ **Infraction & Warning Auto-formatting:** The script actively monitors the inspector/infraction modal. It checks whether you've selected "Warning only" or assigned penalty points, and flawlessly updates the boilerplate placeholder (e.g., automatically replacing `***ostrzeżenie / punkty karne:` with `Poprzez tę wiadomość otrzymujesz punkty karne (2).`).
 * ✂️ **Smart Hold Note Extractor:** If you type a custom message to the user during a Hold procedure, the script neatly extracts your custom text, safely truncates it to 270 characters (to prevent cutting off), and pastes it into the moderator notes field for your team to see.
