@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño - PepperModPL add-on
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.6.3
+// @version      4.6.4
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -53,7 +53,8 @@
         enableMessageTemplates: true,
         enableFloatingButton: true,
         customFloatingText: ' - Spersonalizuj mnie!',
-        floatingButtonAutoFreeDelivery: false
+        floatingButtonAutoFreeDelivery: false,
+        enableMoveApproveBtn: true
         //enableAutoInfractionNote: true
     };
 
@@ -85,6 +86,7 @@
             mTemplates: "Szablony wiad. (Hold)",
             mInfracNote: "Auto Notatka (Kary/Usunięcia)",
             mFloatingBtn: "Latający przycisk (Szybki dopisek)",
+            mMoveApprove: "Przesuń przycisk 'Approve & Send PM'",
             lblFloatingText: "Personalizacja - Latający przycisk. Podaj tekst do doklejenia w tytule:",
             lblFloatingFreeDel: "Włącz też darmową dostawę",
             hStatus: "Status (Aktywna/Wygasła/Skasowana)",
@@ -151,6 +153,7 @@
             mTemplates: "Hold Msg Templates",
             mInfracNote: "Auto Infraction Note",
             mFloatingBtn: "Floating Button (Quick append)",
+            mMoveApprove: "Move 'Approve & Send PM' button",
             lblFloatingText: "Personalization - Floating button. Enter text to append to title:",
             lblFloatingFreeDel: "Also enable Free Delivery",
             hStatus: "Status (Active/Expired/Deleted)",
@@ -310,6 +313,21 @@
                 border-color: var(--jp-link);
                 transform: translateY(-50%) scale(1.1);
             }
+
+            .jp-relative-container {
+                position: relative !important;
+            }
+            .jp-approve-moved {
+                position: absolute !important;
+                left: 55px !important;    /* Ustawia skrajnie z lewej */
+                top: -45px !important;    /* Wyciąga ponad kontener */
+                z-index: 100 !important;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
+                transition: transform 0.2s ease !important;
+            }
+            .jp-approve-moved:hover {
+                transform: scale(1.05) !important;
+            }
         `;
         GM_addStyle(cssVars);
     }
@@ -352,6 +370,7 @@
                         <label style="font-weight:normal"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
                         <label style="font-weight:normal"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
+                        <label style="font-weight:normal"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
                     </div>
                 </div>
 
@@ -476,7 +495,8 @@
                 enableMessageTemplates: document.getElementById('set-templates').checked,
                 enableFloatingButton: document.getElementById('set-floating-btn').checked,
                 customFloatingText: document.getElementById('set-floating-text').value,
-                floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked
+                floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked,
+                enableMoveApproveBtn: document.getElementById('set-move-approve').checked
                 //enableAutoInfractionNote: document.getElementById('set-infrac-note').checked
             });
         };
@@ -1941,6 +1961,24 @@
 
     fetchExchangeRates(() => {});
 
+    function moveNativeApproveBtn() {
+        if (!settings.enableMoveApproveBtn) return;
+
+        let allBtns = Array.from(document.querySelectorAll('button.v-btn'));
+        let targetBtn = allBtns.find(b => b.innerText && (b.innerText.includes('APPROVE & SEND PM')));
+
+        if (targetBtn && !targetBtn.classList.contains('jp-approve-moved')) {
+            targetBtn.classList.add('jp-approve-moved');
+
+            let container = targetBtn.closest('.layout.wrap');
+            if (container) {
+                container.classList.add('jp-relative-container');
+            } else {
+                targetBtn.parentElement.classList.add('jp-relative-container');
+            }
+        }
+    }
+
     setInterval(() => {
         let titleInput = document.querySelector('input[placeholder="Thread title"]');
         let isAlreadyInjected = document.querySelector('.mod-tools-container');
@@ -1950,6 +1988,7 @@
         checkInspectorModal();
         checkHoldNoteAutomator();
         checkMessageTemplates();
+        moveNativeApproveBtn();
         //checkInfractionNoteAutomator();
 
     }, 300);
