@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.6.7
+// @version      4.6.8
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -60,14 +60,29 @@
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
 
-    // --- Słownik (i18n) ---
+   // --- Słownik (i18n) ---
     const i18n = {
         pl: {
             titleSettings: "⚙️ Ustawienia Jalapeño",
+            secAppearance: "🎨 Wygląd i Interfejs",
+            secModules: "🚀 Aktywne Moduły",
+            secConfig: "⚙️ Konfiguracja Szczegółowa",
+            secHistory: "📜 Personalizacja Historii",
+            lblFontColor: "Kolor czcionki (Tryb nocny):",
+            lblFontSize: "Globalny rozmiar czcionki:",
+            fontColorDefault: "Domyślny (Szaro-biały)",
+            fontColorWhite: "Czysty biały",
+            fontColorGray: "Ciemniejszy szary",
+            fontColorBlue: "Lekki błękit",
+            fontVerySmall: "Bardzo Mała (12px)",
+            fontSmall: "Mała (13px)",
+            fontDefault: "Domyślna",
+            fontLarge: "Większa (15px)",
+            fontVeryLarge: "Duża (16px)",
             activeModules: "Aktywne moduły:",
             histPers: "Personalizacja 'Podobnych okazji' (Historia):",
             livePreview: "Podgląd na żywo:",
-            defCurrency: "Domyślna waluta:",
+            defCurrency: "Kalkulator - Domyślna waluta:",
             histCount: "Ilość wyników w historii (1-10):",
             stopWords: "Własne 'Stop Words' (oddzielone przecinkiem):",
             hideBtns: "Ukryj przyciski:",
@@ -131,10 +146,25 @@
         },
         en: {
             titleSettings: "⚙️ Jalapeño Settings",
+            secAppearance: "🎨 Appearance & UI",
+            secModules: "🚀 Active Modules",
+            secConfig: "⚙️ Advanced Configuration",
+            secHistory: "📜 History Personalization",
+            lblFontColor: "Font Color (Dark Mode):",
+            lblFontSize: "Global Font Size:",
+            fontColorDefault: "Default (Gray-white)",
+            fontColorWhite: "Pure White",
+            fontColorGray: "Darker Gray",
+            fontColorBlue: "Light Blue",
+            fontVerySmall: "Very Small (12px)",
+            fontSmall: "Small (13px)",
+            fontDefault: "Default",
+            fontLarge: "Large (15px)",
+            fontVeryLarge: "Very Large (16px)",
             activeModules: "Active modules:",
             histPers: "'Similar deals' Customization (History):",
             livePreview: "Live preview:",
-            defCurrency: "Default currency:",
+            defCurrency: "Converter - Default currency:",
             histCount: "History results count (1-10):",
             stopWords: "Custom 'Stop Words' (comma separated):",
             hideBtns: "Hide buttons:",
@@ -210,15 +240,23 @@
     function injectThemeCSS() {
         const isDark = settings.theme === 'dark';
 
+        const darkTextColor = settings.darkTextColor || '#dbdee1';
+        const fontSize = settings.fontSize || 'default';
+
+        // Jeśli wybrano "default", nie generujemy reguły font-size. W przeciwnym razie nadpisujemy.
+        const fontRule = fontSize !== 'default'
+            ? `body, .v-application, .page-content, .card-body { font-size: ${fontSize} !important; }`
+            : '';
+
         // =========================================
         // 1. ZMIENNE CSS (:root)
-        // Wartości zmieniają się automatycznie (Jasny/Ciemny)
         // =========================================
         let css = `
             :root {
                 --jp-bg: ${isDark ? '#2b2d31' : '#f9f9f9'};
                 --jp-border: ${isDark ? '#404249' : '#e0e0e0'};
-                --jp-text: ${isDark ? '#dbdee1' : '#333'};
+
+                --jp-text: ${isDark ? darkTextColor : '#333'};
                 --jp-text-muted: ${isDark ? '#949ba4' : '#777'};
 
                 --jp-btn-bg: ${isDark ? '#383a40' : '#fff'};
@@ -234,12 +272,14 @@
                 --jp-preview-bg: ${isDark ? '#1e1f22' : '#fff'};
 
                 --jp-input-bg: ${isDark ? '#313338' : '#fff'};
-                --jp-input-text: ${isDark ? '#dbdee1' : '#000'};
+                --jp-input-text: ${isDark ? darkTextColor : '#000'};
 
                 --jp-link: ${isDark ? '#4fc3f7' : '#03a9f4'};
 
-                --jp-fake-btn-bg: ${isDark ? '#8c3a00' : '#ff9800'};
-                --jp-fake-btn-hover: ${isDark ? '#a64500' : '#e68a00'};
+                --jp-fake-btn-bg: ${isDark ? '#4a1c1c' : '#ff9800'};
+                --jp-fake-btn-hover: ${isDark ? '#732a2a' : '#e68a00'};
+                --jp-fake-btn-text: ${isDark ? '#ff8a80' : '#fff'};
+                --jp-fake-btn-border: ${isDark ? '#d32f2f' : 'transparent'};
                 --jp-fake-alert-bg: ${isDark ? '#d32f2f' : '#ff4d4d'};
 
                 --jp-temp-hot: ${isDark ? '#ef5350' : '#ff5252'};
@@ -268,7 +308,7 @@
                 --jp-approve-bg-hover: ${isDark ? '#404249' : '#e68a00'};
                 --jp-approve-border: ${isDark ? '#5c5f66' : '#e68a00'};
                 --jp-approve-border-hover: ${isDark ? '#6b6f78' : '#cc7a00'};
-                --jp-approve-text: ${isDark ? '#dbdee1' : '#fff'};
+                --jp-approve-text: ${isDark ? darkTextColor : '#fff'};
 
                 --jp-switch-track: ${isDark ? 'rgba(201, 106, 26, 0.45)' : 'rgba(255, 152, 0, 0.45)'};
                 --jp-switch-thumb: ${isDark ? '#c96a1a' : '#ff9800'};
@@ -278,19 +318,14 @@
                 --jp-switch-thumb-off: ${isDark ? '#8b8f98' : '#fafafa'};
             }
 
+            ${fontRule}
+
             /* =========================================
                2. WSPÓLNE STYLE KOMPONENTÓW JALAPENO
-               Zawsze dodawane, dopasowują się zmiennymi
                ========================================= */
 
-            .jp-shipping-alert {
-                border: 2px dashed #ff5252 !important;
-                box-shadow: 0 0 5px rgba(255, 82, 82, 0.3) !important;
-                transition: all 0.3s ease;
-            }
-            .jp-shipping-alert::placeholder {
-                color: #ff5252 !important; opacity: 0.8 !important; font-weight: 500 !important;
-            }
+            .jp-shipping-alert { border: 2px dashed #ff5252 !important; box-shadow: 0 0 5px rgba(255, 82, 82, 0.3) !important; transition: all 0.3s ease; }
+            .jp-shipping-alert::placeholder { color: #ff5252 !important; opacity: 0.8 !important; font-weight: 500 !important; }
 
             .jp-template-btn {
                 background-color: var(--jp-template-btn-bg); color: var(--jp-text);
@@ -309,172 +344,159 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 100;
                 display: flex; align-items: center; justify-content: center; transition: all 0.2s;
             }
-            .mod-floating-btn:hover {
-                background-color: var(--jp-link); color: #fff;
-                border-color: var(--jp-link); transform: scale(1.1);
-            }
+            .mod-floating-btn:hover { background-color: var(--jp-link); color: #fff; border-color: var(--jp-link); transform: scale(1.1); }
 
             .jp-relative-container { position: relative !important; }
             .jp-approve-moved {
                 position: absolute !important; left: 55px !important; top: -45px !important;
-                z-index: 100 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
-                transition: transform 0.2s ease !important;
+                z-index: 100 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important; transition: transform 0.2s ease !important;
             }
             .jp-approve-moved:hover { transform: scale(1.05) !important; }
 
             #shopinfo {
                 text-align: center !important; padding: 15px !important; margin: 10px 0 !important;
                 background-color: var(--jp-bg) !important; color: var(--jp-text) !important;
-                border: 1px solid var(--jp-border) !important; border-radius: 8px !important;
-                font-family: sans-serif !important;
+                border: 1px solid var(--jp-border) !important; border-radius: 8px !important; font-family: sans-serif !important;
             }
             #shopinfo img {
-                display: block !important; margin: 10px auto 0 auto !important; width: 25% !important;
-                filter: ${isDark ? 'invert(1) hue-rotate(180deg)' : 'none'} !important;
+                display: block !important; margin: 10px auto 0 auto !important; width: 25% !important; filter: ${isDark ? 'invert(1) hue-rotate(180deg)' : 'none'} !important;
             }
         `;
 
-        // =========================================
-        // 3. NADPISYWANIE STYLÓW PEPPERA (TYLKO DARK MODE)
-        // =========================================
         if (isDark) {
             css += `
                 /* -----------------------------------------
                    A. NOWY PANEL MODERACJI (V2 - Vuetify)
                    ----------------------------------------- */
-
-                /* Layout bazowy i kontenery */
-                body, .v-application, .v-content, .v-content__wrap, .theme--light.v-application, .grey.lighten-3 {
-                    background-color: #1e1f22 !important; color: #dbdee1 !important;
+                body, .v-application, .v-content, .v-content__wrap, .theme--light.v-application, .grey.lighten-3 { background-color: #1e1f22 !important; color: var(--jp-text) !important; }
+                .theme--light.v-card, .theme--light.v-sheet, .theme--light.v-list, .theme--light.v-navigation-drawer, .theme--light.v-menu__content,
+                .theme--light.v-tabs-items, .theme--light.v-tabs, .theme--light.v-expansion-panel, .theme--light.v-footer {
+                    background-color: #2b2d31 !important; color: var(--jp-text) !important; border-color: #1e1f22 !important;
                 }
-                .theme--light.v-card, .theme--light.v-sheet, .theme--light.v-list,
-                .theme--light.v-navigation-drawer, .theme--light.v-menu__content,
-                .theme--light.v-tabs-items, .theme--light.v-tabs,
-                .theme--light.v-expansion-panel, .theme--light.v-footer {
-                    background-color: #2b2d31 !important; color: #dbdee1 !important; border-color: #1e1f22 !important;
-                }
-                .theme--light.v-expansion-panel .v-expansion-panel__container { background-color: #2b2d31 !important; color: #dbdee1 !important; }
-                .theme--light.v-expansion-panel .v-expansion-panel__header { color: #dbdee1 !important; }
+                .theme--light.v-expansion-panel .v-expansion-panel__container { background-color: #2b2d31 !important; color: var(--jp-text) !important; }
+                .theme--light.v-expansion-panel .v-expansion-panel__header { color: var(--jp-text) !important; }
 
-                /* Tabulatory (Tabs) */
                 .theme--light .v-tabs__bar { background-color: #1e1f22 !important; }
                 .theme--light .v-tabs__item { color: #949ba4 !important; }
                 .theme--light .v-tabs__item--active { color: #ff9800 !important; }
-                .theme--light .v-tabs__item--active, .theme--light .v-tabs__item--active .v-icon { color: #9e360b !important; }
+                .theme--light .v-tabs__item--active, .theme--light .v-tabs__item--active .v-icon { color: #d84315 !important; }
 
-                /* Edytory i Narzędzia */
-                .redactor-box, .redactor-editor, .ce-block__content, .codex-editor__redactor {
-                    background-color: #1e1f22 !important; color: #dbdee1 !important; border: 1px solid #383a40 !important;
-                }
-                .theme--light.v-toolbar { background-color: #1e1f22 !important; color: #dbdee1 !important; }
+                .redactor-box, .redactor-editor, .ce-block__content, .codex-editor__redactor { background-color: #1e1f22 !important; color: var(--jp-text) !important; border: 1px solid #383a40 !important; }
+                .theme--light.v-toolbar { background-color: #1e1f22 !important; color: var(--jp-text) !important; }
 
-                /* Tabele V2 */
-                .theme--light.v-data-table, .theme--light.v-data-table .v-data-table__wrapper table {
-                    background-color: #2b2d31 !important; color: #dbdee1 !important;
-                }
+                .theme--light.v-data-table, .theme--light.v-data-table .v-data-table__wrapper table { background-color: #2b2d31 !important; color: var(--jp-text) !important; }
                 .theme--light.v-data-table tbody tr:hover:not(.v-data-table__expanded__content) { background-color: #313338 !important; }
                 .theme--light.v-divider, .theme--light .v-divider { border-color: #383a40 !important; }
 
-                /* Inputy i Pola Tekstowe */
+                /* -----------------------------------------
+                   NOWE POLA TEKSTOWE V2 (Przezroczyste tło, pojedyncza linia)
+                   ----------------------------------------- */
                 .theme--light.v-text-field > .v-input__control > .v-input__slot,
                 .theme--light.v-text-field--solo > .v-input__control > .v-input__slot {
-                    background-color: #313338 !important; border: 1px solid #404249 !important; box-shadow: none !important; color: #dbdee1 !important;
+                    background-color: transparent !important;
+                    border: none !important;
+                    border-bottom: 1px solid #5c5f66 !important;
+                    border-radius: 0 !important;
+                    box-shadow: none !important;
+                    color: var(--jp-text) !important;
+                    transition: border-color 0.3s;
                 }
-                .theme--light.v-input input, .theme--light.v-input textarea { color: #dbdee1 !important; }
-                .theme--light.v-input input::placeholder, .theme--light.v-input textarea::placeholder, ::-webkit-input-placeholder {
-                    color: #949ba4 !important; opacity: 1 !important;
+
+                .theme--light.v-text-field > .v-input__control > .v-input__slot::before,
+                .theme--light.v-text-field > .v-input__control > .v-input__slot::after {
+                    display: none !important;
                 }
+
+                /* Subtelniejsze pomarańczowe podkreślenie (1px zamiast 2px) */
+                .theme--light.v-text-field.v-input--is-focused > .v-input__control > .v-input__slot {
+                    border-bottom: 1px solid #d84315 !important;
+                }
+
+                .theme--light.v-input input, .theme--light.v-input textarea { color: var(--jp-text) !important; }
+                .theme--light.v-input input::placeholder, .theme--light.v-input textarea::placeholder, ::-webkit-input-placeholder { color: #949ba4 !important; opacity: 1 !important; }
                 .theme--light.v-label { color: #949ba4 !important; }
 
-                /* Kalkulator walut Jalapeno (ujednolicony) */
+                .theme--light.v-text-field .v-text-field__details .v-messages { color: var(--jp-text-muted) !important; }
+
                 #pepper-mod-converter-wrapper > div.rounded-medium {
-                    background-color: #313338 !important; border: 1px solid #404249 !important;
+                    background-color: transparent !important;
+                    border: none !important;
+                    border-bottom: 1px solid #5c5f66 !important;
+                    border-radius: 0 !important;
                 }
                 #pepper-mod-converter-wrapper > div.rounded-medium > div:last-child {
-                    background-color: #2b2d31 !important; border-left: 1px solid #404249 !important;
+                    background-color: transparent !important;
+                    border-left: none !important;
                 }
-                #mod-conv-amount, #mod-conv-from { color: #dbdee1 !important; }
-                #pepper-mod-converter-wrapper .mod-conv-btn-v2 {
-                    background-color: #383a40 !important; color: #dbdee1 !important; border: 1px solid #5c5f66 !important;
-                }
+                #mod-conv-amount, #mod-conv-from { color: var(--jp-text) !important; }
+                #pepper-mod-converter-wrapper .mod-conv-btn-v2 { background-color: #383a40 !important; color: var(--jp-text) !important; border: 1px solid #5c5f66 !important; }
                 #pepper-mod-converter-wrapper .mod-conv-btn-v2:hover { background-color: #404249 !important; }
 
-                /* Select (Dropdown) */
                 .theme--light .v-select__selection, .theme--light .v-select__selection--comma,
-                .theme--light .v-select__selections, .theme--light .v-select__selections input { color: #dbdee1 !important; }
+                .theme--light .v-select__selections, .theme--light .v-select__selections input { color: var(--jp-text) !important; }
                 .theme--light .v-select__selections .v-select__selection--disabled { color: #949ba4 !important; }
                 .theme--light .v-select .v-input__append-inner .v-icon { color: #949ba4 !important; }
                 .theme--light .v-menu__content .v-list, .theme--light .v-menu__content .v-select-list { background-color: #2b2d31 !important; }
-                .theme--light .v-menu__content .v-list__tile__title, .theme--light .v-menu__content .v-list-item__title { color: #dbdee1 !important; }
+                .theme--light .v-menu__content .v-list__tile__title, .theme--light .v-menu__content .v-list-item__title { color: var(--jp-text) !important; }
                 .theme--light .v-menu__content .v-list__tile:hover, .theme--light .v-menu__content .v-list-item:hover { background-color: #383a40 !important; }
                 .theme--light .v-menu__content .v-list__tile--active, .theme--light .v-menu__content .v-list-item--active { background-color: #404249 !important; color: #c96a1a !important; }
 
-                /* -----------------------------------------
-                   PRZYCISKI V2 (Buttons)
-                   ----------------------------------------- */
-                .theme--light.v-btn { color: #dbdee1 !important; }
+                /* PRZYCISKI V2 */
+                .theme--light.v-btn { color: var(--jp-text) !important; }
                 .theme--light.v-btn.v-btn--outline { border-color: #5c5f66 !important; background-color: transparent !important; }
-                .theme--light.v-btn.v-btn--outline:hover, .theme--light.v-btn.v-btn--flat:hover, .theme--light.v-btn.v-btn--icon:hover {
-                    background-color: rgba(255,255,255,0.08) !important;
-                }
+                .theme--light.v-btn.v-btn--outline:hover, .theme--light.v-btn.v-btn--flat:hover, .theme--light.v-btn.v-btn--icon:hover { background-color: rgba(255,255,255,0.08) !important; }
                 .theme--light.v-btn:not(.v-btn--flat):not(.v-btn--outline):not(.v-btn--icon) { background-color: #383a40 !important; }
                 .theme--light.v-btn:not(.v-btn--flat):not(.v-btn--outline):not(.v-btn--icon):hover { background-color: #404249 !important; }
                 .theme--light.v-btn.v-btn--disabled { opacity: 0.5 !important; }
 
-                /* Główne Przyciski V2 (np. Save / Approve - Sterowane z :root) */
-                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled),
-                .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled),
-                .theme--light.v-btn.primary:not(.v-btn--disabled),
-                .theme--light.v-btn.warning:not(.v-btn--disabled),
-                .theme--light.v-btn.success:not(.v-btn--disabled) {
+                /* Główne Przyciski V2 */
+                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled),
+                html body .v-application .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled),
+                html body .v-application .theme--light.v-btn.primary:not(.v-btn--disabled),
+                html body .v-application .theme--light.v-btn.warning:not(.v-btn--disabled),
+                html body .v-application .theme--light.v-btn.success:not(.v-btn--disabled) {
                     background: var(--jp-approve-bg) !important; background-color: var(--jp-approve-bg) !important;
                     border: 1px solid var(--jp-approve-border) !important; color: var(--jp-approve-text) !important; box-shadow: none !important;
                 }
                 .theme--light.v-btn.primary::before, .theme--light.v-btn.warning::before, .theme--light.v-btn.success::before,
                 .theme--light.v-btn.cept-thread-moderation-acknowledge-btn::before, .theme--light.v-btn.jp-approve-moved::before { background-color: transparent !important; }
-                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover,
-                .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled):hover,
-                .theme--light.v-btn.primary:not(.v-btn--disabled):hover,
-                .theme--light.v-btn.warning:not(.v-btn--disabled):hover,
-                .theme--light.v-btn.success:not(.v-btn--disabled):hover {
+                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover,
+                html body .v-application .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled):hover,
+                html body .v-application .theme--light.v-btn.primary:not(.v-btn--disabled):hover,
+                html body .v-application .theme--light.v-btn.warning:not(.v-btn--disabled):hover,
+                html body .v-application .theme--light.v-btn.success:not(.v-btn--disabled):hover {
                     background: var(--jp-approve-bg-hover) !important; background-color: var(--jp-approve-bg-hover) !important;
                     border-color: var(--jp-approve-border-hover) !important;
                 }
-                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn .v-icon, .theme--light.v-btn.jp-approve-moved .v-icon,
-                .theme--light.v-btn.primary .v-icon, .theme--light.v-btn.warning .v-icon, .theme--light.v-btn.success .v-icon { color: var(--jp-approve-text) !important; }
 
-                /* Wymuszenie Rdzawego Approve */
-                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) {
-                    background-color: #9e360b !important; border: 1px solid #7a2806 !important; color: #ffffff !important;
-                }
+                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) { background-color: #9e360b !important; border: 1px solid #7a2806 !important; color: #ffffff !important; }
                 html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover { background-color: #7a2806 !important; }
-                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) {
-                    background-color: transparent !important; color: #9e360b !important; border: 1px solid #9e360b !important;
-                }
-                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover {
-                    background-color: rgba(158, 54, 11, 0.15) !important;
-                }
+                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) { background-color: transparent !important; color: #9e360b !important; border: 1px solid #9e360b !important; }
+                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover { background-color: rgba(158, 54, 11, 0.15) !important; }
 
-                /* Data i Czas (Pickery) */
-                .theme--light .v-picker__body, .theme--light .v-date-picker-header, .theme--light .v-date-picker-table { background-color: #2b2d31 !important; color: #dbdee1 !important; }
+                /* Data i Czas */
+                .theme--light .v-picker__body, .theme--light .v-date-picker-header, .theme--light .v-date-picker-table { background-color: #2b2d31 !important; color: var(--jp-text) !important; }
                 .theme--light .v-date-picker-table th { color: #949ba4 !important; }
-                .theme--light .v-date-picker-table .v-btn { background-color: transparent !important; border: none !important; color: #dbdee1 !important; }
+                .theme--light .v-date-picker-table .v-btn { background-color: transparent !important; border: none !important; color: var(--jp-text) !important; }
                 .theme--light .v-date-picker-table .v-btn:hover { background-color: #404249 !important; }
                 .theme--light .v-time-picker-clock { background-color: #2b2d31 !important; }
                 .theme--light .v-time-picker-clock__inner { background-color: #1e1f22 !important; }
-                .theme--light .v-time-picker-clock__item span { color: #dbdee1 !important; }
+                .theme--light .v-time-picker-clock__item span { color: var(--jp-text) !important; }
                 .theme--light .v-time-picker-clock__item--active span { color: #ffffff !important; }
 
-                /* Alerty, Tła Peppera i Teksty systemowe */
+                /* Alerty i Tła Peppera */
                 .grey.lighten-5, .grey.lighten-4, .white, .theme--light.grey.lighten-4, .theme--light.grey.lighten-5 {
-                    background-color: #313338 !important; color: #dbdee1 !important; border-color: #1e1f22 !important;
+                    background-color: #313338 !important; color: var(--jp-text) !important; border-color: #1e1f22 !important;
                 }
                 .theme--light.v-icon { color: #949ba4 !important; }
-                .theme--light .v-chip { background-color: #404249 !important; color: #dbdee1 !important; }
-                .black--text { color: #dbdee1 !important; }
+
+                /* Pomarańczowe ikony Vuetify -> zgaszony pomarańcz */
+                .theme--light.v-icon.orange--text { color: #d84315 !important; }
+
+                .theme--light .v-chip { background-color: #404249 !important; color: var(--jp-text) !important; }
+                .black--text { color: var(--jp-text) !important; }
                 .grey--text, .grey--text.text--darken-1, .grey--text.text--darken-2, .grey--text.text--darken-3, .grey--text.text--darken-4, .grey--text.text-lighten--1 { color: #949ba4 !important; }
 
-                /* Kolory statusów */
                 .theme--light .green--text { color: #81c784 !important; }
                 .theme--light .red--text { color: #e57373 !important; }
                 .theme--light .orange--text { color: #ffb74d !important; }
@@ -486,35 +508,54 @@
                 .blue.lighten-5 { background-color: #1a233a !important; color: #90caf9 !important; }
                 .yellow.lighten-4 { background-color: #423600 !important; color: #ffeb3b !important; }
 
-                /* Stopka Edycji / Zablokowania */
                 .theme--light.v-footer { background-color: #2b2d31 !important; border-top: 1px solid #404249 !important; }
                 .theme--light.v-footer .red, .theme--light.v-footer hr.red { background-color: rgba(180, 50, 50, 0.25) !important; border-color: rgba(180, 50, 50, 0.4) !important; }
                 .theme--light.v-footer .red .white--text, .theme--light.v-footer .red .v-icon.white--text { color: #e8a5a5 !important; }
                 .theme--light.v-footer hr.thick.red { height: 1px !important; background-color: rgba(180, 50, 50, 0.5) !important; border: none !important; }
+                .theme--light.v-footer .blue, .theme--light.v-footer .primary { background-color: #0d47a1 !important; border-color: #0d47a1 !important; }
 
-                /* Inne dodatki V2 */
+                .theme--light .accent--text, .theme--light .v-input--switch__track.accent--text { color: #d84315 !important; }
+                .theme--light .v-input--switch__thumb.accent--text { color: #d84315 !important; background-color: #d84315 !important; }
+                .v-image div.primary.white--text { background-color: #d84315 !important; color: #ffffff !important; }
                 .theme--light.v-card.jp-card-edited { background-color: rgba(178, 92, 0, 0.15) !important; border: 2px solid #b25c00 !important; }
-                .flex.width--p100.pos-absolute.pos--bottom-left.primary.caption.py-2.white--text.font-weight-medium { background: rgba(25, 25, 28, 0.82) !important; color: #d7d9dc !important; backdrop-filter: blur(4px); border-top: 1px solid rgba(255,255,255,0.06); }
-                .v-btn:hover .flex.width--p100.pos-absolute.pos--bottom-left.primary.caption.py-2.white--text.font-weight-medium { background: rgba(35, 35, 40, 0.9) !important; }
-                .theme--light.v-input--switch .v-input--switch__track.accent--text { background-color: var(--jp-switch-track) !important; opacity: 1 !important; }
-                .theme--light.v-input--switch .v-input--switch__thumb.accent--text { background-color: var(--jp-switch-thumb) !important; border: 1px solid var(--jp-switch-thumb-border) !important; }
-                .theme--light.v-input--switch .v-input--selection-controls__ripple.accent--text::before { background-color: var(--jp-switch-ripple) !important; }
-                .theme--light.v-input--switch .v-input--switch__track { background-color: var(--jp-switch-track-off) !important; }
-                .theme--light.v-input--switch .v-input--switch__thumb { background-color: var(--jp-switch-thumb-off) !important; }
-
 
                 /* -----------------------------------------
                    B. STARY PANEL ADMINA (V1 - Angular/Ace)
                    ----------------------------------------- */
                 body.ng-scope, .main-container, .page-content, .card, .card-header, .card-body, .bg--light {
-                    background-color: #1e1f22 !important; color: #dbdee1 !important; border-color: #383a40 !important;
+                    background-color: #1e1f22 !important; color: var(--jp-text) !important; border-color: #383a40 !important;
                 }
                 .navbar.navbar-pepper .navbar-inner { background: #1e1f22 !important; border-bottom: 1px solid #383a40 !important; box-shadow: none !important; }
                 .navbar.navbar-pepper .brand { color: #d84315 !important; text-shadow: none !important; }
-                .nav-search-input { background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; }
+
+                /* POLA TEKSTOWE V1 (Tylko dolne podkreślenie, przezroczyste tło) */
+                .nav-search-input, #ban_reason_input, .peps-admin-profile-links + .border-top .ds-form input[type="checkbox"] + .lbl::before, textarea, select, input[type="text"] {
+                    background-color: transparent !important;
+                    color: var(--jp-text) !important;
+                    border: none !important;
+                    border-bottom: 1px solid #5c5f66 !important;
+                    border-radius: 0 !important;
+                    box-shadow: none !important;
+                    transition: border-color 0.3s;
+                }
+                .nav-search-input:focus, #ban_reason_input:focus, textarea:focus, select:focus, input[type="text"]:focus {
+                    border-bottom: 1px solid #d84315 !important; /* Subtelniejsze, jednopikselowe podkreślenie */
+                    outline: none !important;
+                }
+
+                /* Ostrzeżenie User created last 48H */
+                p[style*="border: 3px solid red"] {
+                    border: none !important;
+                    border-left: 4px solid #d32f2f !important;
+                    background-color: #4a1c1c !important;
+                    color: #ff8a80 !important;
+                    padding: 6px 10px !important;
+                    border-radius: 4px;
+                    font-weight: 500 !important;
+                }
 
                 .sidebar { background-color: #1e1f22 !important; border-right: 1px solid #383a40 !important; }
-                .nav-list > li > a { background-color: #1e1f22 !important; color: #dbdee1 !important; border-color: #383a40 !important; text-shadow: none !important; }
+                .nav-list > li > a { background-color: #1e1f22 !important; color: var(--jp-text) !important; border-color: #383a40 !important; text-shadow: none !important; }
                 .nav-list > li > a:hover { background-color: #2b2d31 !important; }
                 .nav-list > li.active > a, .nav-list > li.active > a:focus { background-color: #313338 !important; color: #d84315 !important; }
                 .nav-list > li > .submenu { background-color: #1e1f22 !important; border-color: #383a40 !important; }
@@ -523,10 +564,6 @@
                 .text-gray, .text-gray-darker, .text-mute, .muted { color: #949ba4 !important; }
                 .text-bold, .text-medium { color: #ffffff !important; }
 
-                #ban_reason_input, .peps-admin-profile-links + .border-top .ds-form input[type="checkbox"] + .lbl::before, textarea, select {
-                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important;
-                }
-
                 .nav-tabs { border-bottom: 1px solid #383a40 !important; }
                 .nav-tabs > li > a { background-color: #1e1f22 !important; border: 1px solid #383a40 !important; color: #949ba4 !important; }
                 .nav-tabs > li.active > a, .nav-tabs > li.active > a:hover {
@@ -534,7 +571,7 @@
                 }
 
                 .btn.btn-light, .btn-round, .id-copy-button, .uuidtrack-button {
-                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; background-image: none !important; text-shadow: none !important;
+                    background-color: #313338 !important; color: var(--jp-text) !important; border: 1px solid #404249 !important; background-image: none !important; text-shadow: none !important;
                 }
                 .btn.btn-light:hover, .btn-round:hover, .id-copy-button:hover, .uuidtrack-button:hover { background-color: #404249 !important; }
                 .btn-danger { background-color: #a71b1c !important; border-color: #a71b1c !important; color: #fff !important; background-image: none !important; text-shadow: none !important; }
@@ -546,16 +583,16 @@
                 div[style*="border: 2px solid red"] span[style*="color:red"] { color: #ff8a80 !important; }
 
                 /* Tabele i Paginacja V1 */
-                .tab-content, .tab-content > div { background-color: #1e1f22 !important; color: #dbdee1 !important; }
-                .table { background-color: #1e1f22 !important; color: #dbdee1 !important; border: 1px solid #383a40 !important; }
-                .table th, .table td { border-top: 1px solid #383a40 !important; background-color: #1e1f22 !important; color: #dbdee1 !important; }
+                .tab-content, .tab-content > div { background-color: #1e1f22 !important; color: var(--jp-text) !important; }
+                .table { background-color: #1e1f22 !important; color: var(--jp-text) !important; border: 1px solid #383a40 !important; }
+                .table th, .table td { border-top: 1px solid #383a40 !important; background-color: #1e1f22 !important; color: var(--jp-text) !important; }
                 .table-striped tbody > tr:nth-child(odd) > td, .table-striped tbody > tr:nth-child(odd) > th { background-color: #2b2d31 !important; }
                 .table tbody tr.expired > td, .table tbody tr.deleted > td { background-color: #313338 !important; opacity: 0.6; }
                 .table tbody tr.moderated > td { background-color: rgba(92, 21, 21, 0.4) !important; }
 
                 .pagination ul { box-shadow: none !important; }
                 .pagination ul > li > a, .pagination ul > li > span {
-                    background-color: #313338 !important; color: #dbdee1 !important; border-color: #404249 !important; text-shadow: none !important;
+                    background-color: #313338 !important; color: var(--jp-text) !important; border-color: #404249 !important; text-shadow: none !important;
                 }
                 .pagination ul > li > a:hover, .pagination ul > li > span:hover { background-color: #404249 !important; color: #ffffff !important; }
                 .pagination ul > li.active > a, .pagination ul > li.active > span {
@@ -567,16 +604,47 @@
 
                 .ds-pagination, ds-pagination, ds-pagination > div { background-color: #1e1f22 !important; border-color: #383a40 !important; }
                 .ds-pagination-pageSizeLabel { color: #949ba4 !important; font-weight: 500 !important; }
-                .ds-pagination input[type="text"], .ds-pagination select.ds-select {
-                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; box-shadow: none !important;
-                }
-                .ds-pagination input[type="text"]:focus, .ds-pagination select.ds-select:focus { border-color: #bd3a11 !important; }
 
-                .form-search input, .ds-select, select.inline { background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; }
                 .form-search .icon-search, .form-search .icon-spinner { color: #949ba4 !important; }
                 .table .btn-primary { background-color: #1a233a !important; border-color: #2a3b5c !important; color: #64b5f6 !important; background-image: none !important; }
                 .table .btn-primary:hover { background-color: #23304c !important; }
                 .table td p.red { color: #e57373 !important; }
+
+                /* =========================================
+                   Slidery, Config
+                   ========================================= */
+
+                /* Pasek (slider) podkreślający aktywną zakładkę */
+                .theme--light .v-tabs__slider.orange,
+                .v-tabs__slider.orange {
+                    background-color: #d84315 !important;
+                    border-color: #d84315 !important;
+                }
+
+                .theme--light a.link[href*="/admin/inspector/users/"],
+                .theme--light a.link[href*="/admin/inspector/ips"] {
+                    color: #d84315 !important;
+                    text-decoration: none !important;
+                }
+
+                .theme--light a.link[href*="/admin/inspector/users/"]:hover,
+                .theme--light a.link[href*="/admin/inspector/ips"]:hover {
+                    color: #bf360c !important;
+                }
+
+                .theme--light a.link[href*="/admin/inspector/users/"] i.orange--text,
+                .theme--light a.link[href*="/admin/inspector/ips"] i.orange--text {
+                    color: inherit !important;
+                }
+
+                /* Wymuszenie przesunięcia przycisku Config w prawo (o 100px) */
+                #open_peppermod_config {
+                    left: 157px !important;
+                }
+
+                span[style*="color:red"], span[style*="color: red"] {
+                    color: #e57373 !important; /* Łagodny, pastelowy czerwony */
+                }
             `;
         }
 
@@ -588,10 +656,13 @@
     function openSettings() {
         const modalHtml = `
             <div class="modal-overlay" id="modal-overlay"></div>
-            <div id="jalapeno-settings-modal">
-                <h3 style="margin-top:0">${t('titleSettings')}</h3>
+            <div id="jalapeno-settings-modal" style="max-height: 90vh; overflow-y: auto;">
+                <h2 style="margin-top:0; margin-bottom: 25px; text-align: center; color: var(--jp-link);">${t('titleSettings')}</h2>
 
-                <div class="settings-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <h4 style="margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
+                    ${t('secAppearance')}
+                </h4>
+                <div class="settings-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px 20px;">
                     <div>
                         <label>${t('optTheme')}</label>
                         <select id="set-theme" style="width:100%">
@@ -606,90 +677,117 @@
                             <option value="en" ${settings.language === 'en' ? 'selected' : ''}>English (EN)</option>
                         </select>
                     </div>
-                </div>
-                <hr style="border: 1px solid var(--jp-border); margin: 15px 0;">
-
-                <div class="settings-row">
-                    <label>${t('activeModules')}</label>
-                    <div style="font-size: 12px; display: flex; gap: 15px; flex-wrap: wrap;">
-                        <label style="font-weight:normal"><input type="checkbox" id="set-fakepromo" ${settings.enableFakePromo ? 'checked' : ''}> ${t('mFakePromo')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-calc" ${settings.enableCalculator ? 'checked' : ''}> ${t('mCalc')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-hist" ${settings.enableHistory ? 'checked' : ''}> ${t('mHist')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-meta" ${settings.enableMetaInfo ? 'checked' : ''}> ${t('mMeta')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-fallback" ${settings.enableKeywordFallback ? 'checked' : ''}> ${t('mFall')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-auto-amazon" ${settings.enableAutoAmazonShipping ? 'checked' : ''}> ${t('mAutoAmz')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-auto-local" ${settings.enableAutoLocalStore ? 'checked' : ''}> ${t('mAutoLoc')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
-                        <label style="font-weight:normal"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
+                    <div>
+                        <label>${t('lblFontColor')}</label>
+                        <select id="set-dark-text-color" style="width:100%">
+                            <option value="#dbdee1" ${settings.darkTextColor === '#dbdee1' ? 'selected' : ''}>${t('fontColorDefault')}</option>
+                            <option value="#ffffff" ${settings.darkTextColor === '#ffffff' ? 'selected' : ''}>${t('fontColorWhite')}</option>
+                            <option value="#949ba4" ${settings.darkTextColor === '#949ba4' ? 'selected' : ''}>${t('fontColorGray')}</option>
+                            <option value="#b2dfdb" ${settings.darkTextColor === '#b2dfdb' ? 'selected' : ''}>${t('fontColorBlue')}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>${t('lblFontSize')}</label>
+                        <select id="set-font-size" style="width:100%">
+                            <option value="12px" ${settings.fontSize === '12px' ? 'selected' : ''}>${t('fontVerySmall')}</option>
+                            <option value="13px" ${settings.fontSize === '13px' ? 'selected' : ''}>${t('fontSmall')}</option>
+                            <option value="default" ${!settings.fontSize || settings.fontSize === 'default' ? 'selected' : ''}>${t('fontDefault')}</option>
+                            <option value="15px" ${settings.fontSize === '15px' ? 'selected' : ''}>${t('fontLarge')}</option>
+                            <option value="16px" ${settings.fontSize === '16px' ? 'selected' : ''}>${t('fontVeryLarge')}</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="settings-row" style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: end;">
+                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
+                    ${t('secModules')}
+                </h4>
+                <div class="settings-row">
+                    <div style="font-size: 13px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-fakepromo" ${settings.enableFakePromo ? 'checked' : ''}> ${t('mFakePromo')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-calc" ${settings.enableCalculator ? 'checked' : ''}> ${t('mCalc')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hist" ${settings.enableHistory ? 'checked' : ''}> ${t('mHist')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-meta" ${settings.enableMetaInfo ? 'checked' : ''}> ${t('mMeta')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-fallback" ${settings.enableKeywordFallback ? 'checked' : ''}> ${t('mFall')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-amazon" ${settings.enableAutoAmazonShipping ? 'checked' : ''}> ${t('mAutoAmz')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-local" ${settings.enableAutoLocalStore ? 'checked' : ''}> ${t('mAutoLoc')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
+                    </div>
+                </div>
+
+                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
+                    ${t('secConfig')}
+                </h4>
+
+                <div class="settings-row" style="width: 50%;">
+                    <label>${t('defCurrency')}</label>
+                    <select id="set-currency" style="width:100%">
+                        <option value="EUR" ${settings.defaultCurrency === 'EUR' ? 'selected' : ''}>EUR</option>
+                        <option value="USD" ${settings.defaultCurrency === 'USD' ? 'selected' : ''}>USD</option>
+                        <option value="GBP" ${settings.defaultCurrency === 'GBP' ? 'selected' : ''}>GBP</option>
+                    </select>
+                </div>
+
+                <div class="settings-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: end; margin-top: 15px;">
                     <div>
                         <label>${t('lblFloatingText')}</label>
                         <input type="text" id="set-floating-text" value="${settings.customFloatingText}" placeholder="np.  | Smart! Okazja" style="width:100%">
                     </div>
                     <div>
-                        <label style="font-weight:normal; display:flex; align-items:center; gap:5px; height: 35px; margin-bottom: 2px;">
+                        <label style="font-weight:normal; display:flex; align-items:center; gap:5px; height: 35px; margin-bottom: 2px; cursor:pointer;">
                             <input type="checkbox" id="set-floating-freedel" ${settings.floatingButtonAutoFreeDelivery ? 'checked' : ''}> ${t('lblFloatingFreeDel')}
                         </label>
                     </div>
                 </div>
 
-                <div class="settings-row settings-row-special">
-                    <label>${t('histPers')}</label>
-                    <div style="font-size: 11px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;">
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-status" ${settings.histShowStatus ? 'checked' : ''}> ${t('hStatus')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-price" ${settings.histShowPrice ? 'checked' : ''}> ${t('hPrice')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-temp" ${settings.histShowTemp ? 'checked' : ''}> ${t('hTemp')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-merchant" ${settings.histShowMerchant ? 'checked' : ''}> ${t('hMerch')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-category" ${settings.histShowCategory ? 'checked' : ''}> ${t('hCat')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-date" ${settings.histShowDate ? 'checked' : ''}> ${t('hDate')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-author" ${settings.histShowAuthor ? 'checked' : ''}> ${t('hAuth')}</label>
-                        <label><input type="checkbox" class="hist-toggle" id="set-h-copy" ${settings.histShowCopy ? 'checked' : ''}> ${t('hCopy')}</label>
-                    </div>
-                    <div class="preview-box">
-                        <strong>${t('livePreview')}</strong>
-                        <ul style="margin: 5px 0 0 15px; padding: 0; list-style: none;">
-                            <li id="history-preview-item" style="line-height: 1.6;"></li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="settings-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <label>${t('defCurrency')}</label>
-                        <select id="set-currency" style="width:100%">
-                            <option value="EUR" ${settings.defaultCurrency === 'EUR' ? 'selected' : ''}>EUR</option>
-                            <option value="USD" ${settings.defaultCurrency === 'USD' ? 'selected' : ''}>USD</option>
-                            <option value="GBP" ${settings.defaultCurrency === 'GBP' ? 'selected' : ''}>GBP</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>${t('histCount')}</label>
-                        <input type="number" id="set-history-count" value="${settings.historyCount}" min="1" max="10" style="width:100%">
-                    </div>
-                </div>
-
-                <div class="settings-row">
+                <div class="settings-row" style="margin-top: 15px;">
                     <label>${t('stopWords')}</label>
-                    <textarea id="set-stopwords" placeholder="e.g. fryer, cheap, now">${settings.customStopWords}</textarea>
+                    <textarea id="set-stopwords" style="width: 100%; min-height: 50px;" placeholder="np. fryer, cheap, now">${settings.customStopWords}</textarea>
                 </div>
 
-                <div class="settings-row">
+                <div class="settings-row" style="margin-top: 15px;">
                     <label>${t('hideBtns')}</label>
-                    <div style="font-size: 11px; display: grid; grid-template-columns: repeat(4, 1fr);">
+                    <div style="font-size: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 5px;">
                         ${['Ceneo', 'Keepa', 'GG.deals', 'PerfumeHub', 'LubimyCzytać', 'UpolujEbooka', 'Promoklocki', 'DekuDeals'].map(btn => `
-                            <label style="font-weight:normal">
+                            <label style="font-weight:normal; cursor:pointer;">
                                 <input type="checkbox" class="hide-btn-check" value="${btn}" ${settings.hiddenButtons.includes(btn) ? 'checked' : ''}> ${btn}
                             </label>
                         `).join('')}
                     </div>
                 </div>
 
-                <div class="settings-actions">
+                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
+                    ${t('secHistory')}
+                </h4>
+
+                <div class="settings-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <label style="margin: 0;">${t('histCount')}</label>
+                    <input type="number" id="set-history-count" value="${settings.historyCount}" min="1" max="10" style="width: 80px;">
+                </div>
+
+                <div class="settings-row settings-row-special">
+                    <label style="margin-bottom: 10px; display: block;">${t('histPers')}</label>
+                    <div style="font-size: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px;">
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-status" ${settings.histShowStatus ? 'checked' : ''}> ${t('hStatus')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-price" ${settings.histShowPrice ? 'checked' : ''}> ${t('hPrice')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-temp" ${settings.histShowTemp ? 'checked' : ''}> ${t('hTemp')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-merchant" ${settings.histShowMerchant ? 'checked' : ''}> ${t('hMerch')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-category" ${settings.histShowCategory ? 'checked' : ''}> ${t('hCat')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-date" ${settings.histShowDate ? 'checked' : ''}> ${t('hDate')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-author" ${settings.histShowAuthor ? 'checked' : ''}> ${t('hAuth')}</label>
+                        <label style="cursor:pointer;"><input type="checkbox" class="hist-toggle" id="set-h-copy" ${settings.histShowCopy ? 'checked' : ''}> ${t('hCopy')}</label>
+                    </div>
+                    <div class="preview-box">
+                        <strong>${t('livePreview')}</strong>
+                        <ul style="margin: 8px 0 0 15px; padding: 0; list-style: none;">
+                            <li id="history-preview-item" style="line-height: 1.6;"></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="settings-actions" style="margin-top: 25px;">
                     <button class="btn-cancel" id="btn-close-settings">${t('btnCancel')}</button>
                     <button class="btn-save" id="btn-save-settings">${t('btnSave')}</button>
                 </div>
@@ -702,7 +800,7 @@
             let pStatus = document.getElementById('set-h-status').checked ? `<span style="background: var(--jp-stat-exp-bg); color: var(--jp-stat-exp-co); padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: bold; margin-right: 5px; border: 1px solid var(--jp-stat-exp-bo);">${t('statExpired')}</span>` : '';
             let pTitle = `<a href="#" onclick="return false;" style="color: var(--jp-link); text-decoration:none; font-weight: 500;">Najlepsze Jalapeño ever...</a>`;
             let pPrice = document.getElementById('set-h-price').checked ? `<b style="margin-left:5px; color:var(--jp-input-text);">2137,00 zł</b>` : '';
-            let pTemp = document.getElementById('set-h-temp').checked ? `<span style="color: var(--jp-temp-hot); font-weight:bold; margin-left:5px;">[576°]</span>` : '';
+            let pTemp = document.getElementById('set-h-temp').checked ? `<span style="color: var(--jp-temp-hot); font-weight:bold; margin-left:5px;">[420°]</span>` : '';
             let pCopy = document.getElementById('set-h-copy').checked ? `<span style="cursor:pointer; font-size:12px; margin-left:8px;">📋</span>` : '';
 
             let pCat = document.getElementById('set-h-category').checked ? `${t('lblCat')} Elektronika` : '';
@@ -724,6 +822,10 @@
             saveSettings({
                 theme: document.getElementById('set-theme').value,
                 language: document.getElementById('set-lang').value,
+
+                darkTextColor: document.getElementById('set-dark-text-color').value,
+                fontSize: document.getElementById('set-font-size').value,
+
                 defaultCurrency: document.getElementById('set-currency').value,
                 historyCount: parseInt(document.getElementById('set-history-count').value),
                 customStopWords: document.getElementById('set-stopwords').value,
@@ -749,7 +851,6 @@
                 customFloatingText: document.getElementById('set-floating-text').value,
                 floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked,
                 enableMoveApproveBtn: document.getElementById('set-move-approve').checked
-                //enableAutoInfractionNote: document.getElementById('set-infrac-note').checked
             });
         };
 
@@ -769,11 +870,19 @@
             margin: 10px 0; background: var(--jp-bg); padding: 15px; border-radius: 6px; border: 1px solid var(--jp-border);
             display: flex; justify-content: space-between; gap: 20px; align-items: stretch; color: var(--jp-text);
         }
+
         .fake-promo-btn {
-            background-color: var(--jp-fake-btn-bg); color: white; border: none; padding: 6px 12px;
-            cursor: pointer; font-size: 12px; border-radius: 4px; font-weight: bold;
+            background-color: var(--jp-fake-btn-bg);
+            color: var(--jp-fake-btn-text);
+            border: 1px solid var(--jp-fake-btn-border);
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+            font-weight: bold;
         }
         .fake-promo-btn:hover { background-color: var(--jp-fake-btn-hover); }
+
         .mod-left-col { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 280px; }
         .mod-right-col { flex-grow: 1; border-left: 1px dashed var(--jp-border); padding-left: 20px; }
         .mod-links-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -795,10 +904,11 @@
         .mod-conv-btn-v2:hover { background-color: var(--jp-btn-hover); }
         .mod-settings-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 5px; line-height: 1; transition: transform 0.2s; }
         .mod-settings-btn:hover { transform: rotate(45deg); }
+
         #jalapeno-settings-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
             background: var(--jp-modal-bg); border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            z-index: 10000; width: 1000px; padding: 20px; font-family: sans-serif; color: var(--jp-text);
+            z-index: 10000; width: 1200px; padding: 20px; font-family: sans-serif; color: var(--jp-text);
         }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--jp-modal-overlay); z-index: 9999; }
         .settings-row { margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
