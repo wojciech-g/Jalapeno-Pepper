@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Jalapeño - PepperModPL add-on
+// @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.6.4
-// @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Light/Dark Mode + PL/EN + Poprawki moderacyjne
+// @version      4.6.7
+// @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
@@ -52,9 +52,9 @@
         enableAutoHoldNote: true,
         enableMessageTemplates: true,
         enableFloatingButton: true,
-        customFloatingText: ' - Spersonalizuj mnie!',
+        customFloatingText: ' - Spersonalizuj mnie w ustawieniach!',
         floatingButtonAutoFreeDelivery: false,
-        enableMoveApproveBtn: true
+        enableMoveApproveBtn: false
         //enableAutoInfractionNote: true
     };
 
@@ -206,28 +206,42 @@
         location.reload();
     }
 
+
     function injectThemeCSS() {
         const isDark = settings.theme === 'dark';
-        const cssVars = `
+
+        // =========================================
+        // 1. ZMIENNE CSS (:root)
+        // Wartości zmieniają się automatycznie (Jasny/Ciemny)
+        // =========================================
+        let css = `
             :root {
-                --jp-bg: ${isDark ? '#262626' : '#f9f9f9'};
-                --jp-border: ${isDark ? '#444' : '#e0e0e0'};
-                --jp-text: ${isDark ? '#ddd' : '#333'};
-                --jp-text-muted: ${isDark ? '#aaa' : '#777'};
-                --jp-btn-bg: ${isDark ? '#333' : '#fff'};
-                --jp-btn-border: ${isDark ? '#555' : '#ccc'};
-                --jp-btn-hover: ${isDark ? '#444' : '#e6e6e6'};
-                --jp-modal-bg: ${isDark ? '#2a2a2a' : '#fff'};
-                --jp-modal-overlay: ${isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)'};
-                --jp-row-bg: ${isDark ? '#1f2a33' : '#f0f8ff'};
-                --jp-row-border: ${isDark ? '#2e4354' : '#b3d4ff'};
-                --jp-preview-bg: ${isDark ? '#222' : '#fff'};
-                --jp-input-bg: ${isDark ? '#333' : '#fff'};
-                --jp-input-text: ${isDark ? '#fff' : '#000'};
+                --jp-bg: ${isDark ? '#2b2d31' : '#f9f9f9'};
+                --jp-border: ${isDark ? '#404249' : '#e0e0e0'};
+                --jp-text: ${isDark ? '#dbdee1' : '#333'};
+                --jp-text-muted: ${isDark ? '#949ba4' : '#777'};
+
+                --jp-btn-bg: ${isDark ? '#383a40' : '#fff'};
+                --jp-btn-border: ${isDark ? '#5c5f66' : '#ccc'};
+                --jp-btn-hover: ${isDark ? '#404249' : '#e6e6e6'};
+
+                --jp-modal-bg: ${isDark ? '#2b2d31' : '#fff'};
+                --jp-modal-overlay: ${isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)'};
+
+                --jp-row-bg: ${isDark ? '#1e1f22' : '#f0f8ff'};
+                --jp-row-border: ${isDark ? '#383a40' : '#b3d4ff'};
+
+                --jp-preview-bg: ${isDark ? '#1e1f22' : '#fff'};
+
+                --jp-input-bg: ${isDark ? '#313338' : '#fff'};
+                --jp-input-text: ${isDark ? '#dbdee1' : '#000'};
+
                 --jp-link: ${isDark ? '#4fc3f7' : '#03a9f4'};
-                --jp-fake-btn-bg: ${isDark ? '#e65100' : '#ff9800'};
-                --jp-fake-btn-hover: ${isDark ? '#ef6c00' : '#e68a00'};
+
+                --jp-fake-btn-bg: ${isDark ? '#8c3a00' : '#ff9800'};
+                --jp-fake-btn-hover: ${isDark ? '#a64500' : '#e68a00'};
                 --jp-fake-alert-bg: ${isDark ? '#d32f2f' : '#ff4d4d'};
+
                 --jp-temp-hot: ${isDark ? '#ef5350' : '#ff5252'};
                 --jp-temp-cold: ${isDark ? '#4fc3f7' : '#03a9f4'};
 
@@ -235,102 +249,340 @@
                 --jp-stat-act-co: ${isDark ? '#81c784' : '#2e7d32'};
                 --jp-stat-act-bo: ${isDark ? '#2e5c36' : '#a5d6a7'};
 
-                --jp-stat-exp-bg: ${isDark ? '#333' : '#eeeeee'};
-                --jp-stat-exp-co: ${isDark ? '#bbb' : '#616161'};
-                --jp-stat-exp-bo: ${isDark ? '#555' : '#e0e0e0'};
+                --jp-stat-exp-bg: ${isDark ? '#313338' : '#eeeeee'};
+                --jp-stat-exp-co: ${isDark ? '#949ba4' : '#616161'};
+                --jp-stat-exp-bo: ${isDark ? '#404249' : '#e0e0e0'};
 
                 --jp-stat-del-bg: ${isDark ? '#4a1c1c' : '#ffebee'};
                 --jp-stat-del-co: ${isDark ? '#e57373' : '#c62828'};
                 --jp-stat-del-bo: ${isDark ? '#732a2a' : '#ef9a9a'};
 
-                /* Zmienne dla Asystenta Wysyłki */
                 --jp-alert-field-bg: ${isDark ? '#423600' : '#fff9c4'};
                 --jp-alert-field-co: ${isDark ? '#ffeb3b' : '#333'};
 
-                /* Przyciski szablonów wiadomości */
-                --jp-template-btn-bg: ${isDark ? '#1a233a' : '#e3f2fd'};
-                --jp-template-btn-hover: ${isDark ? '#23304c' : '#bbdefb'};
-                --jp-template-btn-border: ${isDark ? '#2a3b5c' : '#90caf9'};
+                --jp-template-btn-bg: ${isDark ? '#1e1f22' : '#e3f2fd'};
+                --jp-template-btn-hover: ${isDark ? '#383a40' : '#bbdefb'};
+                --jp-template-btn-border: ${isDark ? '#404249' : '#90caf9'};
+
+                --jp-approve-bg: ${isDark ? '#383a40' : '#ff9800'};
+                --jp-approve-bg-hover: ${isDark ? '#404249' : '#e68a00'};
+                --jp-approve-border: ${isDark ? '#5c5f66' : '#e68a00'};
+                --jp-approve-border-hover: ${isDark ? '#6b6f78' : '#cc7a00'};
+                --jp-approve-text: ${isDark ? '#dbdee1' : '#fff'};
+
+                --jp-switch-track: ${isDark ? 'rgba(201, 106, 26, 0.45)' : 'rgba(255, 152, 0, 0.45)'};
+                --jp-switch-thumb: ${isDark ? '#c96a1a' : '#ff9800'};
+                --jp-switch-thumb-border: ${isDark ? '#a65412' : '#e68a00'};
+                --jp-switch-ripple: ${isDark ? 'rgba(201, 106, 26, 0.18)' : 'rgba(255, 152, 0, 0.18)'};
+                --jp-switch-track-off: ${isDark ? '#4a4d55' : '#bdbdbd'};
+                --jp-switch-thumb-off: ${isDark ? '#8b8f98' : '#fafafa'};
             }
+
+            /* =========================================
+               2. WSPÓLNE STYLE KOMPONENTÓW JALAPENO
+               Zawsze dodawane, dopasowują się zmiennymi
+               ========================================= */
 
             .jp-shipping-alert {
                 border: 2px dashed #ff5252 !important;
                 box-shadow: 0 0 5px rgba(255, 82, 82, 0.3) !important;
                 transition: all 0.3s ease;
             }
-
             .jp-shipping-alert::placeholder {
-                ccolor: #ff5252 !important;
-                opacity: 0.8 !important;
-                font-weight: 500 !important;
+                color: #ff5252 !important; opacity: 0.8 !important; font-weight: 500 !important;
             }
 
             .jp-template-btn {
-                background-color: var(--jp-template-btn-bg);
-                color: var(--jp-text);
+                background-color: var(--jp-template-btn-bg); color: var(--jp-text);
                 border: 1px solid var(--jp-template-btn-border);
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 11px;
-                cursor: pointer;
-                font-weight: 500;
-                transition: background-color 0.2s;
-                white-space: nowrap;
+                padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;
+                font-weight: 500; transition: background-color 0.2s; white-space: nowrap;
             }
-            .jp-template-btn:hover {
-                background-color: var(--jp-template-btn-hover);
-            }
-            .jp-templates-container {
-                display: flex;
-                gap: 8px;
-                margin-top: 10px;
-                flex-wrap: wrap;
-            }
+            .jp-template-btn:hover { background-color: var(--jp-template-btn-hover); }
+            .jp-templates-container { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
             .mod-floating-btn {
-                position: absolute;
-                top: 50%;
-                right: -18px;
-                transform: translateY(-50%);
-                background-color: var(--jp-btn-bg);
-                color: var(--jp-link);
-                border: 2px solid var(--jp-border);
-                border-radius: 50%;
-                width: 36px;
-                height: 36px;
-                font-size: 16px;
-                cursor: pointer;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                z-index: 100;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.2s;
+                position: absolute; top: -15px; left: -15px;
+                background-color: var(--jp-btn-bg); color: var(--jp-link);
+                border: 2px solid var(--jp-border); border-radius: 50%;
+                width: 36px; height: 36px; font-size: 16px; cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 100;
+                display: flex; align-items: center; justify-content: center; transition: all 0.2s;
             }
             .mod-floating-btn:hover {
-                background-color: var(--jp-link);
-                color: white;
-                border-color: var(--jp-link);
-                transform: translateY(-50%) scale(1.1);
+                background-color: var(--jp-link); color: #fff;
+                border-color: var(--jp-link); transform: scale(1.1);
             }
 
-            .jp-relative-container {
-                position: relative !important;
-            }
+            .jp-relative-container { position: relative !important; }
             .jp-approve-moved {
-                position: absolute !important;
-                left: 55px !important;    /* Ustawia skrajnie z lewej */
-                top: -45px !important;    /* Wyciąga ponad kontener */
-                z-index: 100 !important;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
+                position: absolute !important; left: 55px !important; top: -45px !important;
+                z-index: 100 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
                 transition: transform 0.2s ease !important;
             }
-            .jp-approve-moved:hover {
-                transform: scale(1.05) !important;
+            .jp-approve-moved:hover { transform: scale(1.05) !important; }
+
+            #shopinfo {
+                text-align: center !important; padding: 15px !important; margin: 10px 0 !important;
+                background-color: var(--jp-bg) !important; color: var(--jp-text) !important;
+                border: 1px solid var(--jp-border) !important; border-radius: 8px !important;
+                font-family: sans-serif !important;
+            }
+            #shopinfo img {
+                display: block !important; margin: 10px auto 0 auto !important; width: 25% !important;
+                filter: ${isDark ? 'invert(1) hue-rotate(180deg)' : 'none'} !important;
             }
         `;
-        GM_addStyle(cssVars);
+
+        // =========================================
+        // 3. NADPISYWANIE STYLÓW PEPPERA (TYLKO DARK MODE)
+        // =========================================
+        if (isDark) {
+            css += `
+                /* -----------------------------------------
+                   A. NOWY PANEL MODERACJI (V2 - Vuetify)
+                   ----------------------------------------- */
+
+                /* Layout bazowy i kontenery */
+                body, .v-application, .v-content, .v-content__wrap, .theme--light.v-application, .grey.lighten-3 {
+                    background-color: #1e1f22 !important; color: #dbdee1 !important;
+                }
+                .theme--light.v-card, .theme--light.v-sheet, .theme--light.v-list,
+                .theme--light.v-navigation-drawer, .theme--light.v-menu__content,
+                .theme--light.v-tabs-items, .theme--light.v-tabs,
+                .theme--light.v-expansion-panel, .theme--light.v-footer {
+                    background-color: #2b2d31 !important; color: #dbdee1 !important; border-color: #1e1f22 !important;
+                }
+                .theme--light.v-expansion-panel .v-expansion-panel__container { background-color: #2b2d31 !important; color: #dbdee1 !important; }
+                .theme--light.v-expansion-panel .v-expansion-panel__header { color: #dbdee1 !important; }
+
+                /* Tabulatory (Tabs) */
+                .theme--light .v-tabs__bar { background-color: #1e1f22 !important; }
+                .theme--light .v-tabs__item { color: #949ba4 !important; }
+                .theme--light .v-tabs__item--active { color: #ff9800 !important; }
+                .theme--light .v-tabs__item--active, .theme--light .v-tabs__item--active .v-icon { color: #9e360b !important; }
+
+                /* Edytory i Narzędzia */
+                .redactor-box, .redactor-editor, .ce-block__content, .codex-editor__redactor {
+                    background-color: #1e1f22 !important; color: #dbdee1 !important; border: 1px solid #383a40 !important;
+                }
+                .theme--light.v-toolbar { background-color: #1e1f22 !important; color: #dbdee1 !important; }
+
+                /* Tabele V2 */
+                .theme--light.v-data-table, .theme--light.v-data-table .v-data-table__wrapper table {
+                    background-color: #2b2d31 !important; color: #dbdee1 !important;
+                }
+                .theme--light.v-data-table tbody tr:hover:not(.v-data-table__expanded__content) { background-color: #313338 !important; }
+                .theme--light.v-divider, .theme--light .v-divider { border-color: #383a40 !important; }
+
+                /* Inputy i Pola Tekstowe */
+                .theme--light.v-text-field > .v-input__control > .v-input__slot,
+                .theme--light.v-text-field--solo > .v-input__control > .v-input__slot {
+                    background-color: #313338 !important; border: 1px solid #404249 !important; box-shadow: none !important; color: #dbdee1 !important;
+                }
+                .theme--light.v-input input, .theme--light.v-input textarea { color: #dbdee1 !important; }
+                .theme--light.v-input input::placeholder, .theme--light.v-input textarea::placeholder, ::-webkit-input-placeholder {
+                    color: #949ba4 !important; opacity: 1 !important;
+                }
+                .theme--light.v-label { color: #949ba4 !important; }
+
+                /* Kalkulator walut Jalapeno (ujednolicony) */
+                #pepper-mod-converter-wrapper > div.rounded-medium {
+                    background-color: #313338 !important; border: 1px solid #404249 !important;
+                }
+                #pepper-mod-converter-wrapper > div.rounded-medium > div:last-child {
+                    background-color: #2b2d31 !important; border-left: 1px solid #404249 !important;
+                }
+                #mod-conv-amount, #mod-conv-from { color: #dbdee1 !important; }
+                #pepper-mod-converter-wrapper .mod-conv-btn-v2 {
+                    background-color: #383a40 !important; color: #dbdee1 !important; border: 1px solid #5c5f66 !important;
+                }
+                #pepper-mod-converter-wrapper .mod-conv-btn-v2:hover { background-color: #404249 !important; }
+
+                /* Select (Dropdown) */
+                .theme--light .v-select__selection, .theme--light .v-select__selection--comma,
+                .theme--light .v-select__selections, .theme--light .v-select__selections input { color: #dbdee1 !important; }
+                .theme--light .v-select__selections .v-select__selection--disabled { color: #949ba4 !important; }
+                .theme--light .v-select .v-input__append-inner .v-icon { color: #949ba4 !important; }
+                .theme--light .v-menu__content .v-list, .theme--light .v-menu__content .v-select-list { background-color: #2b2d31 !important; }
+                .theme--light .v-menu__content .v-list__tile__title, .theme--light .v-menu__content .v-list-item__title { color: #dbdee1 !important; }
+                .theme--light .v-menu__content .v-list__tile:hover, .theme--light .v-menu__content .v-list-item:hover { background-color: #383a40 !important; }
+                .theme--light .v-menu__content .v-list__tile--active, .theme--light .v-menu__content .v-list-item--active { background-color: #404249 !important; color: #c96a1a !important; }
+
+                /* -----------------------------------------
+                   PRZYCISKI V2 (Buttons)
+                   ----------------------------------------- */
+                .theme--light.v-btn { color: #dbdee1 !important; }
+                .theme--light.v-btn.v-btn--outline { border-color: #5c5f66 !important; background-color: transparent !important; }
+                .theme--light.v-btn.v-btn--outline:hover, .theme--light.v-btn.v-btn--flat:hover, .theme--light.v-btn.v-btn--icon:hover {
+                    background-color: rgba(255,255,255,0.08) !important;
+                }
+                .theme--light.v-btn:not(.v-btn--flat):not(.v-btn--outline):not(.v-btn--icon) { background-color: #383a40 !important; }
+                .theme--light.v-btn:not(.v-btn--flat):not(.v-btn--outline):not(.v-btn--icon):hover { background-color: #404249 !important; }
+                .theme--light.v-btn.v-btn--disabled { opacity: 0.5 !important; }
+
+                /* Główne Przyciski V2 (np. Save / Approve - Sterowane z :root) */
+                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled),
+                .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled),
+                .theme--light.v-btn.primary:not(.v-btn--disabled),
+                .theme--light.v-btn.warning:not(.v-btn--disabled),
+                .theme--light.v-btn.success:not(.v-btn--disabled) {
+                    background: var(--jp-approve-bg) !important; background-color: var(--jp-approve-bg) !important;
+                    border: 1px solid var(--jp-approve-border) !important; color: var(--jp-approve-text) !important; box-shadow: none !important;
+                }
+                .theme--light.v-btn.primary::before, .theme--light.v-btn.warning::before, .theme--light.v-btn.success::before,
+                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn::before, .theme--light.v-btn.jp-approve-moved::before { background-color: transparent !important; }
+                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover,
+                .theme--light.v-btn.jp-approve-moved:not(.v-btn--disabled):hover,
+                .theme--light.v-btn.primary:not(.v-btn--disabled):hover,
+                .theme--light.v-btn.warning:not(.v-btn--disabled):hover,
+                .theme--light.v-btn.success:not(.v-btn--disabled):hover {
+                    background: var(--jp-approve-bg-hover) !important; background-color: var(--jp-approve-bg-hover) !important;
+                    border-color: var(--jp-approve-border-hover) !important;
+                }
+                .theme--light.v-btn.cept-thread-moderation-acknowledge-btn .v-icon, .theme--light.v-btn.jp-approve-moved .v-icon,
+                .theme--light.v-btn.primary .v-icon, .theme--light.v-btn.warning .v-icon, .theme--light.v-btn.success .v-icon { color: var(--jp-approve-text) !important; }
+
+                /* Wymuszenie Rdzawego Approve */
+                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) {
+                    background-color: #9e360b !important; border: 1px solid #7a2806 !important; color: #ffffff !important;
+                }
+                html body .v-application .theme--light.v-btn.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover { background-color: #7a2806 !important; }
+                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled) {
+                    background-color: transparent !important; color: #9e360b !important; border: 1px solid #9e360b !important;
+                }
+                html body .v-application .theme--light.v-btn.v-btn--outline.cept-thread-moderation-acknowledge-btn:not(.v-btn--disabled):hover {
+                    background-color: rgba(158, 54, 11, 0.15) !important;
+                }
+
+                /* Data i Czas (Pickery) */
+                .theme--light .v-picker__body, .theme--light .v-date-picker-header, .theme--light .v-date-picker-table { background-color: #2b2d31 !important; color: #dbdee1 !important; }
+                .theme--light .v-date-picker-table th { color: #949ba4 !important; }
+                .theme--light .v-date-picker-table .v-btn { background-color: transparent !important; border: none !important; color: #dbdee1 !important; }
+                .theme--light .v-date-picker-table .v-btn:hover { background-color: #404249 !important; }
+                .theme--light .v-time-picker-clock { background-color: #2b2d31 !important; }
+                .theme--light .v-time-picker-clock__inner { background-color: #1e1f22 !important; }
+                .theme--light .v-time-picker-clock__item span { color: #dbdee1 !important; }
+                .theme--light .v-time-picker-clock__item--active span { color: #ffffff !important; }
+
+                /* Alerty, Tła Peppera i Teksty systemowe */
+                .grey.lighten-5, .grey.lighten-4, .white, .theme--light.grey.lighten-4, .theme--light.grey.lighten-5 {
+                    background-color: #313338 !important; color: #dbdee1 !important; border-color: #1e1f22 !important;
+                }
+                .theme--light.v-icon { color: #949ba4 !important; }
+                .theme--light .v-chip { background-color: #404249 !important; color: #dbdee1 !important; }
+                .black--text { color: #dbdee1 !important; }
+                .grey--text, .grey--text.text--darken-1, .grey--text.text--darken-2, .grey--text.text--darken-3, .grey--text.text--darken-4, .grey--text.text-lighten--1 { color: #949ba4 !important; }
+
+                /* Kolory statusów */
+                .theme--light .green--text { color: #81c784 !important; }
+                .theme--light .red--text { color: #e57373 !important; }
+                .theme--light .orange--text { color: #ffb74d !important; }
+                .theme--light .blue--text { color: #64b5f6 !important; }
+
+                .red.lighten-5 { background-color: #4a1c1c !important; color: #ff8a80 !important; }
+                .orange.lighten-5, .orange.lighten-4 { background-color: #4a3311 !important; color: #ffb74d !important; }
+                .green.lighten-5 { background-color: #1b3320 !important; color: #81c784 !important; }
+                .blue.lighten-5 { background-color: #1a233a !important; color: #90caf9 !important; }
+                .yellow.lighten-4 { background-color: #423600 !important; color: #ffeb3b !important; }
+
+                /* Stopka Edycji / Zablokowania */
+                .theme--light.v-footer { background-color: #2b2d31 !important; border-top: 1px solid #404249 !important; }
+                .theme--light.v-footer .red, .theme--light.v-footer hr.red { background-color: rgba(180, 50, 50, 0.25) !important; border-color: rgba(180, 50, 50, 0.4) !important; }
+                .theme--light.v-footer .red .white--text, .theme--light.v-footer .red .v-icon.white--text { color: #e8a5a5 !important; }
+                .theme--light.v-footer hr.thick.red { height: 1px !important; background-color: rgba(180, 50, 50, 0.5) !important; border: none !important; }
+
+                /* Inne dodatki V2 */
+                .theme--light.v-card.jp-card-edited { background-color: rgba(178, 92, 0, 0.15) !important; border: 2px solid #b25c00 !important; }
+                .flex.width--p100.pos-absolute.pos--bottom-left.primary.caption.py-2.white--text.font-weight-medium { background: rgba(25, 25, 28, 0.82) !important; color: #d7d9dc !important; backdrop-filter: blur(4px); border-top: 1px solid rgba(255,255,255,0.06); }
+                .v-btn:hover .flex.width--p100.pos-absolute.pos--bottom-left.primary.caption.py-2.white--text.font-weight-medium { background: rgba(35, 35, 40, 0.9) !important; }
+                .theme--light.v-input--switch .v-input--switch__track.accent--text { background-color: var(--jp-switch-track) !important; opacity: 1 !important; }
+                .theme--light.v-input--switch .v-input--switch__thumb.accent--text { background-color: var(--jp-switch-thumb) !important; border: 1px solid var(--jp-switch-thumb-border) !important; }
+                .theme--light.v-input--switch .v-input--selection-controls__ripple.accent--text::before { background-color: var(--jp-switch-ripple) !important; }
+                .theme--light.v-input--switch .v-input--switch__track { background-color: var(--jp-switch-track-off) !important; }
+                .theme--light.v-input--switch .v-input--switch__thumb { background-color: var(--jp-switch-thumb-off) !important; }
+
+
+                /* -----------------------------------------
+                   B. STARY PANEL ADMINA (V1 - Angular/Ace)
+                   ----------------------------------------- */
+                body.ng-scope, .main-container, .page-content, .card, .card-header, .card-body, .bg--light {
+                    background-color: #1e1f22 !important; color: #dbdee1 !important; border-color: #383a40 !important;
+                }
+                .navbar.navbar-pepper .navbar-inner { background: #1e1f22 !important; border-bottom: 1px solid #383a40 !important; box-shadow: none !important; }
+                .navbar.navbar-pepper .brand { color: #d84315 !important; text-shadow: none !important; }
+                .nav-search-input { background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; }
+
+                .sidebar { background-color: #1e1f22 !important; border-right: 1px solid #383a40 !important; }
+                .nav-list > li > a { background-color: #1e1f22 !important; color: #dbdee1 !important; border-color: #383a40 !important; text-shadow: none !important; }
+                .nav-list > li > a:hover { background-color: #2b2d31 !important; }
+                .nav-list > li.active > a, .nav-list > li.active > a:focus { background-color: #313338 !important; color: #d84315 !important; }
+                .nav-list > li > .submenu { background-color: #1e1f22 !important; border-color: #383a40 !important; }
+
+                .border-bottom, .border-top, .border-all, .no-border-bottom { border-color: #383a40 !important; }
+                .text-gray, .text-gray-darker, .text-mute, .muted { color: #949ba4 !important; }
+                .text-bold, .text-medium { color: #ffffff !important; }
+
+                #ban_reason_input, .peps-admin-profile-links + .border-top .ds-form input[type="checkbox"] + .lbl::before, textarea, select {
+                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important;
+                }
+
+                .nav-tabs { border-bottom: 1px solid #383a40 !important; }
+                .nav-tabs > li > a { background-color: #1e1f22 !important; border: 1px solid #383a40 !important; color: #949ba4 !important; }
+                .nav-tabs > li.active > a, .nav-tabs > li.active > a:hover {
+                    background-color: #2b2d31 !important; border-color: #383a40 !important; border-bottom-color: transparent !important; color: #d84315 !important;
+                }
+
+                .btn.btn-light, .btn-round, .id-copy-button, .uuidtrack-button {
+                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; background-image: none !important; text-shadow: none !important;
+                }
+                .btn.btn-light:hover, .btn-round:hover, .id-copy-button:hover, .uuidtrack-button:hover { background-color: #404249 !important; }
+                .btn-danger { background-color: #a71b1c !important; border-color: #a71b1c !important; color: #fff !important; background-image: none !important; text-shadow: none !important; }
+
+                .temperature-bar { background-color: #313338 !important; }
+                .temperature-bar .bar.hot { background-color: #ef5350 !important; }
+                .temperature-bar .bar.cold { background-color: #4fc3f7 !important; }
+                div[style*="border: 2px solid red"] { background-color: #4a1c1c !important; border-color: #d32f2f !important; color: #ff8a80 !important; }
+                div[style*="border: 2px solid red"] span[style*="color:red"] { color: #ff8a80 !important; }
+
+                /* Tabele i Paginacja V1 */
+                .tab-content, .tab-content > div { background-color: #1e1f22 !important; color: #dbdee1 !important; }
+                .table { background-color: #1e1f22 !important; color: #dbdee1 !important; border: 1px solid #383a40 !important; }
+                .table th, .table td { border-top: 1px solid #383a40 !important; background-color: #1e1f22 !important; color: #dbdee1 !important; }
+                .table-striped tbody > tr:nth-child(odd) > td, .table-striped tbody > tr:nth-child(odd) > th { background-color: #2b2d31 !important; }
+                .table tbody tr.expired > td, .table tbody tr.deleted > td { background-color: #313338 !important; opacity: 0.6; }
+                .table tbody tr.moderated > td { background-color: rgba(92, 21, 21, 0.4) !important; }
+
+                .pagination ul { box-shadow: none !important; }
+                .pagination ul > li > a, .pagination ul > li > span {
+                    background-color: #313338 !important; color: #dbdee1 !important; border-color: #404249 !important; text-shadow: none !important;
+                }
+                .pagination ul > li > a:hover, .pagination ul > li > span:hover { background-color: #404249 !important; color: #ffffff !important; }
+                .pagination ul > li.active > a, .pagination ul > li.active > span {
+                    background-color: #bd3a11 !important; color: #ffffff !important; border-color: #9e2e0b !important;
+                }
+                .pagination ul > li.disabled > span, .pagination ul > li.disabled > a, .pagination ul > li.disabled > a:hover {
+                    background-color: #1e1f22 !important; color: #5c5f66 !important; border-color: #383a40 !important; cursor: not-allowed !important;
+                }
+
+                .ds-pagination, ds-pagination, ds-pagination > div { background-color: #1e1f22 !important; border-color: #383a40 !important; }
+                .ds-pagination-pageSizeLabel { color: #949ba4 !important; font-weight: 500 !important; }
+                .ds-pagination input[type="text"], .ds-pagination select.ds-select {
+                    background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; box-shadow: none !important;
+                }
+                .ds-pagination input[type="text"]:focus, .ds-pagination select.ds-select:focus { border-color: #bd3a11 !important; }
+
+                .form-search input, .ds-select, select.inline { background-color: #313338 !important; color: #dbdee1 !important; border: 1px solid #404249 !important; }
+                .form-search .icon-search, .form-search .icon-spinner { color: #949ba4 !important; }
+                .table .btn-primary { background-color: #1a233a !important; border-color: #2a3b5c !important; color: #64b5f6 !important; background-image: none !important; }
+                .table .btn-primary:hover { background-color: #23304c !important; }
+                .table td p.red { color: #e57373 !important; }
+            `;
+        }
+
+        GM_addStyle(css);
     }
+
     injectThemeCSS();
 
     function openSettings() {
@@ -1682,16 +1934,6 @@
                     }
                 }
 
-                // Allegro
-                /*
-                if (settings.enableAutoAmazonShipping && linkToCheck.includes('allegro.pl') && !window.jpUserEditedShipping) {
-                    let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
-                    if (shipInput && shipInput.value.trim() === "") {
-                        highlightShippingField("10,49");
-                    }
-                }
-                */
-
                 // Auto Markety
                 if (settings.enableAutoLocalStore) {
                     let titleStr = getCurrentTitle().toLowerCase();
@@ -1715,8 +1957,11 @@
                         { keys: ['topaz', 'topaz24'], url: 'https://topaz24.pl/', local: true },
                         { keys: ['Leroy Merlin'], url: 'https://www.leroymerlin.pl/', local: false },
                         { keys: ['Castorama'], url: 'https://www.castorama.pl/', local: false },
-                        { keys: ['Obi', 'OBI'], url: 'https://www.obi.pl/', local: false },
+                        { keys: ['Obi'], url: 'https://www.obi.pl/', local: false },
                         { keys: ['sinsay'], url: 'https://www.sinsay.com/pl/pl/', local: false },
+                        { keys: ['ikea'], url: 'https://www.ikea.com/pl/pl/', local: false },
+                        { keys: ['zabka', 'żabka'], url: 'https://www.zabka.pl/', local: true },
+                        { keys: ['half price', 'halfprice'], url: 'https://www.halfprice.eu/en', local: true },
                     ];
 
                     matchedStore = marketDB.find(store => {
@@ -1852,36 +2097,6 @@
                             inputAmt.addEventListener('input', updateResult);
                             selFrom.addEventListener('change', updateResult);
                             updateResult();
-                            /*
-                            const triggerVueInput = async (element, value) => {
-                                if (!element) {
-                                    console.warn("❌ brak elementu");
-                                    return;
-                                }
-
-                                console.log("👉 Symuluję wpisywanie:", value);
-
-                                element.focus();
-
-                                element.value = '';
-                                element.dispatchEvent(new Event('input', { bubbles: true }));
-
-                                for (let char of value) {
-                                    element.value += char;
-
-                                    element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-                                    element.dispatchEvent(new Event('input', { bubbles: true }));
-                                    element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-
-                                    await new Promise(r => setTimeout(r, 10)); // mikro delay
-                                }
-
-                                element.dispatchEvent(new Event('change', { bubbles: true }));
-                                element.blur();
-
-                                console.log("✅ Final value:", element.value);
-                            };
-                            */
 
                             btnPrice.onclick = (e) => {
                                 e.preventDefault();
@@ -1979,6 +2194,17 @@
         }
     }
 
+    function highlightEditedCards() {
+        document.querySelectorAll('.v-card').forEach(card => {
+            let text = card.innerText.toLowerCase();
+            if (text.includes('currently edited by') || text.includes('edytowane przez') || text.includes('edytowany przez')) {
+                card.classList.add('jp-card-edited');
+            } else {
+                card.classList.remove('jp-card-edited');
+            }
+        });
+    }
+
     setInterval(() => {
         let titleInput = document.querySelector('input[placeholder="Thread title"]');
         let isAlreadyInjected = document.querySelector('.mod-tools-container');
@@ -1989,6 +2215,7 @@
         checkHoldNoteAutomator();
         checkMessageTemplates();
         moveNativeApproveBtn();
+        highlightEditedCards();
         //checkInfractionNoteAutomator();
 
     }, 300);
