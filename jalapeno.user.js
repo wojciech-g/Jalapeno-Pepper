@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.6.8
+// @version      4.6.9
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -644,6 +644,45 @@
 
                 span[style*="color:red"], span[style*="color: red"] {
                     color: #e57373 !important; /* Łagodny, pastelowy czerwony */
+                }
+
+                .theme--light .yellow.lighten-2.cept-highlighted-text {
+                    background-color: #5c1515 !important;
+                    color: #ff8a80 !important;
+                    padding: 0 2px;
+                    border-radius: 2px;
+                }
+
+                /* =========================================
+                   MODUŁ EDYCJI OBRAZKA (Image Editor)
+                   ========================================= */
+
+                /* 1. Usunięcie obramowania głównego kontenera */
+                .imageEditor.border-grey--dark {
+                    border: none !important;
+                }
+
+                /* 2. Usunięcie obramowania z przycisku otwierania obrazka */
+                .imageEditor .border-grey--dark {
+                    border: none !important;
+                }
+
+                /* 3. Ujednolicenie tła menu edytora */
+                .imageEditor-menu {
+                    background-color: #2b2d31 !important;
+                    border-left: 1px solid #383a40 !important;
+                }
+
+                /* 4. Opcjonalnie: Zgaszenie jaskrawego żółtego alertu o słabej jakości */
+                .imageEditor .orange.lighten-5 {
+                    background-color: #4a3311 !important;
+                    border: 1px solid #7d5a10 !important;
+                    color: #ffb74d !important;
+                }
+
+                /* 5. Usunięcie obramowania z przycisków (jakby ktoś chciał pełną czystość) */
+                .imageEditor .v-btn {
+                    border: none !important;
                 }
             `;
         }
