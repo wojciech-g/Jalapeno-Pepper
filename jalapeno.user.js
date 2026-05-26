@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.6.9
+// @version      4.7.0
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -683,6 +683,41 @@
                 /* 5. Usunięcie obramowania z przycisków (jakby ktoś chciał pełną czystość) */
                 .imageEditor .v-btn {
                     border: none !important;
+                }
+
+                /* =========================================
+                   MODAL BANOWANIA (Stary panel V1)
+                   ========================================= */
+                .modal-content, .modal-body, .modal-header, .modal-footer,
+                .modal-body > div, .form-horizontal {
+                    background-color: #2b2d31 !important;
+                    color: var(--jp-text) !important;
+                    border-color: #383a40 !important;
+                }
+                .modal-header, .modal-footer {
+                    border-bottom: 1px solid #383a40 !important;
+                    border-top: 1px solid #383a40 !important;
+                }
+                .modal-header .close {
+                    color: var(--jp-text) !important;
+                    text-shadow: none !important;
+                    opacity: 0.8 !important;
+                }
+                .modal-header .close:hover {
+                    opacity: 1 !important;
+                }
+
+                /* =========================================
+                   TREEVIEW (Drzewo Wyboru np. województw)
+                   ========================================= */
+                .theme--light .v-treeview-node__label {
+                    color: var(--jp-text) !important;
+                }
+                .theme--light .v-treeview-node__checkbox {
+                    color: #949ba4 !important;
+                }
+                .theme--light .v-treeview-node--active > .v-treeview-node__root .v-treeview-node__checkbox {
+                    color: #d84315 !important;
                 }
             `;
         }
@@ -2354,6 +2389,14 @@
         });
     }
 
+    function updateSaveButtonText() {
+        document.querySelectorAll('span.flex--inline.boxAlign-ai--all-c').forEach(span => {
+            if (span.innerText.trim() === 'Dodaj Okazję') {
+                span.innerText = 'Zapisz edycję';
+            }
+        });
+    }
+
     setInterval(() => {
         let titleInput = document.querySelector('input[placeholder="Thread title"]');
         let isAlreadyInjected = document.querySelector('.mod-tools-container');
@@ -2365,6 +2408,7 @@
         checkMessageTemplates();
         moveNativeApproveBtn();
         highlightEditedCards();
+        updateSaveButtonText();
         //checkInfractionNoteAutomator();
 
     }, 300);
