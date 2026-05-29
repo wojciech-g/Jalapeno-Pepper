@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.7.0
+// @version      4.7.3
 // @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -54,8 +54,8 @@
         enableFloatingButton: true,
         customFloatingText: ' - Spersonalizuj mnie w ustawieniach!',
         floatingButtonAutoFreeDelivery: false,
-        enableMoveApproveBtn: false
-        //enableAutoInfractionNote: true
+        enableMoveApproveBtn: false,
+        enableInfractionNote: true
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -785,6 +785,7 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-amazon" ${settings.enableAutoAmazonShipping ? 'checked' : ''}> ${t('mAutoAmz')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-local" ${settings.enableAutoLocalStore ? 'checked' : ''}> ${t('mAutoLoc')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hold-note" ${settings.enableAutoHoldNote ? 'checked' : ''}> ${t('mHoldNote')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-infraction-note" ${settings.enableInfractionNote ? 'checked' : ''}> ${t('mInfracNote')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
@@ -920,6 +921,7 @@
                 histShowAuthor: document.getElementById('set-h-author').checked,
                 histShowMerchant: document.getElementById('set-h-merchant').checked,
                 enableAutoHoldNote: document.getElementById('set-hold-note').checked,
+                enableInfractionNote: document.getElementById('set-infraction-note').checked,
                 enableMessageTemplates: document.getElementById('set-templates').checked,
                 enableFloatingButton: document.getElementById('set-floating-btn').checked,
                 customFloatingText: document.getElementById('set-floating-text').value,
@@ -1455,8 +1457,8 @@
                 e.preventDefault();
                 let currentText = userMsgTa.value;
 
-                let anchor = "następujące informacje:";
-                let tailAnchor = "Nie możemy się doczekać";
+                let anchor = "ponieważ brakuje w niej:";
+                let tailAnchor = "Możesz łatwo uzupełnić to";
 
                 let newToInsert = "- " + tpl.text;
                 let newText = currentText;
@@ -1508,27 +1510,30 @@
 
         if (text.includes("musimy potwierdzić rabat")) {
             extractedNote = "Potwierdzenie";
-        } else if (text.includes("Gdzie go widziałeś lub podać link do źródła")) {
+        } else if (text.includes("Gdzie go widziałeś lub podać link do źródła") || text.includes("potwierdzić źródło tej promocji")) {
             extractedNote = "Źródło";
-        } else if (text.includes("potrzebujemy przykładów okazyjnych produktów")) {
-            extractedNote = "Przykłady";
-        } else if (text.includes("lokalizację sklepu")) {
+        } else if (text.includes("potrzebujemy przykładów okazyjnych produktów") || text.includes("W opisie brakuje konkretnych przykładów")) {
+            extractedNote = "Przykłady produktów";
+        } else if (text.includes("lokalizację sklepu") || text.includes("W opisie brakuje nam tylko lokalizacji")) {
             extractedNote = "Lokalizacja";
-        } else if (text.includes("specyfikacje pojazdu")) {
+        } else if (text.includes("specyfikacje pojazdu") || text.includes("brakuje nam jeszcze potwierdzenia jego dostępności")) {
             extractedNote = "Pojazdy";
         }
-        else if (text.includes("następujące informacje:")) {
-            let parts = text.split("następujące informacje:");
+        else if (text.includes("ponieważ brakuje w niej:")) {
+            let parts = text.split("ponieważ brakuje w niej:");
             if (parts.length > 1) {
                 let customText = parts[1].split("Nie możemy się doczekać")[0];
-                customText = customText.split("Możesz dodać informacje")[0];
-                customText = customText.split("Uzupełnij okazję samodzielnie")[0];
+                customText = customText.split("Możesz łatwo uzupełnić to")[0];
+                //customText = customText.split("Uzupełnij okazję samodzielnie")[0];
                 customText = customText.trim();
 
                 if (customText.length > 0) {
                     extractedNote = customText.length > 270 ? customText.substring(0, 270) + "..." : customText;
                 }
             }
+        }
+        else if (text.includes("[TUTAJ WPISZ NIESTANDARDOWY OPIS")) {
+            extractedNote = "Niestandardowe wymaganie";
         }
 
         if (extractedNote && modNoteTa.dataset.jpLastAutoNote !== extractedNote) {
@@ -1546,75 +1551,82 @@
         }
     }
 
-/*
-    function getCleanNoteFromReason(reason) {
-        if (!reason) return "";
-        let r = reason.toLowerCase();
+    function getCleanNoteFromMessage(messageText) {
+        if (!messageText) return "";
+        let msg = messageText.toLowerCase();
 
-        if (r.includes("potraktowane jako spam")) return "Spam";
-        if (r.includes("potraktowane jako autopromocja")) return "Autopromocja";
-        if (r.includes("potraktowane jako obraźliwe zachowanie")) return "Obraźliwe zachowanie";
-        if (r.includes("zdublowałeś istniejącą okazję")) return "Dubel";
-        if (r.includes("zawiera niekompletne informacje")) return "Uzupełnienie informacji";
-        if (r.includes("oferty polecające/reflinki")) return "Oferty polecające / reflinki";
-        if (r.includes("treści powiązane z polityką")) return "Polityka";
-        if (r.includes("wyłącznie z Twoim kontem")) return "Decyzje moderacji";
-        if (r.includes("propozycję sprzedaży"))return "Sprzedaż / Wspólne zakupy / Wymiany / Rodzinka";
-        if (r.includes("Dotyczy to punktów mówiących")) return "Naruszenie regulaminu";
-        if (r.includes("niestandardowy")) return "Niestandardowe naruszenie:";
-*/
-//      let cleaned = reason.replace(/^(Okazja|Komentarz)\s*[-–]\s*/i, '').trim();
-/*
-        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        // Spam
+        if (msg.includes("zakwalifikowana przez nasz zespół jako spam") || msg.includes("potraktowane jako spam")) {
+            return "Spam";
+        }
+        // Autopromocja
+        if (msg.includes("zakwalifikowana przez nasz zespół jako autopromocja") || msg.includes("potraktowane jako autopromocja") || msg.includes("udostępniania własnych reflinków")) {
+            return "Autopromocja";
+        }
+        // Obraśliwe zachowanie
+        if (msg.includes("uznana przez nasz zespół za obraźliwą") || msg.includes("potraktowane jako obraźliwe zachowanie") || msg.includes("sformułowania uderzające")) {
+            return "Obraźliwe zachowanie";
+        }
+        // Dubel
+        if (msg.includes("zdublowałeś istniejącą okazję")) {
+            return "Dubel";
+        }
+        // Uzupełnienie informacji
+        if (msg.includes("zawiera niekompletne informacje") || msg.includes("brakuje w niej") || msg.includes("musimy potwierdzić")) {
+            return "Uzupełnienie informacji";
+        }
+        // Oferty polecające / reflinki
+        if (msg.includes("oferty polecające") || msg.includes("reflinki") || msg.includes("działań agencji marketingowych")) {
+            return "Oferty polecające / reflinki";
+        }
+        // Polityka
+        if (msg.includes("treści powiązane z polityką")) {
+            return "Polityka";
+        }
+        // Decyzje moderacji
+        if (msg.includes("wyłącznie z Twoim kontem")) {
+            return "Decyzje moderacji";
+        }
+        // Sprzedaż / Wspólne zakupy
+        if (msg.includes("propozycję sprzedaży")) {
+            return "Sprzedaż / Wspólne zakupy / Wymiany";
+        }
+        // Nadużycie funkcji
+        if (msg.includes("nadużywaniem przycisków") || msg.includes("ustawieniem nazwy użytkownika")) {
+            return "Nadużycie funkcji";
+        }
+        // Multikonto / Manipulacja głosów
+        if (msg.includes("związane z tworzeniem multikont") || msg.includes("niewłaściwym używaniem systemu ocen")) {
+            return "Multikonto / Manipulacja głosowaniem";
+        }
+
+        return "";
     }
 
     function checkInfractionNoteAutomator() {
         if (!settings.enableInfractionNote) return;
 
-        let reasonText = "";
         let noteInput = null;
-        let messageText = ""
+        let messageText = "";
 
         if (window.location.href.includes('/inspector/')) {
-            let angularSelect = document.querySelector('select#type, select[name="type"]');
-            if (angularSelect && angularSelect.selectedIndex > 0) {
-                reasonText = angularSelect.options[angularSelect.selectedIndex].textContent.trim();
-            }
             noteInput = document.querySelector('textarea#notes, textarea[name="notes"]');
 
             let textareas = Array.from(document.querySelectorAll('textarea'));
-            let msgTa = textareas.find(t => t.value.includes("Poprzez tę wiadomość"));
+            let msgTa = textareas.find(t => t.value.includes("Poprzez tę wiadomość") || t.value.includes("W związku z tym"));
             if (msgTa) messageText = msgTa.value;
         }
         else {
             let activeModal = document.querySelector('.v-dialog--active') || document.querySelector('[role="dialog"]');
             if (activeModal) {
-                let vuetifySelect = activeModal.querySelector('.v-select__selection');
-                if (vuetifySelect) reasonText = vuetifySelect.textContent.trim();
-
                 noteInput = document.querySelector('input[placeholder="Leave a note for moderators"]');
                 let msgTa = activeModal.querySelector('textarea[aria-label="Message for the user"]');
                 if (msgTa) messageText = msgTa.value;
             }
         }
 
-        if (reasonText && noteInput) {
-            let cleanNote = getCleanNoteFromReason(reasonText);
-
-            if (cleanNote === "Niestandardowe naruszenie" && messageText) {
-                let urlAnchor = "code-of-conduct";
-                let botAnchor = "Poprzez tę wiadomość";
-
-                if (messageText.includes(urlAnchor) && messageText.includes(botAnchor)) {
-                    let extracted = messageText.split(urlAnchor)[1].split(botAnchor)[0].trim();
-*/
-//                    extracted = extracted.replace(/\*\*\*Niestandardowy opis\*\*\*/g, '').trim();
-/*
-                    if (extracted.length > 0) {
-                        cleanNote = extracted.length > 150 ? extracted.substring(0, 150) + "..." : extracted;
-                    }
-                }
-            }
+        if (messageText && noteInput) {
+            let cleanNote = getCleanNoteFromMessage(messageText);
 
             if (cleanNote && noteInput.dataset.jpLastReason !== cleanNote) {
 
@@ -1633,7 +1645,6 @@
             }
         }
     }
-*/
 
     function checkInfractionModal() {
         if (window.location.href.includes('/inspector/')) return;
@@ -1651,23 +1662,30 @@
         let points = pointsInput ? (parseInt(pointsInput.value) || 0) : 0;
 
         let desiredLine = "Poprzez tę wiadomość otrzymujesz ";
+        let desiredLineNew = "W związku z tym na Twoje konto zostało nałożone oficjalne ";
+        let desiredLineSuffix = "";
+
         if (isWarning) {
             desiredLine += "ostrzeżenie.";
+            desiredLineSuffix = "ostrzeżenie.";
         } else if (points > 0) {
             desiredLine += `punkty karne (${points}).`;
+            desiredLineSuffix = `punkty karne (${points}).`;
         } else {
             desiredLine += "***ostrzeżenie / punkty karne:";
+            desiredLineSuffix = "***ostrzeżenie / punkty karne:";
         }
 
         // BEZPIECZNIK EDYCJI
         if (ta.dataset.jpLastDesiredLine === desiredLine) return;
 
         let currentLineMatch = val.match(/Poprzez tę wiadomość otrzymujesz .*/);
+        let currentLineNewMatch = val.match(/W związku z tym na Twoje konto zostało nałożone oficjalne .*/);
 
         if (currentLineMatch) {
             let currentLine = currentLineMatch[0];
 
-            if (!isWarning && points === 0 && val.includes("Zależy nam, aby zapewnić bezpieczeństwo")) {
+            if (!isWarning && points === 0 && (val.includes("Zależy nam, aby zapewnić bezpieczeństwo") || val.includes("Zależy nam na budowaniu bezpiecznej społeczności"))) {
                 ta.value = val.replace(currentLine + "\n\n", "").replace(currentLine, "");
                 ta.dispatchEvent(new Event('input', { bubbles: true }));
                 ta.dataset.jpLastDesiredLine = desiredLine;
@@ -1677,9 +1695,19 @@
                  ta.dispatchEvent(new Event('input', { bubbles: true }));
                  ta.dataset.jpLastDesiredLine = desiredLine;
             }
-        } else if (val.includes("Zależy nam, aby zapewnić bezpieczeństwo")) {
+        } else if (currentLineNewMatch) {
+            let currentLine = currentLineNewMatch[0];
+            let desiredLineNewFull = desiredLineNew + desiredLineSuffix;
+
+            if (currentLine !== desiredLineNewFull) {
+                ta.value = val.replace(currentLine, desiredLineNewFull);
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                ta.dataset.jpLastDesiredLine = desiredLine;
+            }
+        } else if (val.includes("Zależy nam, aby zapewnić bezpieczeństwo") || val.includes("Zależy nam na budowaniu bezpiecznej społeczności")) {
             if (isWarning || points > 0) {
-                ta.value = val.replace("Zależy nam, aby zapewnić bezpieczeństwo", desiredLine + "\n\nZależy nam, aby zapewnić bezpieczeństwo");
+                let oldPhrase = val.includes("Zależy nam, aby zapewnić bezpieczeństwo") ? "Zależy nam, aby zapewnić bezpieczeństwo" : "Zależy nam na budowaniu bezpiecznej społeczności";
+                ta.value = val.replace(oldPhrase, desiredLine + "\n\n" + oldPhrase);
                 ta.dispatchEvent(new Event('input', { bubbles: true }));
                 ta.dataset.jpLastDesiredLine = desiredLine;
             }
@@ -1692,7 +1720,7 @@
         if (!window.location.href.includes('/inspector/')) return;
 
         let textareas = Array.from(document.querySelectorAll('textarea'));
-        let ta = textareas.find(t => t.value.includes("Poprzez tę wiadomość otrzymujesz"));
+        let ta = textareas.find(t => t.value.includes("Poprzez tę wiadomość otrzymujesz") || t.value.includes("W związku z tym na Twoje konto zostało nałożone oficjalne"));
         if (!ta) return;
 
         let val = ta.value;
@@ -1704,21 +1732,37 @@
 
         let isWarning = (points === 0);
         let desiredLine = "Poprzez tę wiadomość otrzymujesz ";
+        let desiredLineNew = "W związku z tym na Twoje konto zostało nałożone oficjalne ";
+        let desiredLineSuffix = "";
+
         if (isWarning) {
             desiredLine += "ostrzeżenie.";
+            desiredLineSuffix = "ostrzeżenie.";
         } else {
             desiredLine += `punkty karne (${points}).`;
+            desiredLineSuffix = `punkty karne (${points}).`;
         }
 
         // BEZPIECZNIK EDYCJI
         if (ta.dataset.jpLastDesiredLine === desiredLine) return;
 
         let currentLineMatch = val.match(/Poprzez tę wiadomość otrzymujesz.*/);
+        let currentLineNewMatch = val.match(/W związku z tym na Twoje konto zostało nałożone oficjalne .*/);
+
         if (currentLineMatch) {
             let currentLine = currentLineMatch[0];
 
             if (currentLine !== desiredLine) {
                 ta.value = val.replace(currentLine, desiredLine);
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                ta.dataset.jpLastDesiredLine = desiredLine;
+            }
+        } else if (currentLineNewMatch) {
+            let currentLine = currentLineNewMatch[0];
+            let desiredLineNewFull = desiredLineNew + desiredLineSuffix;
+
+            if (currentLine !== desiredLineNewFull) {
+                ta.value = val.replace(currentLine, desiredLineNewFull);
                 ta.dispatchEvent(new Event('input', { bubbles: true }));
                 ta.dataset.jpLastDesiredLine = desiredLine;
             }
@@ -1898,6 +1942,7 @@
 
             if (typeof window.jpUserEditedShipping === 'undefined') {
                 window.jpUserEditedShipping = false;
+                window.jpAutoShippingSet = false;
 
                 document.body.addEventListener('input', (e) => {
                     if (e.isTrusted && e.target && e.target.tagName === 'INPUT' && e.target.placeholder === 'Shipping costs') {
@@ -1913,6 +1958,7 @@
                         let wrapper = e.target.closest('.v-input--selection-controls');
                         if (wrapper && wrapper.innerText.includes("Free Delivery")) {
                             window.jpUserEditedShipping = true;
+                            window.jpAutoShippingSet = false;
                             let coloredElements = Array.from(wrapper.querySelectorAll('*')).filter(x => x.style && x.style.backgroundColor);
                             coloredElements.forEach(el => {
                                 el.style.backgroundColor = "";
@@ -1982,21 +2028,25 @@
                 console.log("🚚 Auto shipping:", value);
 
                 input.focus();
-
                 input.value = '';
-                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
 
                 for (let char of value) {
                     input.value += char;
-
-                    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-
+                    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, composed: true }));
+                    input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, composed: true }));
                     await new Promise(r => setTimeout(r, 10));
                 }
 
-                input.dispatchEvent(new Event('change', { bubbles: true }));
+                // Trigger Vue reactivity with additional events
+                input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                input.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
+
+                // Wait for Vue to process changes
+                await new Promise(r => setTimeout(r, 50));
+
                 input.blur();
 
                 input.classList.remove('jp-shipping-alert');
@@ -2010,6 +2060,15 @@
             let checkAutomations = () => {
                 let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
                 if (!urlTextarea) return;
+
+                // Check if URL changed - reset shipping flags
+                if (!window.jpLastCheckedUrl) {
+                    window.jpLastCheckedUrl = urlTextarea.value;
+                } else if (window.jpLastCheckedUrl !== urlTextarea.value) {
+                    window.jpLastCheckedUrl = urlTextarea.value;
+                    window.jpUserEditedShipping = false;
+                    window.jpAutoShippingSet = false;
+                }
 
                 let highlightShippingField = (expectedValue) => {
                     let attempts = 0;
@@ -2063,6 +2122,9 @@
                                 shipInput.placeholder = "Shipping costs";
                             }
 
+                            // Reset shipping set flag for prices >= 65 so it can be set again if price drops
+                            window.jpAutoShippingSet = false;
+
                             if (!window.jpUserEditedShipping) {
                                 setVuetifyCheckbox("Free Delivery", true, true);
                             }
@@ -2085,11 +2147,12 @@
                             }
                             //test
                             //highlightShippingField("8,99");
-                            setTimeout(() => {
-                                if (!window.jpUserEditedShipping) {
+                            if (!window.jpUserEditedShipping && !window.jpAutoShippingSet) {
+                                window.jpAutoShippingSet = true;
+                                setTimeout(() => {
                                     setShippingCost("8,99");
-                                }
-                            }, 150);
+                                }, 150);
+                            }
                         }
                     }
                 }
@@ -2409,7 +2472,7 @@
         moveNativeApproveBtn();
         highlightEditedCards();
         updateSaveButtonText();
-        //checkInfractionNoteAutomator();
+        checkInfractionNoteAutomator();
 
     }, 300);
 
