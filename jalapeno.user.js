@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.7.3
-// @description  Baza Fake Promo + Przelicznik + Historia + Auto Kategorie + Pełny Light/Dark Mode + PL/EN + Poprawki moderacyjne
+// @version      4.7.7
+// @description  Skrypt optymalizujący pracę moderatorów z ponad 10 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
@@ -24,6 +24,8 @@
     'use strict';
 
     const API_URL = "https://script.google.com/macros/s/AKfycbxPY1KVfIZ-MdhBG_QPYhE-H8QsDCqIp2OkD9nBKU8-tGh8mF5OReV0KRVFMecUX0xUcQ/exec";
+    const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbxcxDkQHTdalafwyh2ffhjeIvJjjDIsOBHti0Uh5vuG6JKIvo3DtdUVUTPRf_mMInnl/exec";
+    const DEBUG = false; // Ustaw na true aby włączyć debugowanie
     let fakePromoDB = {};
     let exchangeRates = null;
 
@@ -55,7 +57,9 @@
         customFloatingText: ' - Spersonalizuj mnie w ustawieniach!',
         floatingButtonAutoFreeDelivery: false,
         enableMoveApproveBtn: false,
-        enableInfractionNote: true
+        enableInfractionNote: true,
+        enableMerchantNotes: true,
+        enableApproveReasons: true
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -142,7 +146,15 @@
             calcAdded: "✅ Dodano",
             lblStore: "🏪 Sklep:",
             lblTemp: "🌡️ Temp:",
-            lblCom: "💬 Kom:"
+            lblCom: "💬 Kom:",
+            lblMerchantNotes: "📝 Notatki - Merchant",
+            btnAddMerchantNote: "Dodaj notatkę",
+            btnRemoveMerchantNote: "🗑️ Usuń notatkę",
+            placeholderMerchantNote: "Dodaj notatkę dla tego merchanta...",
+            msgMerchantNoteSaved: "✅ Notatka zapisana i zsynchronizowana",
+            msgMerchantNoteDeleted: "✅ Notatka usunięta",
+            msgMerchantNoteError: "❌ Błąd synchronizacji notatki",
+            mApproveReasons: "Szablony A&M w oknie Approve (Uzupełniliśmy/zmieniliśmy)"
         },
         en: {
             titleSettings: "⚙️ Jalapeño Settings",
@@ -224,7 +236,15 @@
             calcAdded: "✅ Added",
             lblStore: "🏪 Store:",
             lblTemp: "🌡️ Temp:",
-            lblCom: "💬 Com:"
+            lblCom: "💬 Com:",
+            lblMerchantNotes: "📝 Merchant Notes",
+            btnAddMerchantNote: "Add note",
+            btnRemoveMerchantNote: "🗑️ Delete note",
+            placeholderMerchantNote: "Add a note for this merchant...",
+            msgMerchantNoteSaved: "✅ Note saved and synchronized",
+            msgMerchantNoteDeleted: "✅ Note deleted",
+            msgMerchantNoteError: "❌ Note synchronization error",
+            mApproveReasons: "A&M Templates in Approve modal"
         }
     };
 
@@ -239,11 +259,8 @@
 
     function injectThemeCSS() {
         const isDark = settings.theme === 'dark';
-
         const darkTextColor = settings.darkTextColor || '#dbdee1';
         const fontSize = settings.fontSize || 'default';
-
-        // Jeśli wybrano "default", nie generujemy reguły font-size. W przeciwnym razie nadpisujemy.
         const fontRule = fontSize !== 'default'
             ? `body, .v-application, .page-content, .card-body { font-size: ${fontSize} !important; }`
             : '';
@@ -360,6 +377,57 @@
             }
             #shopinfo img {
                 display: block !important; margin: 10px auto 0 auto !important; width: 25% !important; filter: ${isDark ? 'invert(1) hue-rotate(180deg)' : 'none'} !important;
+            }
+
+            /* MERCHANT NOTES STYLING */
+            .jp-merchant-notes-section {
+                transition: all 0.3s ease;
+            }
+            .jp-merchant-note-input:focus {
+                outline: none !important;
+                border-color: #ff9800 !important;
+                box-shadow: 0 0 4px rgba(255, 152, 0, 0.3) !important;
+            }
+            .jp-merchant-note-save:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
+            }
+            .jp-merchant-note-delete:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
+            }
+            .jp-merchant-note-display {
+                animation: slideIn 0.3s ease-out;
+            }
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            /* MERCHANT NOTES DELETE BUTTONS */
+            .jp-merchant-note-delete-single, .jp-merchant-note-delete-btn {
+                background-color: var(--jp-stat-del-bg) !important;
+                color: var(--jp-stat-del-co) !important;
+                border: 1px solid var(--jp-stat-del-bo) !important;
+                padding: 6px 12px !important;
+                border-radius: 4px !important;
+                cursor: pointer !important;
+                font-size: 16px !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 5px !important;
+            }
+            .jp-merchant-note-delete-single:hover, .jp-merchant-note-delete-btn:hover {
+                filter: brightness(0.9);
+                transform: scale(1.05) !important;
             }
         `;
 
@@ -789,6 +857,8 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-templates" ${settings.enableMessageTemplates ? 'checked' : ''}> ${t('mTemplates')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-merchant-notes" ${settings.enableMerchantNotes ? 'checked' : ''}> ${t('lblMerchantNotes')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-approve-reasons" ${settings.enableApproveReasons ? 'checked' : ''}> ${t('mApproveReasons')}</label>
                     </div>
                 </div>
 
@@ -926,7 +996,9 @@
                 enableFloatingButton: document.getElementById('set-floating-btn').checked,
                 customFloatingText: document.getElementById('set-floating-text').value,
                 floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked,
-                enableMoveApproveBtn: document.getElementById('set-move-approve').checked
+                enableMoveApproveBtn: document.getElementById('set-move-approve').checked,
+                enableMerchantNotes: document.getElementById('set-merchant-notes').checked,
+                enableApproveReasons: document.getElementById('set-approve-reasons').checked
             });
         };
 
@@ -1177,6 +1249,216 @@
                 showWarning(dbNote, dbPrice, currentPrice || "???", matchedPatternName);
             }
         }
+    }
+
+    // ===== MERCHANT NOTES SYSTEM =====
+    function getMerchantNotes() {
+        return GM_getValue('jalapenoMerchantNotes', {});
+    }
+
+    function getModeratorName() {
+        // 1. Sprawdź, czy mamy już poprawny nick zapisany (żeby nie skanować strony co chwilę)
+        let saved = localStorage.getItem('jalapenoModeratorName');
+        if (saved && saved !== 'keyboard_arrow_down' && saved !== 'Jalapeño User') {
+            return saved;
+        }
+
+        let username = null;
+
+        // 2. Szukamy w kodzie źródłowym strony omijając Sandbox Tampermonkey
+        let scripts = document.querySelectorAll('script');
+        for (let script of scripts) {
+            let content = script.textContent;
+            // Szukamy skryptu, w którym Pepper ładuje swój stan początkowy
+            if (content.includes('window.__INITIAL_STATE__') && content.includes('"username"')) {
+                // Wyciągamy zawartość klucza "username"
+                let match = content.match(/"username":"([^"]+)"/);
+                if (match && match[1]) {
+                    username = match[1];
+                    break;
+                }
+            }
+        }
+
+        // 3. Jeśli z jakiegoś powodu to zawiedzie, próbujemy przez unsafeWindow
+        if (!username && typeof unsafeWindow !== 'undefined' && unsafeWindow.__INITIAL_STATE__) {
+            try {
+                let stateStr = JSON.stringify(unsafeWindow.__INITIAL_STATE__);
+                let match = stateStr.match(/"username":"([^"]+)"/);
+                if (match && match[1]) username = match[1];
+            } catch (e) {
+                if (DEBUG) console.warn("Błąd unsafeWindow: ", e);
+            }
+        }
+
+        // Zapisujemy sukces w pamięci lokalnej
+        if (username && !username.includes('keyboard_arrow')) {
+            localStorage.setItem('jalapenoModeratorName', username);
+            return username;
+        }
+
+        // Ostateczność
+        return 'Jalapeño User';
+    }
+
+    function saveMerchantNote(merchantName, noteText, moderatorName = null) {
+        if (!merchantName || !noteText) return false;
+
+        let allNotes = getMerchantNotes();
+        let merchantKey = merchantName.toLowerCase();
+        let timestamp = new Date().toISOString();
+
+        // Wyciągamy nick prosto z "bebechów" Peppera
+        let moderator = moderatorName || getModeratorName();
+
+        // Inicjalizuj tablicę jeśli nie istnieje
+        if (!allNotes[merchantKey]) {
+            allNotes[merchantKey] = [];
+        }
+
+        // Dodaj nową notatkę
+        allNotes[merchantKey].push({
+            text: noteText,
+            savedAt: timestamp,
+            savedBy: moderator
+        });
+
+        GM_setValue('jalapenoMerchantNotes', allNotes);
+
+        // Send to API for synchronization
+        sendMerchantNotesToAPI(allNotes);
+
+        return true;
+    }
+
+    function deleteMerchantNote(merchantName, noteIndex) {
+        if (!merchantName) return false;
+
+        let allNotes = getMerchantNotes();
+        let merchantKey = merchantName.toLowerCase();
+
+        if (allNotes[merchantKey] && allNotes[merchantKey][noteIndex]) {
+            allNotes[merchantKey].splice(noteIndex, 1);
+
+            // Jeśli tablica jest pusta, usuń cały merchant
+            if (allNotes[merchantKey].length === 0) {
+                delete allNotes[merchantKey];
+            }
+        }
+
+        GM_setValue('jalapenoMerchantNotes', allNotes);
+        sendMerchantNotesToAPI(allNotes);
+
+        return true;
+    }
+
+    function getMerchantNotesList(merchantName) {
+        if (!merchantName) return [];
+
+        let allNotes = getMerchantNotes();
+        let merchantKey = merchantName.toLowerCase();
+
+        return allNotes[merchantKey] || [];
+    }
+
+    function sendMerchantNotesToAPI(notesObj) {
+        if (!MERCHANT_NOTES_API_URL) {
+            if (DEBUG) console.warn("⚠️ MERCHANT_NOTES_API_URL not configured");
+            return;
+        }
+
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: MERCHANT_NOTES_API_URL,
+            data: JSON.stringify({
+                action: 'saveMerchantNotes',
+                notes: notesObj
+            }),
+            headers: { "Content-Type": "application/json" },
+            onload: function(response) {
+                if (DEBUG) console.log("✅ Merchant notes synchronized");
+            },
+            onerror: function() {
+                if (DEBUG) console.warn("⚠️ Failed to sync merchant notes");
+            }
+        });
+    }
+
+    function fetchMerchantNotesFromAPI() {
+        if (!MERCHANT_NOTES_API_URL) {
+            if (DEBUG) console.warn("⚠️ MERCHANT_NOTES_API_URL not configured");
+            return;
+        }
+
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: MERCHANT_NOTES_API_URL,
+            data: JSON.stringify({
+                action: 'getMerchantNotes'
+            }),
+            headers: { "Content-Type": "application/json" },
+            onload: function(response) {
+                try {
+                    let data = JSON.parse(response.responseText);
+                    if (data && data.notes && typeof data.notes === 'object') {
+                        GM_setValue('jalapenoMerchantNotes', data.notes);
+                        if (DEBUG) console.log("✅ Merchant notes updated directly from API");
+                    }
+                } catch (e) {
+                    if (DEBUG) console.warn("⚠️ Error parsing merchant notes from API:", e);
+                }
+            },
+            onerror: function() {
+                if (DEBUG) console.warn("⚠️ Failed to fetch merchant notes from API");
+            }
+        });
+    }
+
+    function displayMerchantNote(merchantName, merchantElement = null) {
+        if (!settings.enableMerchantNotes || !merchantName) return;
+
+        let notesList = getMerchantNotesList(merchantName);
+        if (notesList.length === 0) return;
+
+        // Wyświetl ostatnią notatkę
+        let lastNote = notesList[notesList.length - 1];
+
+        // Use provided element or find it
+        let targetElement = merchantElement;
+        if (!targetElement) {
+            targetElement = Array.from(document.querySelectorAll('span, div, p')).find(el =>
+                el.innerText && el.innerText.includes(merchantName) && el.innerText.length < 100
+            );
+        }
+
+        if (!targetElement) return;
+
+        // Check if already displayed
+        if (targetElement.parentNode.querySelector('.jp-merchant-note-display')) return;
+
+        // Create note display
+        let noteBox = document.createElement('div');
+        noteBox.className = 'jp-merchant-note-display';
+        let lastIndex = notesList.length - 1;
+        let dateStr = new Date(lastNote.savedAt).toLocaleDateString('pl-PL');
+        noteBox.innerHTML = `
+            <div style="background-color: var(--jp-template-btn-bg); border-left: 3px solid #ff9800; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 12px;">
+                <div style="font-weight: 500; color: #ff9800; margin-bottom: 4px;"> ${t('lblMerchantNotes')}</div>
+                <div style="color: var(--jp-text); word-break: break-word; margin-bottom: 4px;">${lastNote.text}</div>
+                <div style="font-size: 10px; color: #bbb; margin-bottom: 4px;">${lastNote.savedBy} • ${dateStr}</div>
+                <button class="jp-merchant-note-delete-btn" data-index="${lastIndex}" title="Usuń notatkę">🗑️ ${t('btnRemoveMerchantNote')}</button>
+            </div>
+        `;
+
+        noteBox.querySelector('.jp-merchant-note-delete-btn').addEventListener('click', (e) => {
+            let index = parseInt(e.currentTarget.getAttribute('data-index'));
+            if (confirm('⚠️ Czy na pewno chcesz trwale usunąć tę notatkę?')) {
+                deleteMerchantNote(merchantName, index);
+                noteBox.remove();
+            }
+        });
+
+        targetElement.parentNode.insertBefore(noteBox, targetElement.nextSibling);
     }
 
     function fetchPepperHistory(query, containerNode, isFallback = false, originalTitle = "") {
@@ -1508,18 +1790,17 @@
 
         let extractedNote = "";
 
-        if (text.includes("musimy potwierdzić rabat")) {
+        if (text.includes("Weryfikacja bezpośrednio u źródła") || text.includes("potwierdzić źródło tej promocji")) {
+            extractedNote = "Żródło";
+        } else if (text.includes("Dodanie zdjęcia produktu") || text.includes("dostępności dla każdego klienta oraz opcji zakupu online")) {
             extractedNote = "Potwierdzenie";
-        } else if (text.includes("Gdzie go widziałeś lub podać link do źródła") || text.includes("potwierdzić źródło tej promocji")) {
-            extractedNote = "Źródło";
-        } else if (text.includes("potrzebujemy przykładów okazyjnych produktów") || text.includes("W opisie brakuje konkretnych przykładów")) {
+        } else if (text.includes("potrzebujemy przykładów okazyjnych produktów") || text.includes("brakuje konkretnych przykładów przecenionych produktów")) {
             extractedNote = "Przykłady produktów";
         } else if (text.includes("lokalizację sklepu") || text.includes("W opisie brakuje nam tylko lokalizacji")) {
             extractedNote = "Lokalizacja";
-        } else if (text.includes("specyfikacje pojazdu") || text.includes("brakuje nam jeszcze potwierdzenia jego dostępności")) {
+        } else if (text.includes("specyfikacje pojazdu") || text.includes("jego dostępności dla każdego klienta oraz opcji zakupu online.")) {
             extractedNote = "Pojazdy";
-        }
-        else if (text.includes("ponieważ brakuje w niej:")) {
+        } else if (text.includes("ponieważ brakuje w niej:")) {
             let parts = text.split("ponieważ brakuje w niej:");
             if (parts.length > 1) {
                 let customText = parts[1].split("Nie możemy się doczekać")[0];
@@ -1563,9 +1844,21 @@
         if (msg.includes("zakwalifikowana przez nasz zespół jako autopromocja") || msg.includes("potraktowane jako autopromocja") || msg.includes("udostępniania własnych reflinków")) {
             return "Autopromocja";
         }
-        // Obraśliwe zachowanie
+        // Obraxliwe zachowanie
         if (msg.includes("uznana przez nasz zespół za obraźliwą") || msg.includes("potraktowane jako obraźliwe zachowanie") || msg.includes("sformułowania uderzające")) {
             return "Obraźliwe zachowanie";
+        }
+        // Naruszenie regulaminu
+        if (msg.includes("podszycie się pod inną osobę, tworzeniu multikont") || msg.includes("nieuzasadnione zgłaszanie i wygaszanie treści jest u nas niedozwolone.")) {
+            return "Naruszenie regulaminu";
+        }
+        // Niestandardowe naruszenie
+        if (msg.includes("NIESTANDARDOWY OPIS")) {
+            return "Niestandardowe naruszenie: ";
+        }
+        // Multikonta / manipulacja systemem ocen
+        if (msg.includes("tworzeniem multikont lub niewłaściwym używaniem systemu ocen") || msg.includes("zależy nam na sprawiedliwych i naturalnych ocenach")) {
+            return "Multikonta / manipulacja systemem ocen";
         }
         // Dubel
         if (msg.includes("zdublowałeś istniejącą okazję")) {
@@ -1596,8 +1889,12 @@
             return "Nadużycie funkcji";
         }
         // Multikonto / Manipulacja głosów
-        if (msg.includes("związane z tworzeniem multikont") || msg.includes("niewłaściwym używaniem systemu ocen")) {
-            return "Multikonto / Manipulacja głosowaniem";
+        if (msg.includes("zwi\u0105zane z tworzeniem multikont") || msg.includes("niew\u0142a\u015bciwym u\u017cywaniem systemu ocen")) {
+            return "Multikonto / Manipulacja g\u0142os\u00f3w";
+        }
+        // Decyzje moderacji
+        if (msg.includes("sprawdzamy tylko pierwsze komentarze")) {
+            return "Decyzje moderacji";
         }
 
         return "";
@@ -1612,8 +1909,15 @@
         if (window.location.href.includes('/inspector/')) {
             noteInput = document.querySelector('textarea#notes, textarea[name="notes"]');
 
-            let textareas = Array.from(document.querySelectorAll('textarea'));
-            let msgTa = textareas.find(t => t.value.includes("Poprzez tę wiadomość") || t.value.includes("W związku z tym"));
+            // Wyszukaj bardziej precyzyjnie zamiast iterować przez wszystkie textarea
+            let msgTa = document.querySelector('textarea[aria-label="Message for the user"]') ||
+                        document.querySelector('textarea.text-area-with-counter');
+
+            // Fallback na szersze wyszukiwanie jeśli potrzeba
+            if (!msgTa) {
+                let textareas = Array.from(document.querySelectorAll('textarea'));
+                msgTa = textareas.find(t => t.value.includes("Poprzez tę wiadomość") || t.value.includes("W związku z tym"));
+            }
             if (msgTa) messageText = msgTa.value;
         }
         else {
@@ -1813,7 +2117,9 @@
 
         if (settings.enableFakePromo) checkFakePromoWarning();
 
-        if (!document.querySelector('.mod-tools-container')) {
+        // Sprawdź czy moduł już się załadował - zapobiega duplikacji event listenerów
+        if (!document.querySelector('.mod-tools-container') && !window.jpDealCheckersAttached) {
+            window.jpDealCheckersAttached = true;
 
             const triggerVueInput = async (element, value) => {
                 if (!element) return;
@@ -2014,18 +2320,22 @@
                 }
                 return targetEl;
             };
-//Test
+
+            // Helper do unikania duplikacji selektora
+            const getShippingInput = () => {
+                return document.querySelector('input[placeholder="Shipping costs"]') ||
+                       document.querySelector('input[data-jp-shipping="true"]');
+            };
+
             const setShippingCost = async (value) => {
-                let input =
-                    document.querySelector('input[placeholder="Shipping costs"]') ||
-                    document.querySelector('input[data-jp-shipping="true"]');
+                let input = getShippingInput();
 
                 if (!input) {
-                    console.warn("❌ Shipping input not found");
+                    if (DEBUG) console.warn("❌ Shipping input not found");
                     return;
                 }
 
-                console.log("🚚 Auto shipping:", value);
+                if (DEBUG) console.log("🚚 Auto shipping:", value);
 
                 input.focus();
                 input.value = '';
@@ -2053,7 +2363,7 @@
                 input.style.color = "";
                 input.style.backgroundColor = "";
 
-                console.log("✅ Shipping set:", input.value);
+                if (DEBUG) console.log("✅ Shipping set:", input.value);
             };
             //test
 
@@ -2068,12 +2378,13 @@
                     window.jpLastCheckedUrl = urlTextarea.value;
                     window.jpUserEditedShipping = false;
                     window.jpAutoShippingSet = false;
+                    window.jpDealCheckersAttached = false;
                 }
 
                 let highlightShippingField = (expectedValue) => {
                     let attempts = 0;
                     let interval = setInterval(() => {
-                        let inputNode = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
+                        let inputNode = getShippingInput();
 
                         if (inputNode && !inputNode.disabled) {
                             clearInterval(interval);
@@ -2116,7 +2427,7 @@
                                 freeDelLabel.style.color = "var(--jp-stat-act-co)";
                                 freeDelLabel.title = "";
                             }
-                            let shipInput = document.querySelector('input[data-jp-shipping="true"]');
+                            let shipInput = getShippingInput();
                             if (shipInput) {
                                 shipInput.classList.remove('jp-shipping-alert');
                                 shipInput.placeholder = "Shipping costs";
@@ -2159,7 +2470,7 @@
 
                 // Auto Wysyłka Allegro
                 if (settings.enableAutoAmazonShipping && linkToCheck.includes('allegro.pl') && !window.jpUserEditedShipping) {
-                    let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
+                    let shipInput = getShippingInput();
                     if (shipInput && shipInput.value.trim() === "") {
                         setTimeout(() => {
                             if (!window.jpUserEditedShipping) {
@@ -2171,7 +2482,7 @@
 
                 // Auto Wysyłka Zalando Lounge
                 if (settings.enableAutoAmazonShipping && linkToCheck.includes('zalando-lounge.pl') && !window.jpUserEditedShipping) {
-                    let shipInput = document.querySelector('input[placeholder="Shipping costs"]') || document.querySelector('input[data-jp-shipping="true"]');
+                    let shipInput = getShippingInput();
                     if (shipInput && shipInput.value.trim() === "") {
                         setTimeout(() => {
                             if (!window.jpUserEditedShipping) {
@@ -2252,6 +2563,176 @@
                 targetDiv.parentNode.insertBefore(toolsBox, targetDiv);
             } else {
                 urlTextarea.parentNode.appendChild(toolsBox);
+            }
+
+            // MERCHANT NOTES - Wyświetlane jako alert (pod fake promo alertem)
+            if (settings.enableMerchantNotes) {
+                let merchantNoteAlert = null;
+
+                const getMerchantNameForNotes = () => {
+                    // 1. Najpierw czytamy bezpośrednio z inputu (jeśli sklep jest przypisany)
+                    let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+                    if (merchantInput && merchantInput.value.trim()) {
+                        return merchantInput.value.trim();
+                    }
+
+                    // 2. Jeśli brak, czytamy z wygenerowanej historii (tekst po "🏪 Sklep:")
+                    let historyBox = document.querySelector('.pepper-history-box');
+                    if (historyBox) {
+                        let text = historyBox.innerText;
+                        // Szukamy tekstu aż do napotkania znaku nowej linii lub pionowej kreski (separatora)
+                        let match = text.match(/🏪 Sklep:\s*([^|\n]+)/);
+                        if (match && match[1]) {
+                            let parsedMerchant = match[1].trim();
+                            // Upewniamy się, że nie wyciągnęliśmy pustych znaków "---"
+                            if (parsedMerchant !== '---') {
+                                return parsedMerchant;
+                            }
+                        }
+                    }
+
+                    // 3. Fallback absolutny: jeśli historia jeszcze się nie załadowała lub z jakiegoś powodu pominęła domenę,
+                    // wyciągamy samą domenę bezpośrednio z głównego linku dodanej okazji.
+                    let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
+                    if (urlTextarea && urlTextarea.value.trim()) {
+                        try {
+                            let domain = new URL(urlTextarea.value.trim()).hostname.replace(/^www\./, '');
+                            if (domain) return domain;
+                        } catch(e) {
+                            // Link może być niekompletny lub uszkodzony
+                        }
+                    }
+
+                    return null;
+                };
+
+                const updateMerchantNoteAlert = () => {
+                    let merchantName = getMerchantNameForNotes();
+
+                    if (!merchantName) {
+                        if (merchantNoteAlert && merchantNoteAlert.parentNode) {
+                            merchantNoteAlert.parentNode.removeChild(merchantNoteAlert);
+                        }
+                        return;
+                    }
+
+                    // Usuń stary alert jeśli istnieje
+                    if (merchantNoteAlert && merchantNoteAlert.parentNode) {
+                        merchantNoteAlert.parentNode.removeChild(merchantNoteAlert);
+                    }
+
+                    let notesList = getMerchantNotesList(merchantName);
+
+                    merchantNoteAlert = document.createElement('div');
+                    merchantNoteAlert.className = 'jp-merchant-note-alert';
+                    merchantNoteAlert.style.cssText = 'background-color: var(--jp-template-btn-bg); color: white; padding: 10px 15px; text-align: left; font-size: 13px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ff9800; z-index: 9999;';
+
+                    let alertHTML = `<div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 ${merchantName}</div>`;
+
+                    // Wyświetl wszystkie notatki
+                    if (notesList.length > 0) {
+                        notesList.forEach((note, index) => {
+                            let dateObj = new Date(note.savedAt);
+                            let dateStr = dateObj.toLocaleDateString('pl-PL') + ' ' + dateObj.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+
+                            alertHTML += `
+                                <div style="background-color: rgba(255,255,255,0.08); padding: 8px; border-radius: 3px; margin-bottom: 8px; border-left: 2px solid #ff9800;">
+                                    <div style="color: var(--jp-text); font-size: 12px; word-break: break-word; margin-bottom: 4px;">${note.text}</div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #bbb;">
+                                        <span>${note.savedBy} • ${dateStr}</span>
+                                        <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę">🗑️</button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    // Przycisk dodania nowej notatki
+                    alertHTML += `
+                        <button class="jp-merchant-note-edit-btn" style="width: 100%; background-color: #4a7a59; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">+ ${t('btnAddMerchantNote')}</button>
+                    `;
+
+                    merchantNoteAlert.innerHTML = alertHTML;
+
+                    // Wstaw po fake promo alert
+                    let fakePromoAlert = document.querySelector('.fake-promo-alert');
+                    if (fakePromoAlert && fakePromoAlert.parentNode) {
+                        fakePromoAlert.parentNode.insertBefore(merchantNoteAlert, fakePromoAlert.nextSibling);
+                    } else {
+                        let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
+                        container.prepend(merchantNoteAlert);
+                    }
+
+                    // Delete buttons dla każdej notatki
+                    let deleteButtons = merchantNoteAlert.querySelectorAll('.jp-merchant-note-delete-single');
+                    deleteButtons.forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            let index = parseInt(btn.getAttribute('data-index'));
+                            if (confirm('⚠️ Czy na pewno chcesz trwale usunąć tę notatkę?')) {
+                                deleteMerchantNote(merchantName, index);
+                                updateMerchantNoteAlert();
+                            }
+                        });
+                    });
+
+                    // Edit button
+                    let editBtn = merchantNoteAlert.querySelector('.jp-merchant-note-edit-btn');
+                    if (editBtn) {
+                        editBtn.addEventListener('click', () => {
+                            editMerchantNote(merchantName, updateMerchantNoteAlert);
+                        });
+                    }
+                };
+
+                // Funkcja do edycji notatki
+                const editMerchantNote = (merchantName, callback) => {
+                    let editContainer = document.createElement('div');
+                    editContainer.style.cssText = 'background-color: var(--jp-template-btn-bg); padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ff9800; z-index: 9999;';
+
+                    editContainer.innerHTML = `
+                        <div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 Nowa notatka dla ${merchantName}</div>
+                        <input type="text" class="jp-merchant-note-edit-input" placeholder="${t('placeholderMerchantNote')}" style="width: 100%; padding: 8px; border: 1px solid var(--jp-border); background-color: var(--jp-input-bg); color: var(--jp-text); border-radius: 3px; font-size: 12px; box-sizing: border-box; margin-bottom: 8px;" value="">
+                        <div style="display: flex; gap: 8px;">
+                            <button class="jp-merchant-note-save-edit" style="flex: 1; background-color: #366141; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">💾 ${t('btnAddMerchantNote')}</button>
+                            <button class="jp-merchant-note-cancel-edit" style="flex: 1; background-color: #757575; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">Anuluj</button>
+                        </div>
+                    `;
+
+                    // Wstaw na miejsce alert
+                    if (merchantNoteAlert && merchantNoteAlert.parentNode) {
+                        merchantNoteAlert.parentNode.replaceChild(editContainer, merchantNoteAlert);
+                    }
+
+                    let input = editContainer.querySelector('.jp-merchant-note-edit-input');
+                    input.focus();
+
+                    let saveBtn = editContainer.querySelector('.jp-merchant-note-save-edit');
+                    let cancelBtn = editContainer.querySelector('.jp-merchant-note-cancel-edit');
+
+                    saveBtn.addEventListener('click', () => {
+                        let noteText = input.value.trim();
+                        if (noteText) {
+                            saveMerchantNote(merchantName, noteText);
+                        }
+                        merchantNoteAlert = editContainer;
+                        callback();
+                    });
+
+                    cancelBtn.addEventListener('click', () => {
+                        merchantNoteAlert = editContainer;
+                        callback();
+                    });
+                };
+
+                // Inicjalizuj
+                updateMerchantNoteAlert();
+
+                // Obserwaj zmiany
+                let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+                if (merchantInput) {
+                    merchantInput.addEventListener('change', updateMerchantNoteAlert);
+                    merchantInput.addEventListener('input', debounce(updateMerchantNoteAlert, 300));
+                }
             }
 
             let detectAndConvertCallback = null;
@@ -2349,7 +2830,7 @@
                                 e.preventDefault();
 
                                 if (currentCalculatedPLN <= 0) {
-                                    console.warn("❌ Brak wartości do wklejenia");
+                                    if (DEBUG) console.warn("❌ Brak wartości do wklejenia");
                                     return;
                                 }
 
@@ -2358,12 +2839,12 @@
                                     document.querySelector('input[aria-label="Price"]') ||
                                     document.querySelector('input[type="text"]');
 
-                                console.log("🔎 znaleziony input:", priceInput);
+                                if (DEBUG) console.log("🔎 znaleziony input:", priceInput);
 
                                 if (priceInput) {
                                     let formatted = currentCalculatedPLN.toFixed(2).replace('.', ',');
 
-                                    console.log("💰 Wklejam:", formatted);
+                                    if (DEBUG) console.log("💰 Wklejam:", formatted);
 
                                     triggerVueInput(priceInput, formatted);
 
@@ -2376,7 +2857,7 @@
                                         btnPrice.innerText = oldText;
                                     }, 1500);
                                 } else {
-                                    console.error("❌ Nie znaleziono inputa ceny!");
+                                    if (DEBUG) console.error("❌ Nie znaleziono inputa ceny!");
                                 }
                             };
 
@@ -2422,6 +2903,23 @@
     }
 
     fetchExchangeRates(() => {});
+    fetchMerchantNotesFromAPI();
+
+    function displayMerchantNotesOnPage() {
+        if (!settings.enableMerchantNotes) return;
+
+        // Check inspector/profile pages for merchant info
+        let profileHeading = document.querySelector('h1, h2, [class*="title"]');
+        if (profileHeading && profileHeading.innerText && !profileHeading.parentNode.querySelector('.jp-merchant-note-display')) {
+            let merchantName = profileHeading.innerText.trim();
+            if (merchantName && merchantName.length > 2 && merchantName.length < 50) {
+                let notesList = getMerchantNotesList(merchantName);
+                if (notesList && notesList.length > 0) {
+                    displayMerchantNote(merchantName, profileHeading);
+                }
+            }
+        }
+    }
 
     function moveNativeApproveBtn() {
         if (!settings.enableMoveApproveBtn) return;
@@ -2460,7 +2958,138 @@
         });
     }
 
+    function checkApproveMessageModal() {
+        if (!settings.enableApproveReasons) return;
+
+        let titleNodes = document.querySelectorAll('h3.title');
+        let isApproveModalOpen = Array.from(titleNodes).some(node => node.innerText.includes('Approve and Send Message'));
+
+        if (!isApproveModalOpen) return;
+
+        let ta = document.querySelector('textarea[placeholder="Message for the thread submitter"]');
+        if (!ta) return;
+
+        // Czy textarea zawiera słowo wyzwalające nasz panel?
+        const isTargetTemplate = /Uzupełniliśmy\/zmieniliśmy/i.test(ta.value);
+
+        let wrapper = document.getElementById('jp-approve-reasons-wrapper');
+
+        // Tworzymy panel tylko raz
+        if (!wrapper) {
+            const APPROVE_REASONS = {
+                "Waluta": "Dodaliśmy do opisu cenę w oryginalnej obcej walucie. Przy ofertach od zagranicznych sprzedawców dobrze jest dopisywać oryginalną walutę obok ceny w złotówkach. Kursy walut potrafią się szybko zmieniać, więc dzięki temu cena w okazji zawsze będzie precyzyjna, a społeczność łatwo sprawdzi realny koszt w danym momencie.",
+                "Koszt dostawy": "Dodaliśmy brakujący koszt dostawy. Następnym razem pamiętaj proszę o uzupełnieniu wysyłki. Dla naszej społeczności ostateczna cena razem z dostawą to kluczowa informacja, żeby uczciwie ocenić całościowy koszt i zdecydować o zakupie.",
+                "Tytuł (uzupełnienie)": "Uzupełniliśmy tytuł o dokładną nazwę/ rodzaj /producenta i model produktu. Mała wskazówka na przyszłość: warto podawać pełną nazwę sprzętu już przy dodawaniu okazji najlepiej w formacie [Rodzaj sprzętu] [Producent] [Model] (np. Karta graficzna ASUS RTX 4060). W przypadku wielu sklepów wystarczy przekopiować to z ich strony. Dla naszej społeczności to kluczowa informacja, żeby od razu wiedzieć, czego dotyczy oferta i łatwiej znaleźć ją w wyszukiwarce.",
+                "Tytuł (zbędne)": "Zmieniliśmy odrobinę tytuł. Mała podpowiedź na przyszłość: w tytule najlepiej podawać wyłącznie samą nazwę produktu oraz jego model. Taki tytuł ułatwia społeczności wyszukiwanie okazji i sprawia, że wygląda on o wiele lepiej.",
+                "KNC / NBP": "Zaktualizowaliśmy w okazji kolejną najlepszą cenę, czyli najniższą kwotę, za jaką można teraz kupić ten produkt w innych sklepach. Warto pamiętać o tym polu, bo przekreślone ceny promocyjne na stronach sprzedawców bywają mocno zawyżone. Podanie realnego porównania od razu pokazuje społeczności faktyczną obniżkę, a to zazwyczaj przynosi masę plusów!",
+                "Zaokrąglenie ceny": "Poprawiliśmy cenę w okazji na dokładną kwotę bez zaokrągleń. Na przyszłość staraj się podawać cenę co do grosza, dokładnie taką, jaka jest w sklepie. Dla naszej społeczności liczy się każdy grosz, a precyzyjna kwota pozwala od razu zobaczyć realną, najniższą cenę i bezkonkurencyjność oferty.",
+                "Data zakończenia": "Uzupełniliśmy w okazji datę zakończenia promocji, którą udało się zweryfikować na stronie sklepu. Dobrą praktyką jest dopisywanie czasu trwania promocji, jeśli tylko jest podany. Dzięki temu okazja wygaśnie automatycznie w odpowiednim momencie, a społeczność dostanie jasną informację, ile czasu zostało na zakupy.",
+                "Rozwinięcie linku": "Podmieniliśmy w okazji link ze skróconego na pełny adres do sklepu. Jako szybki tip: na platformie zawsze używamy pełnych linków bez skracaczy lub krótkich linków z aplikacji. Bardzo często aplikacje mobilne sklepów podczas kliknięcia Udostępnij automatycznie generują takie skrócone adresy.\n\nDla porównania:\nLink z aplikacji: https://amzn.eu/d/00qOnKk2\nPrawidłowy pełny link: https://www.amazon.pl/dp/B0B9BBJ3BL\n\nDzięki dodawaniu pełnych adresów system prawidłowo rozpoznaje sprzedawcę, a nasza społeczność bez problemu znajduje ofertę i od razu otrzymuje ustawione alerty o promocji.",
+                "Oczyszczenie linku": "Oczyściliśmy link w okazji z dodatkowych parametrów i tagów po znaku zapytania. Pamiętaj proszę, że zgodnie z naszym regulaminem na platformie nie pozwalamy na wrzucanie linków afiliacyjnych ani reflinków.\n\nMała wskazówka na przyszłość: przed wklejeniem linku na Peppera warto skasować z paska adresu wszystko, co znajduje się po znaku zapytania.",
+                "Okazja lokalna": "Oznaczyliśmy w okazji, że to oferta lokalna, żeby społeczność wiedziała, że znajdzie produkt stacjonarnie a nie online. Dobrą praktyką przy dodawaniu takich promocji jest zaznaczenie opcji stacjonarnej już w formularzu. Jasna informacja oszczędza czas innym użytkownikom i pozwala im od razu zaplanować zakupy na miejscu.",
+                "Okazja->Kupon": "Zmieniliśmy typ Twojego wpisu z okazji na kupon. Mała wskazówka na przyszłość: formę okazji wybieramy wtedy, gdy podajesz cenę konkretnego produktu lub dodajesz kod z przynajmniej jednym przykładem zakupu. Kupony są idealne na ogólne akcje promocyjne i kody rabatowe bez rozpisywania przykładów. Dzięki takiemu podziałowi społeczność łatwiej trafia na Twoje okazje w odpowiednich zakładkach.",
+                "Opis": "Dodaliśmy do opisu specyfikację i najważniejsze parametry produktu. Dobrą praktyką na przyszłość jest wrzucanie krótkich danych technicznych lub cech sprzętu już przy tworzeniu opisu okazji. Dla naszej społeczności to ogromne ułatwienie, bo pozwala szybko ocenić opłacalność oferty bez konieczności szukania szczegółów na innych stronach. Co więcej, jeśli znasz ten produkt, używałeś go lub testowałeś, niesamowicie ważna i pomocna dla innych jest Twoja osobista opinia, wrażenia z użytkowania."
+            };
+
+            let container = ta.closest('.v-input').parentNode;
+
+            wrapper = document.createElement('div');
+            wrapper.id = 'jp-approve-reasons-wrapper';
+            wrapper.style.cssText = 'margin: 10px 0 15px 0; padding: 12px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); border-radius: 6px;';
+            wrapper.style.display = isTargetTemplate ? 'block' : 'none'; // Pokazuje tylko, gdy trzeba
+
+            let header = document.createElement('div');
+            header.innerHTML = '<strong style="color: var(--jp-link);">🛠️ Szybkie szablony (A&M)</strong><br><span style="font-size: 11px; color: var(--jp-text-muted);">Zaznacz powody edycji (wkleją się poniżej słowa "uzupełniliśmy/zmieniliśmy").</span>';
+            header.style.marginBottom = '10px';
+            wrapper.appendChild(header);
+
+            let checkboxContainer = document.createElement('div');
+            checkboxContainer.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; max-height: 200px; overflow-y: auto; padding-right: 5px;';
+
+            let updateTextarea = () => {
+                let baseVal = ta.value;
+                let anchorRegex = /(Uzupełniliśmy\/zmieniliśmy:?)/i;
+                let closingRegex = /(Czekamy na Twoje kolejne okazje!.*)/i;
+
+                let matchAnchor = baseVal.match(anchorRegex);
+                let matchClosing = baseVal.match(closingRegex);
+
+                if (!matchAnchor) return;
+
+                // Oddzielamy górną część z powitaniem
+                let beforeText = baseVal.substring(0, matchAnchor.index + matchAnchor[0].length);
+                if (!beforeText.endsWith(":")) beforeText += ":";
+
+                // Oddzielamy pożegnanie
+                let closingText = matchClosing ? matchClosing[0] : "Czekamy na Twoje kolejne okazje!";
+
+                // Sklejamy zaznaczone szablony
+                let newInsertedText = "";
+                let checkboxes = wrapper.querySelectorAll('input[type="checkbox"]:checked');
+                checkboxes.forEach(cb => {
+                    newInsertedText += "\n- " + APPROVE_REASONS[cb.value] + "\n";
+                });
+
+                // Łączymy z zachowaniem odpowiednich enterów ("\n")
+                let finalVal = beforeText + (newInsertedText ? "\n" + newInsertedText + "\n" : "\n\n") + closingText;
+
+                let valueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                valueSetter.call(ta, finalVal);
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+
+            Object.keys(APPROVE_REASONS).forEach(reason => {
+                let lbl = document.createElement('label');
+                lbl.style.cssText = 'display: flex; align-items: flex-start; gap: 5px; cursor: pointer; color: var(--jp-text); line-height: 1.2;';
+                let cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = reason;
+                cb.style.marginTop = '2px';
+                cb.addEventListener('change', updateTextarea);
+
+                lbl.appendChild(cb);
+                lbl.appendChild(document.createTextNode(reason));
+                checkboxContainer.appendChild(lbl);
+            });
+
+            wrapper.appendChild(checkboxContainer);
+            container.insertBefore(wrapper, ta.closest('.v-input'));
+
+        } else {
+            // Reaguje dynamicznie w pętli setInterval - jeśli szablon się zmienił na inny, ukrywa panel
+            wrapper.style.display = isTargetTemplate ? 'block' : 'none';
+        }
+    }
+
+    // Tracking dla zmniejszenia liczby wywołań rzadko zmieniających się funkcji
+    let lastHighlightCheck = 0;
+    let lastUpdateSaveBtn = 0;
+    const RARE_FUNCTION_INTERVAL = 1500; // ms
+
+    // Zmienna do śledzenia "miękkich" zmian URL w aplikacjach SPA (Vue.js)
+    let lastKnownHref = "";
+
     setInterval(() => {
+        let currentHref = window.location.href;
+
+        // 1. WYKRYWANIE ZMIANY URL W SPA
+        if (currentHref !== lastKnownHref) {
+            lastKnownHref = currentHref;
+
+            // Zresetuj flagi blokujące wstrzykiwanie interfejsu
+            window.jpDealCheckersAttached = false;
+            window.jpLastCheckedUrl = null;
+            window.jpUserEditedShipping = false;
+            window.jpAutoShippingSet = false;
+        }
+
+        // 2. WCZESNE ZAKOŃCZENIE - Uruchamia logikę tylko na właściwych podstronach
+        let isModeration = currentHref.includes('/admin-v2/moderation/');
+        let isInspector = currentHref.includes('/admin/inspector/');
+
+        if (!isModeration && !isInspector) return;
+
+        // 3. GŁÓWNA LOGIKA SKRYPTU
         let titleInput = document.querySelector('input[placeholder="Thread title"]');
         let isAlreadyInjected = document.querySelector('.mod-tools-container');
 
@@ -2470,13 +3099,19 @@
         checkHoldNoteAutomator();
         checkMessageTemplates();
         moveNativeApproveBtn();
-        highlightEditedCards();
-        updateSaveButtonText();
         checkInfractionNoteAutomator();
+        displayMerchantNotesOnPage();
+        checkApproveMessageModal();
+
+        let now = Date.now();
+        if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
+            highlightEditedCards();
+            lastHighlightCheck = now;
+        }
+        if (now - lastUpdateSaveBtn >= RARE_FUNCTION_INTERVAL) {
+            updateSaveButtonText();
+            lastUpdateSaveBtn = now;
+        }
 
     }, 300);
-
-    loadDatabase(() => {
-        if (settings.enableFakePromo) checkFakePromoWarning();
-    });
 })();
