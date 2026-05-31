@@ -75,8 +75,6 @@ A dedicated panel with buttons to instantly check the product on:
 ### ✨ 8. "Quick Append" Floating Button
 A small, discreet button next to the title field that allows you to append your customized text (e.g., ` | Smart! Okazja`) to the title and optionally check/uncheck free delivery with a single click.
 
-<img width="1223" height="324" alt="image" src="https://github.com/user-attachments/assets/47765551-18c8-4be9-971a-c59bb6903309" />
-
 ### 🏪 9. Merchant Notes System
 Keep track of store-specific rules, warnings, or tips. The script allows you to add, edit, and delete internal notes for any merchant directly in the moderation panel.
 * Notes are displayed as prominent alerts when processing a deal from a specific store.
