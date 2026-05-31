@@ -97,7 +97,7 @@ The script features a powerful, graphical configuration UI accessible by clickin
 * 🛑 **Stop Words:** Define custom words that the script should ignore when analyzing the title for search queries.
 * 📍 **Floating Approve Button:** An optional setting to move the "Approve & Send PM" button to a more accessible, floating position on the screen, saving you from unnecessary scrolling.
 
-<img width="2012" height="1514" alt="image" src="https://github.com/user-attachments/assets/a0584a05-e5f0-403e-91e5-431798d3fa32" />
+<img width="843" height="874" alt="Zrzut ekranu 2026-05-31 o 17 51 34" src="https://github.com/user-attachments/assets/73052f78-a8a4-460d-85f1-911283a34923" />
 
 ---
 
