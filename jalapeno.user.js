@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.7.7
+// @version      4.7.8
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 10 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -59,7 +59,9 @@
         enableMoveApproveBtn: false,
         enableInfractionNote: true,
         enableMerchantNotes: true,
-        enableApproveReasons: true
+        enableApproveReasons: true,
+        enableLockButtons: true,
+        enableBannedHighlight: true
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -154,7 +156,9 @@
             msgMerchantNoteSaved: "✅ Notatka zapisana i zsynchronizowana",
             msgMerchantNoteDeleted: "✅ Notatka usunięta",
             msgMerchantNoteError: "❌ Błąd synchronizacji notatki",
-            mApproveReasons: "Szablony A&M w oknie Approve (Uzupełniliśmy/zmieniliśmy)"
+            mApproveReasons: "Szablony A&M w oknie Approve (Uzupełniliśmy/zmieniliśmy)",
+            mLockButtons: "Lock/Unlock przyciski (Edit Lock & Expire Lock)",
+            mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'"
         },
         en: {
             titleSettings: "⚙️ Jalapeño Settings",
@@ -244,7 +248,10 @@
             msgMerchantNoteSaved: "✅ Note saved and synchronized",
             msgMerchantNoteDeleted: "✅ Note deleted",
             msgMerchantNoteError: "❌ Note synchronization error",
-            mApproveReasons: "A&M Templates in Approve modal"
+            mApproveReasons: "A&M Templates in Approve modal",
+            mLockButtons: "Lock/Unlock buttons (Edit Lock & Expire Lock)",
+            mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words",
+            mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words"
         }
     };
 
@@ -859,6 +866,8 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-merchant-notes" ${settings.enableMerchantNotes ? 'checked' : ''}> ${t('lblMerchantNotes')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-approve-reasons" ${settings.enableApproveReasons ? 'checked' : ''}> ${t('mApproveReasons')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lock-buttons" ${settings.enableLockButtons ? 'checked' : ''}> ${t('mLockButtons')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-banned-highlight" ${settings.enableBannedHighlight ? 'checked' : ''}> ${t('mBannedHighlight')}</label>
                     </div>
                 </div>
 
@@ -998,7 +1007,9 @@
                 floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked,
                 enableMoveApproveBtn: document.getElementById('set-move-approve').checked,
                 enableMerchantNotes: document.getElementById('set-merchant-notes').checked,
-                enableApproveReasons: document.getElementById('set-approve-reasons').checked
+                enableApproveReasons: document.getElementById('set-approve-reasons').checked,
+                enableLockButtons: document.getElementById('set-lock-buttons').checked,
+                enableBannedHighlight: document.getElementById('set-banned-highlight').checked
             });
         };
 
@@ -2682,6 +2693,99 @@
                             editMerchantNote(merchantName, updateMerchantNoteAlert);
                         });
                     }
+
+                    // ========== WSTAW PRZYCISKI LOCK/UNLOCK (PONAD PANELEM NOTATEK) ==========
+                    if (settings.enableLockButtons) {
+                        let existingLockButtons = document.querySelector('.jp-lock-buttons-container');
+                        if (existingLockButtons && existingLockButtons.parentNode) {
+                            existingLockButtons.parentNode.removeChild(existingLockButtons);
+                        }
+
+                        let lockButtonsContainer = document.createElement('div');
+                        lockButtonsContainer.className = 'jp-lock-buttons-container';
+                        lockButtonsContainer.style.cssText = 'display: flex; gap: 8px; margin-bottom: 10px; z-index: 9999;';
+                        
+                        lockButtonsContainer.innerHTML = `
+                            <button class="jp-edit-lock-btn" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;" title="Zablokuj/odblokuj edycję">🔒 Edit Lock</button>
+                            <button class="jp-expire-lock-btn" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;" title="Zablokuj/odblokuj ważność">⏰ Expire Lock</button>
+                        `;
+
+                        // Wstaw PRZED panelem notatek
+                        if (merchantNoteAlert && merchantNoteAlert.parentNode) {
+                            merchantNoteAlert.parentNode.insertBefore(lockButtonsContainer, merchantNoteAlert);
+                        } else {
+                            let fakePromoAlert = document.querySelector('.fake-promo-alert');
+                            if (fakePromoAlert && fakePromoAlert.parentNode) {
+                                fakePromoAlert.parentNode.insertBefore(lockButtonsContainer, fakePromoAlert.nextSibling);
+                            } else {
+                                let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
+                                container.prepend(lockButtonsContainer);
+                            }
+                        }
+
+                        // Stan przycisków
+                        let editLockState = 'unlocked'; // domyślnie odblokowane
+                        let expireLockState = 'unlocked';
+
+                        const updateLockButtonAppearance = (btn, state, lockType) => {
+                            if (state === 'locked') {
+                                btn.style.backgroundColor = '#ff6b6b';
+                                btn.innerHTML = lockType === 'edit' ? '🔐 Edit Unlock' : '🔐 Expire Unlock';
+                                btn.title = `Kliknij aby odblokować ${lockType === 'edit' ? 'edycję' : 'ważność'}`;
+                                btn.disabled = false;
+                            } else if (state === 'unlocked') {
+                                btn.style.backgroundColor = '#5a5a5a';
+                                btn.innerHTML = lockType === 'edit' ? '🔒 Edit Lock' : '🔒 Expire Lock';
+                                btn.title = `Kliknij aby zablokować ${lockType === 'edit' ? 'edycję' : 'ważność'}`;
+                                btn.disabled = false;
+                            }
+                        };
+
+                        let editLockBtn = lockButtonsContainer.querySelector('.jp-edit-lock-btn');
+                        let expireLockBtn = lockButtonsContainer.querySelector('.jp-expire-lock-btn');
+
+                        if (editLockBtn) {
+                            editLockBtn.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                let action = editLockState === 'locked' ? 'unlock' : 'lock';
+                                editLockBtn.disabled = true;
+                                editLockBtn.style.opacity = '0.6';
+
+                                try {
+                                    await sendLockRequest('edit', action);
+                                    editLockState = action === 'lock' ? 'locked' : 'unlocked';
+                                    updateLockButtonAppearance(editLockBtn, editLockState, 'edit');
+                                    alert(`✅ Edit lock ${action === 'lock' ? 'włączony' : 'wyłączony'}`);
+                                } catch (err) {
+                                    alert(`❌ Błąd: ${err}`);
+                                } finally {
+                                    editLockBtn.disabled = false;
+                                    editLockBtn.style.opacity = '1';
+                                }
+                            });
+                        }
+
+                        if (expireLockBtn) {
+                            expireLockBtn.addEventListener('click', async (e) => {
+                                e.preventDefault();
+                                let action = expireLockState === 'locked' ? 'unlock' : 'lock';
+                                expireLockBtn.disabled = true;
+                                expireLockBtn.style.opacity = '0.6';
+
+                                try {
+                                    await sendLockRequest('expire', action);
+                                    expireLockState = action === 'lock' ? 'locked' : 'unlocked';
+                                    updateLockButtonAppearance(expireLockBtn, expireLockState, 'expire');
+                                    alert(`✅ Expire lock ${action === 'lock' ? 'włączony' : 'wyłączony'}`);
+                                } catch (err) {
+                                    alert(`❌ Błąd: ${err}`);
+                                } finally {
+                                    expireLockBtn.disabled = false;
+                                    expireLockBtn.style.opacity = '1';
+                                }
+                            });
+                        }
+                    }
                 };
 
                 // Funkcja do edycji notatki
@@ -2905,6 +3009,82 @@
     fetchExchangeRates(() => {});
     fetchMerchantNotesFromAPI();
 
+    // Funkcja do wyciągnięcia slug-a z URL-a referer-a
+    function getPromoSlugFromPage() {
+        // 1. Spróbuj wyciągnąć z referer-a
+        let referrer = document.referrer;
+        if (referrer) {
+            try {
+                let match = referrer.match(/\/promocje\/([^\/\?]+)/);
+                if (match && match[1]) {
+                    if (DEBUG) console.log("✅ Slug wyciągnięty z referer-a");
+                    return match[1];
+                }
+            } catch (e) {}
+        }
+
+        // 2. Szukaj linku do okazji na stronie
+        try {
+            let allLinks = document.querySelectorAll('a[href*="/promocje/"]');
+            for (let link of allLinks) {
+                let href = link.getAttribute('href');
+                let match = href.match(/\/promocje\/([^\/\?]+)/);
+                if (match && match[1]) {
+                    if (DEBUG) console.log("✅ Slug wyciągnięty ze strony:", match[1]);
+                    return match[1];
+                }
+            }
+        } catch (e) {
+            if (DEBUG) console.warn("❌ Błąd szukania linku:", e);
+        }
+
+        // 3. Spróbuj wyciągnąć thread ID i pobrać dane okazji przez API (ostatnia deska ratunku)
+        try {
+            let threadMatch = window.location.href.match(/moderation\/thread\/(\d+)/);
+            if (threadMatch && threadMatch[1]) {
+                let threadId = threadMatch[1];
+                if (DEBUG) console.log("ℹ️ Thread ID:", threadId);
+                // TODO: Można tu dodać API call aby pobrać slug na podstawie thread ID
+            }
+        } catch (e) {}
+
+        return null;
+    }
+
+    // Funkcja do wysłania żądania lock/unlock
+    function sendLockRequest(lockType, action) {
+        let slug = getPromoSlugFromPage();
+        if (!slug) {
+            alert('❌ Nie udało się znaleźć slug-a okazji.\n\nUpewnij się, że:\n1. Jesteś na stronie moderacji okazji\n2. Link do okazji jest wyświetlony na stronie\n\nJeśli problem się powtarza, spróbuj odświeżyć stronę.');
+            return Promise.reject('No slug found');
+        }
+
+        let endpoint = lockType === 'edit' ? 'edit-lock' : 'expire-lock';
+        let url = `https://www.pepper.pl/promocje/${slug}/${endpoint}`;
+
+        if (DEBUG) console.log(`🔒 Wysyłam ${action} request do ${endpoint}:`, url);
+
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: url,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                data: `action=${action}`,
+                onload: function(response) {
+                    if (DEBUG) console.log(`✅ Odpowiedź ${endpoint}:`, response.status, response.responseText);
+                    resolve(response);
+                },
+                onerror: function(error) {
+                    console.error(`❌ Błąd przy wysyłaniu ${endpoint}:`, error);
+                    reject(error);
+                }
+            });
+        });
+    }
+
     function displayMerchantNotesOnPage() {
         if (!settings.enableMerchantNotes) return;
 
@@ -2946,6 +3126,48 @@
                 card.classList.add('jp-card-edited');
             } else {
                 card.classList.remove('jp-card-edited');
+            }
+        });
+    }
+
+    function highlightBannedAndUnauthenticated() {
+        // Przechodzenie przez wszystkie elementy na stronie
+        document.querySelectorAll('*').forEach(element => {
+            // Przechodzenie przez węzły tekstowe (childNodes, nie innerText)
+            for (let node of element.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    let text = node.textContent.toLowerCase();
+                    
+                    // Jeśli węzeł zawiera "banned" lub "unauthenticated"
+                    if (text.includes('banned') || text.includes('unauthenticated')) {
+                        // Tworzymy span z highlight'owaniem
+                        let span = document.createElement('span');
+                        span.textContent = node.textContent;
+                        
+                        if (text.includes('banned')) {
+                            Object.assign(span.style, {
+                                backgroundColor: '#ffcccc',
+                                color: '#cc0000',
+                                border: '2px solid red',
+                                fontWeight: 'bold',
+                                borderRadius: '4px',
+                                padding: '2px 5px'
+                            });
+                        } else if (text.includes('unauthenticated')) {
+                            Object.assign(span.style, {
+                                backgroundColor: '#fff3cd',
+                                color: '#856404',
+                                border: '2px solid #ffeeba',
+                                fontWeight: 'bold',
+                                borderRadius: '4px',
+                                padding: '2px 5px'
+                            });
+                        }
+                        
+                        span.dataset.isHighlighted = 'true';
+                        element.replaceChild(span, node);
+                    }
+                }
             }
         });
     }
@@ -3064,6 +3286,7 @@
     // Tracking dla zmniejszenia liczby wywołań rzadko zmieniających się funkcji
     let lastHighlightCheck = 0;
     let lastUpdateSaveBtn = 0;
+    let lastBannedHighlightCheck = 0;
     const RARE_FUNCTION_INTERVAL = 1500; // ms
 
     // Zmienna do śledzenia "miękkich" zmian URL w aplikacjach SPA (Vue.js)
@@ -3111,6 +3334,10 @@
         if (now - lastUpdateSaveBtn >= RARE_FUNCTION_INTERVAL) {
             updateSaveButtonText();
             lastUpdateSaveBtn = now;
+        }
+        if (settings.enableBannedHighlight && now - lastBannedHighlightCheck >= RARE_FUNCTION_INTERVAL) {
+            highlightBannedAndUnauthenticated();
+            lastBannedHighlightCheck = now;
         }
 
     }, 300);
