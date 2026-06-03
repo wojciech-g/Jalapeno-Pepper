@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.7.8
+// @version      4.7.9
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 10 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -421,20 +421,142 @@
                 background-color: var(--jp-stat-del-bg) !important;
                 color: var(--jp-stat-del-co) !important;
                 border: 1px solid var(--jp-stat-del-bo) !important;
-                padding: 6px 12px !important;
-                border-radius: 4px !important;
+                padding: 3px 6px !important;
+                border-radius: 3px !important;
                 cursor: pointer !important;
-                font-size: 16px !important;
+                font-size: 12px !important;
                 font-weight: 500 !important;
                 transition: all 0.2s ease !important;
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                gap: 5px !important;
+                gap: 3px !important;
             }
             .jp-merchant-note-delete-single:hover, .jp-merchant-note-delete-btn:hover {
                 filter: brightness(0.9);
                 transform: scale(1.05) !important;
+            }
+
+            /* MERCHANT NOTE ALERT BOX */
+            .jp-merchant-note-alert {
+                background-color: var(--jp-template-btn-bg) !important;
+                color: white !important;
+                padding: 8px 12px !important;
+                text-align: left !important;
+                font-size: 12px !important;
+                border-radius: 4px !important;
+                margin-bottom: 8px !important;
+                border-left: 3px solid #ff9800 !important;
+                z-index: 9999 !important;
+            }
+
+            /* LOCK BUTTONS CONTAINER */
+            .jp-lock-buttons-container {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+                height: fit-content !important;
+            }
+
+            .jp-edit-lock-btn, .jp-edit-unlock-btn, .jp-expire-lock-btn, .jp-expire-unlock-btn {
+                background-color: #5a5a5a !important;
+                color: white !important;
+                border: none !important;
+                padding: 8px 12px !important;
+                border-radius: 3px !important;
+                cursor: pointer !important;
+                font-size: 12px !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            .jp-edit-unlock-btn, .jp-expire-unlock-btn {
+                background-color: #ff6b6b !important;
+            }
+
+            .jp-edit-lock-btn:hover, .jp-edit-unlock-btn:hover, .jp-expire-lock-btn:hover, .jp-expire-unlock-btn:hover {
+                opacity: 0.9 !important;
+                transform: translateY(-1px) !important;
+            }
+
+            .jp-edit-lock-btn:disabled, .jp-edit-unlock-btn:disabled, .jp-expire-lock-btn:disabled, .jp-expire-unlock-btn:disabled {
+                opacity: 0.6 !important;
+                cursor: not-allowed !important;
+            }
+
+            /* MERCHANT NOTES WRAPPER */
+            .jp-note-buttons-wrapper {
+                display: flex !important;
+                gap: 8px !important;
+                margin-bottom: 8px !important;
+                z-index: 9999 !important;
+            }
+
+            .jp-note-buttons-wrapper .jp-merchant-note-alert {
+                flex: 3 !important;
+            }
+
+            .jp-note-buttons-wrapper .jp-lock-buttons-container {
+                flex: 1 !important;
+            }
+
+            /* MERCHANT NOTE EDIT CONTAINER */
+            .jp-merchant-note-edit-container {
+                background-color: var(--jp-template-btn-bg) !important;
+                padding: 10px 12px !important;
+                border-radius: 4px !important;
+                margin-bottom: 8px !important;
+                border-left: 3px solid #ff9800 !important;
+                z-index: 9999 !important;
+            }
+
+            .jp-merchant-note-edit-input {
+                width: 100% !important;
+                padding: 6px !important;
+                border: 1px solid var(--jp-border) !important;
+                background-color: var(--jp-input-bg) !important;
+                color: var(--jp-text) !important;
+                border-radius: 3px !important;
+                font-size: 12px !important;
+                box-sizing: border-box !important;
+                margin-bottom: 6px !important;
+            }
+
+            .jp-merchant-note-edit-input:focus {
+                outline: none !important;
+                border-color: #ff9800 !important;
+            }
+
+            .jp-merchant-note-button-group {
+                display: flex !important;
+                gap: 6px !important;
+            }
+
+            .jp-merchant-note-save-edit, .jp-merchant-note-cancel-edit {
+                flex: 1 !important;
+                border: none !important;
+                padding: 5px !important;
+                border-radius: 3px !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                color: white !important;
+                transition: all 0.2s ease !important;
+            }
+
+            .jp-merchant-note-save-edit {
+                background-color: #366141 !important;
+            }
+
+            .jp-merchant-note-cancel-edit {
+                background-color: #757575 !important;
+            }
+
+            .jp-merchant-note-save-edit:hover, .jp-merchant-note-cancel-edit:hover {
+                opacity: 0.9 !important;
             }
         `;
 
@@ -2576,268 +2698,379 @@
                 urlTextarea.parentNode.appendChild(toolsBox);
             }
 
-            // MERCHANT NOTES - Wyświetlane jako alert (pod fake promo alertem)
-            if (settings.enableMerchantNotes) {
-                let merchantNoteAlert = null;
+            // ========== MERCHANT NOTES & LOCK BUTTONS - NIEZALEŻNE ==========
+            let merchantNoteAlert = null;
 
-                const getMerchantNameForNotes = () => {
-                    // 1. Najpierw czytamy bezpośrednio z inputu (jeśli sklep jest przypisany)
-                    let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
-                    if (merchantInput && merchantInput.value.trim()) {
-                        return merchantInput.value.trim();
-                    }
+            const getMerchantNameForNotes = () => {
+                // 1. Najpierw czytamy bezpośrednio z inputu (jeśli sklep jest przypisany)
+                let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+                if (merchantInput && merchantInput.value.trim()) {
+                    return merchantInput.value.trim();
+                }
 
-                    // 2. Jeśli brak, czytamy z wygenerowanej historii (tekst po "🏪 Sklep:")
-                    let historyBox = document.querySelector('.pepper-history-box');
-                    if (historyBox) {
-                        let text = historyBox.innerText;
-                        // Szukamy tekstu aż do napotkania znaku nowej linii lub pionowej kreski (separatora)
-                        let match = text.match(/🏪 Sklep:\s*([^|\n]+)/);
-                        if (match && match[1]) {
-                            let parsedMerchant = match[1].trim();
-                            // Upewniamy się, że nie wyciągnęliśmy pustych znaków "---"
-                            if (parsedMerchant !== '---') {
-                                return parsedMerchant;
-                            }
+                // 2. Jeśli brak, czytamy z wygenerowanej historii (tekst po "🏪 Sklep:")
+                let historyBox = document.querySelector('.pepper-history-box');
+                if (historyBox) {
+                    let text = historyBox.innerText;
+                    let match = text.match(/🏪 Sklep:\s*([^|\n]+)/);
+                    if (match && match[1]) {
+                        let parsedMerchant = match[1].trim();
+                        if (parsedMerchant !== '---') {
+                            return parsedMerchant;
                         }
                     }
+                }
 
-                    // 3. Fallback absolutny: jeśli historia jeszcze się nie załadowała lub z jakiegoś powodu pominęła domenę,
-                    // wyciągamy samą domenę bezpośrednio z głównego linku dodanej okazji.
-                    let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
-                    if (urlTextarea && urlTextarea.value.trim()) {
-                        try {
-                            let domain = new URL(urlTextarea.value.trim()).hostname.replace(/^www\./, '');
-                            if (domain) return domain;
-                        } catch(e) {
-                            // Link może być niekompletny lub uszkodzony
+                // 3. Fallback: wyciągnij domenę z linku
+                let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
+                if (urlTextarea && urlTextarea.value.trim()) {
+                    try {
+                        let domain = new URL(urlTextarea.value.trim()).hostname.replace(/^www\./, '');
+                        if (domain) return domain;
+                    } catch(e) {}
+                }
+
+                return null;
+            };
+
+            // Funkcja do edycji notatki
+            const editMerchantNote = (merchantName, callback) => {
+                let editContainer = document.createElement('div');
+                editContainer.className = 'jp-merchant-note-edit-container';
+
+                editContainer.innerHTML = `
+                    <div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 Nowa notatka dla ${merchantName}</div>
+                    <input type="text" class="jp-merchant-note-edit-input" placeholder="${t('placeholderMerchantNote')}" value="">
+                    <div class="jp-merchant-note-button-group">
+                        <button class="jp-merchant-note-save-edit">💾 ${t('btnAddMerchantNote')}</button>
+                        <button class="jp-merchant-note-cancel-edit">Anuluj</button>
+                    </div>
+                `;
+
+                // Czyszcz wszystkie stare elementy
+                let oldWrapper = document.querySelector('.jp-note-buttons-wrapper');
+                if (oldWrapper && oldWrapper.parentNode) {
+                    oldWrapper.parentNode.removeChild(oldWrapper);
+                }
+
+                let standaloneLock = document.querySelector('.jp-lock-buttons-standalone');
+                if (standaloneLock && standaloneLock.parentNode) {
+                    standaloneLock.parentNode.removeChild(standaloneLock);
+                }
+
+                // Wstaw edit container
+                let fakePromoAlert = document.querySelector('.fake-promo-alert');
+                if (fakePromoAlert && fakePromoAlert.parentNode) {
+                    fakePromoAlert.parentNode.insertBefore(editContainer, fakePromoAlert.nextSibling);
+                } else {
+                    let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
+                    container.prepend(editContainer);
+                }
+
+                let input = editContainer.querySelector('.jp-merchant-note-edit-input');
+                input.focus();
+
+                let saveBtn = editContainer.querySelector('.jp-merchant-note-save-edit');
+                let cancelBtn = editContainer.querySelector('.jp-merchant-note-cancel-edit');
+
+                saveBtn.addEventListener('click', () => {
+                    let noteText = input.value.trim();
+                    if (noteText) {
+                        saveMerchantNote(merchantName, noteText);
+                    }
+                    callback();
+                });
+
+                cancelBtn.addEventListener('click', () => {
+                    callback();
+                });
+            };
+
+            // MERCHANT NOTES UPDATE
+            const updateMerchantNoteAlert = () => {
+                if (!settings.enableMerchantNotes) {
+                    // Usuń jeśli wyłączone
+                    let oldWrapper = document.querySelector('.jp-note-buttons-wrapper');
+                    if (oldWrapper && oldWrapper.parentNode) {
+                        oldWrapper.parentNode.removeChild(oldWrapper);
+                    }
+                    let editPanel = document.querySelector('.jp-merchant-note-edit-container');
+                    if (editPanel && editPanel.parentNode) {
+                        editPanel.parentNode.removeChild(editPanel);
+                    }
+                    return;
+                }
+
+                let merchantName = getMerchantNameForNotes();
+
+                if (!merchantName) {
+                    let oldWrapper = document.querySelector('.jp-note-buttons-wrapper');
+                    if (oldWrapper && oldWrapper.parentNode) {
+                        oldWrapper.parentNode.removeChild(oldWrapper);
+                    }
+                    let editPanel = document.querySelector('.jp-merchant-note-edit-container');
+                    if (editPanel && editPanel.parentNode) {
+                        editPanel.parentNode.removeChild(editPanel);
+                    }
+                    return;
+                }
+
+                let notesList = getMerchantNotesList(merchantName);
+
+                merchantNoteAlert = document.createElement('div');
+                merchantNoteAlert.className = 'jp-merchant-note-alert';
+
+                let alertHTML = `<div style="font-weight: 500; color: #ff9800; margin-bottom: 6px; font-size: 11px;">📝 ${merchantName}</div>`;
+
+                // Wyświetl wszystkie notatki
+                if (notesList.length > 0) {
+                    notesList.forEach((note, index) => {
+                        let dateObj = new Date(note.savedAt);
+                        let dateStr = dateObj.toLocaleDateString('pl-PL') + ' ' + dateObj.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+
+                        alertHTML += `
+                            <div style="display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 3px; margin-bottom: 6px; border-left: 2px solid #ff9800; background-color: rgba(255,255,255,0.05);">
+                                <div style="color: var(--jp-text); font-size: 11px; word-break: break-word; flex: 1;">${note.text}</div>
+                                <span style="font-size: 9px; color: #888; white-space: nowrap;">${note.savedBy} • ${dateStr}</span>
+                                <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę" style="padding: 2px 6px; font-size: 10px; flex-shrink: 0;">🗑️</button>
+                            </div>
+                        `;
+                    });
+                }
+
+                // Przycisk dodania nowej notatki
+                alertHTML += `
+                    <button class="jp-merchant-note-edit-btn" style="width: 100%; background-color: #4a7a59; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 500; transition: all 0.2s ease;">+ ${t('btnAddMerchantNote')}</button>
+                `;
+
+                merchantNoteAlert.innerHTML = alertHTML;
+
+                // Delete buttons
+                let deleteButtons = merchantNoteAlert.querySelectorAll('.jp-merchant-note-delete-single');
+                deleteButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        let index = parseInt(btn.getAttribute('data-index'));
+                        if (confirm('⚠️ Czy na pewno chcesz trwale usunąć tę notatkę?')) {
+                            deleteMerchantNote(merchantName, index);
+                            updateMerchantNoteAlert();
                         }
+                    });
+                });
+
+                // Edit button
+                let editBtn = merchantNoteAlert.querySelector('.jp-merchant-note-edit-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                        editMerchantNote(merchantName, updateMerchantNoteAlert);
+                    });
+                }
+
+                // Rekonstruuj wrapper (z merchant notes i lock buttons jeśli są)
+                rebuildNoteButtonsWrapper(merchantNoteAlert);
+            };
+
+            // LOCK BUTTONS UPDATE - Niezależnie od merchant notes!
+            const updateLockButtons = () => {
+                if (!settings.enableLockButtons) {
+                    // Usuń przyciski jeśli wyłączone
+                    let existingLock = document.querySelector('.jp-lock-buttons-standalone');
+                    if (existingLock && existingLock.parentNode) {
+                        existingLock.parentNode.removeChild(existingLock);
                     }
+                    return;
+                }
 
-                    return null;
-                };
+                // Jeśli merchant notes są włączone, lock buttons będą w wrapperze - nie twórz standalone
+                if (settings.enableMerchantNotes) {
+                    return;
+                }
 
-                const updateMerchantNoteAlert = () => {
-                    let merchantName = getMerchantNameForNotes();
+                // Sprawdź czy standalone lock buttons już istnieją
+                let existingLock = document.querySelector('.jp-lock-buttons-standalone');
+                if (existingLock) {
+                    return; // Już istnieją, nie twórz duplikatów
+                }
 
-                    if (!merchantName) {
-                        if (merchantNoteAlert && merchantNoteAlert.parentNode) {
-                            merchantNoteAlert.parentNode.removeChild(merchantNoteAlert);
-                        }
-                        return;
-                    }
+                let lockButtonsContainer = document.createElement('div');
+                lockButtonsContainer.className = 'jp-lock-buttons-standalone jp-lock-buttons-container';
+                lockButtonsContainer.style.cssText = 'margin-bottom: 10px;';
 
-                    // Usuń stary alert jeśli istnieje
-                    if (merchantNoteAlert && merchantNoteAlert.parentNode) {
-                        merchantNoteAlert.parentNode.removeChild(merchantNoteAlert);
-                    }
+                lockButtonsContainer.innerHTML = `
+                    <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Edit Lock</button>
+                    <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Edit Unlock</button>
+                    <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Expire Lock</button>
+                    <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Expire Unlock</button>
+                `;
 
-                    let notesList = getMerchantNotesList(merchantName);
+                // Wstaw po fake promo alert
+                let fakePromoAlert = document.querySelector('.fake-promo-alert');
+                if (fakePromoAlert && fakePromoAlert.parentNode) {
+                    fakePromoAlert.parentNode.insertBefore(lockButtonsContainer, fakePromoAlert.nextSibling);
+                } else {
+                    let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
+                    container.prepend(lockButtonsContainer);
+                }
 
-                    merchantNoteAlert = document.createElement('div');
-                    merchantNoteAlert.className = 'jp-merchant-note-alert';
-                    merchantNoteAlert.style.cssText = 'background-color: var(--jp-template-btn-bg); color: white; padding: 10px 15px; text-align: left; font-size: 13px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ff9800; z-index: 9999;';
+                // EVENT LISTENERY
+                attachLockButtonEvents(lockButtonsContainer);
+            };
 
-                    let alertHTML = `<div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 ${merchantName}</div>`;
+            // Helper: rebuild wrapper gdy merchant notes i lock buttons powinny być razem
+            const rebuildNoteButtonsWrapper = (noteAlertElement) => {
+                // CZYŚĆ WSZYSTKO - wszystkie stare elementy
+                let oldWrapper = document.querySelector('.jp-note-buttons-wrapper');
+                if (oldWrapper && oldWrapper.parentNode) {
+                    oldWrapper.parentNode.removeChild(oldWrapper);
+                }
 
-                    // Wyświetl wszystkie notatki
-                    if (notesList.length > 0) {
-                        notesList.forEach((note, index) => {
-                            let dateObj = new Date(note.savedAt);
-                            let dateStr = dateObj.toLocaleDateString('pl-PL') + ' ' + dateObj.toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'});
+                let standaloneLock = document.querySelector('.jp-lock-buttons-standalone');
+                if (standaloneLock && standaloneLock.parentNode) {
+                    standaloneLock.parentNode.removeChild(standaloneLock);
+                }
 
-                            alertHTML += `
-                                <div style="background-color: rgba(255,255,255,0.08); padding: 8px; border-radius: 3px; margin-bottom: 8px; border-left: 2px solid #ff9800;">
-                                    <div style="color: var(--jp-text); font-size: 12px; word-break: break-word; margin-bottom: 4px;">${note.text}</div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #bbb;">
-                                        <span>${note.savedBy} • ${dateStr}</span>
-                                        <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę">🗑️</button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                    }
+                let editPanel = document.querySelector('.jp-merchant-note-edit-container');
+                if (editPanel && editPanel.parentNode) {
+                    editPanel.parentNode.removeChild(editPanel);
+                }
 
-                    // Przycisk dodania nowej notatki
-                    alertHTML += `
-                        <button class="jp-merchant-note-edit-btn" style="width: 100%; background-color: #4a7a59; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">+ ${t('btnAddMerchantNote')}</button>
+                // Jeśli merchant notes są wyłączone, pokaż lock buttons niezależnie
+                if (!settings.enableMerchantNotes) {
+                    updateLockButtons();
+                    return;
+                }
+
+                // Jeśli merchant notes są włączone i istnieje element
+                if (!noteAlertElement) {
+                    return;
+                }
+
+                // Jeśli lock buttons również włączone, połącz je w wrapper
+                if (settings.enableLockButtons) {
+                    let wrapperContainer = document.createElement('div');
+                    wrapperContainer.className = 'jp-note-buttons-wrapper';
+                    wrapperContainer.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px;';
+
+                    noteAlertElement.style.flex = '3';
+                    wrapperContainer.appendChild(noteAlertElement);
+
+                    let lockButtonsContainer = document.createElement('div');
+                    lockButtonsContainer.className = 'jp-lock-buttons-container';
+                    lockButtonsContainer.style.flex = '1';
+
+                    lockButtonsContainer.innerHTML = `
+                        <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Edit Lock</button>
+                        <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Edit Unlock</button>
+                        <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Expire Lock</button>
+                        <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Expire Unlock</button>
                     `;
 
-                    merchantNoteAlert.innerHTML = alertHTML;
+                    wrapperContainer.appendChild(lockButtonsContainer);
 
-                    // Wstaw po fake promo alert
+                    // Wstaw wrapper
                     let fakePromoAlert = document.querySelector('.fake-promo-alert');
                     if (fakePromoAlert && fakePromoAlert.parentNode) {
-                        fakePromoAlert.parentNode.insertBefore(merchantNoteAlert, fakePromoAlert.nextSibling);
+                        fakePromoAlert.parentNode.insertBefore(wrapperContainer, fakePromoAlert.nextSibling);
                     } else {
                         let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
-                        container.prepend(merchantNoteAlert);
+                        container.prepend(wrapperContainer);
                     }
 
-                    // Delete buttons dla każdej notatki
-                    let deleteButtons = merchantNoteAlert.querySelectorAll('.jp-merchant-note-delete-single');
-                    deleteButtons.forEach(btn => {
-                        btn.addEventListener('click', () => {
-                            let index = parseInt(btn.getAttribute('data-index'));
-                            if (confirm('⚠️ Czy na pewno chcesz trwale usunąć tę notatkę?')) {
-                                deleteMerchantNote(merchantName, index);
-                                updateMerchantNoteAlert();
-                            }
-                        });
+                    // Re-attach events do lock buttons w wrapper
+                    attachLockButtonEvents(wrapperContainer);
+                } else {
+                    // Tylko merchant notes bez lock buttons
+                    let fakePromoAlert = document.querySelector('.fake-promo-alert');
+                    if (fakePromoAlert && fakePromoAlert.parentNode) {
+                        fakePromoAlert.parentNode.insertBefore(noteAlertElement, fakePromoAlert.nextSibling);
+                    } else {
+                        let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
+                        container.prepend(noteAlertElement);
+                    }
+                }
+            };
+
+            // Helper: attach lock button events
+            const attachLockButtonEvents = (container) => {
+                let editLockBtn = container.querySelector('.jp-edit-lock-btn');
+                let editUnlockBtn = container.querySelector('.jp-edit-unlock-btn');
+                let expireLockBtn = container.querySelector('.jp-expire-lock-btn');
+                let expireUnlockBtn = container.querySelector('.jp-expire-unlock-btn');
+
+                if (editLockBtn) {
+                    editLockBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        editLockBtn.disabled = true;
+                        try {
+                            await sendLockRequest('edit', 'lock');
+                            alert(`✅ Edit lock włączony`);
+                        } catch (err) {
+                            alert(`❌ Błąd: ${err}`);
+                        } finally {
+                            editLockBtn.disabled = false;
+                        }
                     });
+                }
 
-                    // Edit button
-                    let editBtn = merchantNoteAlert.querySelector('.jp-merchant-note-edit-btn');
-                    if (editBtn) {
-                        editBtn.addEventListener('click', () => {
-                            editMerchantNote(merchantName, updateMerchantNoteAlert);
-                        });
-                    }
-
-                    // ========== WSTAW PRZYCISKI LOCK/UNLOCK (PONAD PANELEM NOTATEK) ==========
-                    if (settings.enableLockButtons) {
-                        let existingLockButtons = document.querySelector('.jp-lock-buttons-container');
-                        if (existingLockButtons && existingLockButtons.parentNode) {
-                            existingLockButtons.parentNode.removeChild(existingLockButtons);
+                if (editUnlockBtn) {
+                    editUnlockBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        editUnlockBtn.disabled = true;
+                        try {
+                            await sendLockRequest('edit', 'unlock');
+                            alert(`✅ Edit lock wyłączony`);
+                        } catch (err) {
+                            alert(`❌ Błąd: ${err}`);
+                        } finally {
+                            editUnlockBtn.disabled = false;
                         }
-
-                        let lockButtonsContainer = document.createElement('div');
-                        lockButtonsContainer.className = 'jp-lock-buttons-container';
-                        lockButtonsContainer.style.cssText = 'display: flex; gap: 8px; margin-bottom: 10px; z-index: 9999;';
-                        
-                        lockButtonsContainer.innerHTML = `
-                            <button class="jp-edit-lock-btn" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;" title="Zablokuj/odblokuj edycję">🔒 Edit Lock</button>
-                            <button class="jp-expire-lock-btn" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s;" title="Zablokuj/odblokuj ważność">⏰ Expire Lock</button>
-                        `;
-
-                        // Wstaw PRZED panelem notatek
-                        if (merchantNoteAlert && merchantNoteAlert.parentNode) {
-                            merchantNoteAlert.parentNode.insertBefore(lockButtonsContainer, merchantNoteAlert);
-                        } else {
-                            let fakePromoAlert = document.querySelector('.fake-promo-alert');
-                            if (fakePromoAlert && fakePromoAlert.parentNode) {
-                                fakePromoAlert.parentNode.insertBefore(lockButtonsContainer, fakePromoAlert.nextSibling);
-                            } else {
-                                let container = document.querySelector('.v-card.rounded-medium.border-grey--dark') || document.body;
-                                container.prepend(lockButtonsContainer);
-                            }
-                        }
-
-                        // Stan przycisków
-                        let editLockState = 'unlocked'; // domyślnie odblokowane
-                        let expireLockState = 'unlocked';
-
-                        const updateLockButtonAppearance = (btn, state, lockType) => {
-                            if (state === 'locked') {
-                                btn.style.backgroundColor = '#ff6b6b';
-                                btn.innerHTML = lockType === 'edit' ? '🔐 Edit Unlock' : '🔐 Expire Unlock';
-                                btn.title = `Kliknij aby odblokować ${lockType === 'edit' ? 'edycję' : 'ważność'}`;
-                                btn.disabled = false;
-                            } else if (state === 'unlocked') {
-                                btn.style.backgroundColor = '#5a5a5a';
-                                btn.innerHTML = lockType === 'edit' ? '🔒 Edit Lock' : '🔒 Expire Lock';
-                                btn.title = `Kliknij aby zablokować ${lockType === 'edit' ? 'edycję' : 'ważność'}`;
-                                btn.disabled = false;
-                            }
-                        };
-
-                        let editLockBtn = lockButtonsContainer.querySelector('.jp-edit-lock-btn');
-                        let expireLockBtn = lockButtonsContainer.querySelector('.jp-expire-lock-btn');
-
-                        if (editLockBtn) {
-                            editLockBtn.addEventListener('click', async (e) => {
-                                e.preventDefault();
-                                let action = editLockState === 'locked' ? 'unlock' : 'lock';
-                                editLockBtn.disabled = true;
-                                editLockBtn.style.opacity = '0.6';
-
-                                try {
-                                    await sendLockRequest('edit', action);
-                                    editLockState = action === 'lock' ? 'locked' : 'unlocked';
-                                    updateLockButtonAppearance(editLockBtn, editLockState, 'edit');
-                                    alert(`✅ Edit lock ${action === 'lock' ? 'włączony' : 'wyłączony'}`);
-                                } catch (err) {
-                                    alert(`❌ Błąd: ${err}`);
-                                } finally {
-                                    editLockBtn.disabled = false;
-                                    editLockBtn.style.opacity = '1';
-                                }
-                            });
-                        }
-
-                        if (expireLockBtn) {
-                            expireLockBtn.addEventListener('click', async (e) => {
-                                e.preventDefault();
-                                let action = expireLockState === 'locked' ? 'unlock' : 'lock';
-                                expireLockBtn.disabled = true;
-                                expireLockBtn.style.opacity = '0.6';
-
-                                try {
-                                    await sendLockRequest('expire', action);
-                                    expireLockState = action === 'lock' ? 'locked' : 'unlocked';
-                                    updateLockButtonAppearance(expireLockBtn, expireLockState, 'expire');
-                                    alert(`✅ Expire lock ${action === 'lock' ? 'włączony' : 'wyłączony'}`);
-                                } catch (err) {
-                                    alert(`❌ Błąd: ${err}`);
-                                } finally {
-                                    expireLockBtn.disabled = false;
-                                    expireLockBtn.style.opacity = '1';
-                                }
-                            });
-                        }
-                    }
-                };
-
-                // Funkcja do edycji notatki
-                const editMerchantNote = (merchantName, callback) => {
-                    let editContainer = document.createElement('div');
-                    editContainer.style.cssText = 'background-color: var(--jp-template-btn-bg); padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #ff9800; z-index: 9999;';
-
-                    editContainer.innerHTML = `
-                        <div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 Nowa notatka dla ${merchantName}</div>
-                        <input type="text" class="jp-merchant-note-edit-input" placeholder="${t('placeholderMerchantNote')}" style="width: 100%; padding: 8px; border: 1px solid var(--jp-border); background-color: var(--jp-input-bg); color: var(--jp-text); border-radius: 3px; font-size: 12px; box-sizing: border-box; margin-bottom: 8px;" value="">
-                        <div style="display: flex; gap: 8px;">
-                            <button class="jp-merchant-note-save-edit" style="flex: 1; background-color: #366141; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">💾 ${t('btnAddMerchantNote')}</button>
-                            <button class="jp-merchant-note-cancel-edit" style="flex: 1; background-color: #757575; color: white; border: none; padding: 6px; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 500;">Anuluj</button>
-                        </div>
-                    `;
-
-                    // Wstaw na miejsce alert
-                    if (merchantNoteAlert && merchantNoteAlert.parentNode) {
-                        merchantNoteAlert.parentNode.replaceChild(editContainer, merchantNoteAlert);
-                    }
-
-                    let input = editContainer.querySelector('.jp-merchant-note-edit-input');
-                    input.focus();
-
-                    let saveBtn = editContainer.querySelector('.jp-merchant-note-save-edit');
-                    let cancelBtn = editContainer.querySelector('.jp-merchant-note-cancel-edit');
-
-                    saveBtn.addEventListener('click', () => {
-                        let noteText = input.value.trim();
-                        if (noteText) {
-                            saveMerchantNote(merchantName, noteText);
-                        }
-                        merchantNoteAlert = editContainer;
-                        callback();
                     });
+                }
 
-                    cancelBtn.addEventListener('click', () => {
-                        merchantNoteAlert = editContainer;
-                        callback();
+                if (expireLockBtn) {
+                    expireLockBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        expireLockBtn.disabled = true;
+                        try {
+                            await sendLockRequest('expire', 'lock');
+                            alert(`✅ Expire lock włączony`);
+                        } catch (err) {
+                            alert(`❌ Błąd: ${err}`);
+                        } finally {
+                            expireLockBtn.disabled = false;
+                        }
                     });
-                };
+                }
 
-                // Inicjalizuj
+                if (expireUnlockBtn) {
+                    expireUnlockBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        expireUnlockBtn.disabled = true;
+                        try {
+                            await sendLockRequest('expire', 'unlock');
+                            alert(`✅ Expire lock wyłączony`);
+                        } catch (err) {
+                            alert(`❌ Błąd: ${err}`);
+                        } finally {
+                            expireUnlockBtn.disabled = false;
+                        }
+                    });
+                }
+            };
+
+            // Inicjalizuj
+            if (settings.enableMerchantNotes) {
                 updateMerchantNoteAlert();
 
-                // Obserwaj zmiany
+                // Obserwaj zmiany merchant input
                 let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
                 if (merchantInput) {
                     merchantInput.addEventListener('change', updateMerchantNoteAlert);
                     merchantInput.addEventListener('input', debounce(updateMerchantNoteAlert, 300));
                 }
             }
+
+            // Zawsze inicjalizuj lock buttons (niezależnie od merchant notes)
+            updateLockButtons();
 
             let detectAndConvertCallback = null;
 
@@ -3135,15 +3368,16 @@
         document.querySelectorAll('*').forEach(element => {
             // Przechodzenie przez węzły tekstowe (childNodes, nie innerText)
             for (let node of element.childNodes) {
-                if (node.nodeType === Node.TEXT_NODE) {
+                if (node.nodeType === Node.TEXT_NODE && !element.dataset.jpHighlighted) {
                     let text = node.textContent.toLowerCase();
-                    
+
                     // Jeśli węzeł zawiera "banned" lub "unauthenticated"
                     if (text.includes('banned') || text.includes('unauthenticated')) {
                         // Tworzymy span z highlight'owaniem
                         let span = document.createElement('span');
                         span.textContent = node.textContent;
-                        
+                        span.dataset.jpHighlighted = 'true';
+
                         if (text.includes('banned')) {
                             Object.assign(span.style, {
                                 backgroundColor: '#ffcccc',
@@ -3163,9 +3397,10 @@
                                 padding: '2px 5px'
                             });
                         }
-                        
-                        span.dataset.isHighlighted = 'true';
+
                         element.replaceChild(span, node);
+                        element.dataset.jpHighlighted = 'true';
+                        break;
                     }
                 }
             }
