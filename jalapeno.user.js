@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.7.9
+// @version      4.8.0
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 10 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -24,7 +24,8 @@
     'use strict';
 
     const API_URL = "https://script.google.com/macros/s/AKfycbxPY1KVfIZ-MdhBG_QPYhE-H8QsDCqIp2OkD9nBKU8-tGh8mF5OReV0KRVFMecUX0xUcQ/exec";
-    const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbxcxDkQHTdalafwyh2ffhjeIvJjjDIsOBHti0Uh5vuG6JKIvo3DtdUVUTPRf_mMInnl/exec";
+    const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbyLBnmCCfJPnmc1owPB-pcxENNXkRuLEb0jkgmBOseU4bpFQVFsPMojJUcxD8vd-x3d/exec";
+    const SHIPPING_COSTS_API_URL = "https://script.google.com/macros/s/AKfycbw-oGcwhBWyvNjr4qosje8MbDXBeiVJeoUa5BLQ1cKUJK51LnvjMw0o7oHNfax72eE1/exec";
     const DEBUG = false; // Ustaw na true aby włączyć debugowanie
     let fakePromoDB = {};
     let exchangeRates = null;
@@ -59,9 +60,11 @@
         enableMoveApproveBtn: false,
         enableInfractionNote: true,
         enableMerchantNotes: true,
+        enableShippingCosts: true,
         enableApproveReasons: true,
         enableLockButtons: true,
-        enableBannedHighlight: true
+        enableBannedHighlight: true,
+        shippingPanelTopOffset: 135
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -156,9 +159,19 @@
             msgMerchantNoteSaved: "✅ Notatka zapisana i zsynchronizowana",
             msgMerchantNoteDeleted: "✅ Notatka usunięta",
             msgMerchantNoteError: "❌ Błąd synchronizacji notatki",
-            mApproveReasons: "Szablony A&M w oknie Approve (Uzupełniliśmy/zmieniliśmy)",
+            lblShippingCosts: "🚚 Koszty Dostawy",
+            lblShippingCost: "Koszt dostawy (PLN)",
+            lblFreeDeliveryFrom: "Darmowa dostawa od (PLN)",
+            lblShippingNote: "Notatka (opcjonalna)",
+            btnAddShippingCost: "Dodaj koszt dostawy",
+            btnSaveShippingCost: "💾 Zapisz",
+            btnDeleteShippingCost: "🗑️ Usuń",
+            msgShippingCostSaved: "✅ Koszt dostawy zapisany i zsynchronizowany",
+            msgShippingCostDeleted: "✅ Koszt dostawy usunięty",
+            msgShippingCostError: "❌ Błąd synchronizacji kosztu dostawy",
             mLockButtons: "Lock/Unlock przyciski (Edit Lock & Expire Lock)",
-            mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'"
+            mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'",
+            lblShippingOffset: "Wysokość panelu dostawy (px):",
         },
         en: {
             titleSettings: "⚙️ Jalapeño Settings",
@@ -248,10 +261,19 @@
             msgMerchantNoteSaved: "✅ Note saved and synchronized",
             msgMerchantNoteDeleted: "✅ Note deleted",
             msgMerchantNoteError: "❌ Note synchronization error",
-            mApproveReasons: "A&M Templates in Approve modal",
+            lblShippingCosts: "🚚 Shipping Costs",
+            lblShippingCost: "Shipping cost (PLN)",
+            lblFreeDeliveryFrom: "Free delivery from (PLN)",
+            lblShippingNote: "Note (optional)",
+            btnAddShippingCost: "Add shipping cost",
+            btnSaveShippingCost: "💾 Save",
+            btnDeleteShippingCost: "🗑️ Delete",
+            msgShippingCostSaved: "✅ Shipping cost saved and synchronized",
+            msgShippingCostDeleted: "✅ Shipping cost deleted",
+            msgShippingCostError: "❌ Shipping cost synchronization error",
             mLockButtons: "Lock/Unlock buttons (Edit Lock & Expire Lock)",
             mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words",
-            mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words"
+            lblShippingOffset: "Shipping panel top offset (px):",
         }
     };
 
@@ -447,7 +469,7 @@
                 border-radius: 4px !important;
                 margin-bottom: 8px !important;
                 border-left: 3px solid #ff9800 !important;
-                z-index: 9999 !important;
+                z-index: 100 !important;
             }
 
             /* LOCK BUTTONS CONTAINER */
@@ -492,7 +514,7 @@
                 display: flex !important;
                 gap: 8px !important;
                 margin-bottom: 8px !important;
-                z-index: 9999 !important;
+                z-index: 100 !important;
             }
 
             .jp-note-buttons-wrapper .jp-merchant-note-alert {
@@ -510,7 +532,7 @@
                 border-radius: 4px !important;
                 margin-bottom: 8px !important;
                 border-left: 3px solid #ff9800 !important;
-                z-index: 9999 !important;
+                z-index: 100 !important;
             }
 
             .jp-merchant-note-edit-input {
@@ -557,6 +579,136 @@
 
             .jp-merchant-note-save-edit:hover, .jp-merchant-note-cancel-edit:hover {
                 opacity: 0.9 !important;
+            }
+
+            /* SHIPPING COSTS PANEL */
+            .jp-shipping-costs-alert {
+                background-color: var(--jp-template-btn-bg) !important;
+                color: white !important;
+                padding: 8px 12px !important;
+                text-align: left !important;
+                font-size: 12px !important;
+                border-radius: 4px !important;
+                margin-bottom: 8px !important;
+                border-left: 3px solid #4fc3f7 !important;
+                z-index: 100 !important;
+            }
+
+            .jp-shipping-cost-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px;
+                border-radius: 3px;
+                margin-bottom: 6px;
+                border-left: 2px solid #4fc3f7;
+                background-color: rgba(255, 255, 255, 0.05);
+            }
+
+            .jp-shipping-cost-item-content {
+                color: var(--jp-text);
+                font-size: 11px;
+                word-break: break-word;
+                flex: 1;
+            }
+
+            .jp-shipping-cost-btn {
+                background-color: #2196f3 !important;
+                color: white !important;
+                border: none !important;
+                padding: 4px 8px !important;
+                border-radius: 3px !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+            }
+
+            .jp-shipping-cost-btn:hover {
+                background-color: #1976d2 !important;
+                opacity: 0.9 !important;
+            }
+
+            .jp-shipping-cost-delete-btn {
+                background-color: #f44336 !important;
+                color: white !important;
+                border: none !important;
+                padding: 2px 6px !important;
+                border-radius: 3px !important;
+                cursor: pointer !important;
+                font-size: 10px !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+                flex-shrink: 0;
+            }
+
+            .jp-shipping-cost-delete-btn:hover {
+                background-color: #d32f2f !important;
+            }
+
+            .jp-shipping-cost-edit-container {
+                background-color: var(--jp-template-btn-bg) !important;
+                padding: 10px 12px !important;
+                border-radius: 4px !important;
+                margin-bottom: 8px !important;
+                border-left: 3px solid #4fc3f7 !important;
+                z-index: 100 !important;
+            }
+
+            .jp-shipping-cost-form-row {
+                display: flex;
+                gap: 8px;
+                margin-bottom: 8px;
+                align-items: center;
+            }
+
+            .jp-shipping-cost-input {
+                flex: 1;
+                padding: 6px !important;
+                border: 1px solid var(--jp-border) !important;
+                background-color: var(--jp-input-bg) !important;
+                color: var(--jp-input-text) !important;
+                border-radius: 3px !important;
+                font-size: 12px !important;
+                box-sizing: border-box !important;
+            }
+
+            .jp-shipping-cost-input:focus {
+                outline: none !important;
+                border-color: #4fc3f7 !important;
+            }
+
+            .jp-shipping-cost-button-group {
+                display: flex;
+                gap: 6px;
+            }
+
+            .jp-shipping-cost-save-edit, .jp-shipping-cost-cancel-edit {
+                flex: 1;
+                border: none !important;
+                padding: 5px !important;
+                border-radius: 3px !important;
+                cursor: pointer !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                color: white !important;
+                transition: all 0.2s ease !important;
+            }
+
+            .jp-shipping-cost-save-edit {
+                background-color: #2196f3 !important;
+            }
+
+            .jp-shipping-cost-cancel-edit {
+                background-color: #757575 !important;
+            }
+
+            .jp-shipping-cost-save-edit:hover, .jp-shipping-cost-cancel-edit:hover {
+                opacity: 0.9 !important;
+            }
+
+            .mShippingCosts {
+                margin-top: 0;
             }
         `;
 
@@ -917,6 +1069,31 @@
                     color: #d84315 !important;
                 }
             `;
+        } else {
+            // Styl dla light mode
+            css += `
+                /* 1. Naprawa tła kontenera i samego edytora w jasnym motywie */
+                .bg--main {
+                    background-color: #ffffff !important;
+                }
+
+                .redactor-box, .redactor-editor, .ce-block__content, .codex-editor__redactor {
+                    background-color: #ffffff !important;
+                    color: #333333 !important;
+                    border: 1px solid #cccccc !important;
+                }
+
+                /* Tło paska narzędzi edytora, żeby nie zlewał się z polem tekstowym */
+                .redactor-toolbar {
+                    background-color: #f5f5f5 !important;
+                    border-bottom: 1px solid #cccccc !important;
+                }
+
+                /* 2. Przesunięcie przycisku Config w prawo (analogicznie do trybu nocnego) */
+                #open_peppermod_config {
+                    left: 157px !important;
+                }
+            `;
         }
 
         GM_addStyle(css);
@@ -987,6 +1164,7 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-floating-btn" ${settings.enableFloatingButton ? 'checked' : ''}> ${t('mFloatingBtn')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings.enableMoveApproveBtn ? 'checked' : ''}> ${t('mMoveApprove')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-merchant-notes" ${settings.enableMerchantNotes ? 'checked' : ''}> ${t('lblMerchantNotes')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-shipping-costs" ${settings.enableShippingCosts ? 'checked' : ''}> ${t('lblShippingCosts')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-approve-reasons" ${settings.enableApproveReasons ? 'checked' : ''}> ${t('mApproveReasons')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lock-buttons" ${settings.enableLockButtons ? 'checked' : ''}> ${t('mLockButtons')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-banned-highlight" ${settings.enableBannedHighlight ? 'checked' : ''}> ${t('mBannedHighlight')}</label>
@@ -1006,7 +1184,7 @@
                     </select>
                 </div>
 
-                <div class="settings-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: end; margin-top: 15px;">
+                <div class="settings-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr; gap: 20px; align-items: end; margin-top: 15px;">
                     <div>
                         <label>${t('lblFloatingText')}</label>
                         <input type="text" id="set-floating-text" value="${settings.customFloatingText}" placeholder="np.  | Smart! Okazja" style="width:100%">
@@ -1015,6 +1193,10 @@
                         <label style="font-weight:normal; display:flex; align-items:center; gap:5px; height: 35px; margin-bottom: 2px; cursor:pointer;">
                             <input type="checkbox" id="set-floating-freedel" ${settings.floatingButtonAutoFreeDelivery ? 'checked' : ''}> ${t('lblFloatingFreeDel')}
                         </label>
+                    </div>
+                    <div>
+                        <label>${t('lblShippingOffset')}</label>
+                        <input type="number" id="set-shipping-offset" value="${settings.shippingPanelTopOffset}" style="width:100%">
                     </div>
                 </div>
 
@@ -1129,9 +1311,11 @@
                 floatingButtonAutoFreeDelivery: document.getElementById('set-floating-freedel').checked,
                 enableMoveApproveBtn: document.getElementById('set-move-approve').checked,
                 enableMerchantNotes: document.getElementById('set-merchant-notes').checked,
+                enableShippingCosts: document.getElementById('set-shipping-costs').checked,
                 enableApproveReasons: document.getElementById('set-approve-reasons').checked,
                 enableLockButtons: document.getElementById('set-lock-buttons').checked,
-                enableBannedHighlight: document.getElementById('set-banned-highlight').checked
+                enableBannedHighlight: document.getElementById('set-banned-highlight').checked,
+                shippingPanelTopOffset: parseInt(document.getElementById('set-shipping-offset').value) || 0
             });
         };
 
@@ -1202,6 +1386,24 @@
         .settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-save { background: #2e7d32; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight:bold;}
         .btn-cancel { background: #777; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; color: white; font-weight:bold;}
+
+        .jp-shipping-side-panel {
+                width: 300px;
+                background: var(--jp-bg);
+                border: 1px solid var(--jp-border);
+                border-radius: 6px;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                position: absolute;
+                left: 100%;
+                top: ${settings.shippingPanelTopOffset !== undefined ? settings.shippingPanelTopOffset : 135}px; /* <--- POZYCJA Z USTAWIEŃ */
+                margin-left: 10px;
+                z-index: 1;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            }
+
     `);
 
     function fetchExchangeRates(callback) {
@@ -1440,26 +1642,23 @@
         let allNotes = getMerchantNotes();
         let merchantKey = merchantName.toLowerCase();
         let timestamp = new Date().toISOString();
-
-        // Wyciągamy nick prosto z "bebechów" Peppera
         let moderator = moderatorName || getModeratorName();
 
-        // Inicjalizuj tablicę jeśli nie istnieje
         if (!allNotes[merchantKey]) {
             allNotes[merchantKey] = [];
         }
 
-        // Dodaj nową notatkę
         allNotes[merchantKey].push({
             text: noteText,
             savedAt: timestamp,
             savedBy: moderator
         });
 
+        // Zapis lokalny
         GM_setValue('jalapenoMerchantNotes', allNotes);
 
-        // Send to API for synchronization
-        sendMerchantNotesToAPI(allNotes);
+        // Wysyłka tylko konkretnej zmiany
+        sendMerchantNoteDeltaToAPI(merchantKey, allNotes[merchantKey]);
 
         return true;
     }
@@ -1473,28 +1672,22 @@
         if (allNotes[merchantKey] && allNotes[merchantKey][noteIndex]) {
             allNotes[merchantKey].splice(noteIndex, 1);
 
-            // Jeśli tablica jest pusta, usuń cały merchant
             if (allNotes[merchantKey].length === 0) {
                 delete allNotes[merchantKey];
             }
         }
 
+        // Zapis lokalny
         GM_setValue('jalapenoMerchantNotes', allNotes);
-        sendMerchantNotesToAPI(allNotes);
+
+        // Wysyłka tylko konkretnej zmiany (podajemy odchudzoną tablicę lub pustą [], jeśli skasowano ostatnią notatkę)
+        sendMerchantNoteDeltaToAPI(merchantKey, allNotes[merchantKey] || []);
 
         return true;
     }
 
-    function getMerchantNotesList(merchantName) {
-        if (!merchantName) return [];
-
-        let allNotes = getMerchantNotes();
-        let merchantKey = merchantName.toLowerCase();
-
-        return allNotes[merchantKey] || [];
-    }
-
-    function sendMerchantNotesToAPI(notesObj) {
+    // Nowa funkcja do komunikacji - wymienia stare "sendMerchantNotesToAPI"
+    function sendMerchantNoteDeltaToAPI(merchantKey, notesArray) {
         if (!MERCHANT_NOTES_API_URL) {
             if (DEBUG) console.warn("⚠️ MERCHANT_NOTES_API_URL not configured");
             return;
@@ -1504,17 +1697,34 @@
             method: "POST",
             url: MERCHANT_NOTES_API_URL,
             data: JSON.stringify({
-                action: 'saveMerchantNotes',
-                notes: notesObj
+                action: 'updateMerchantNotes',
+                merchantName: merchantKey,
+                notesArray: notesArray
             }),
             headers: { "Content-Type": "application/json" },
             onload: function(response) {
-                if (DEBUG) console.log("✅ Merchant notes synchronized");
+                try {
+                    let data = JSON.parse(response.responseText);
+                    if (data && data.notes && typeof data.notes === 'object') {
+                        // Pobiera połączoną bazę z serwera i aktualizuje cache
+                        GM_setValue('jalapenoMerchantNotes', data.notes);
+                        if (DEBUG) console.log("✅ Merchant notes synchronized (Delta)");
+                    }
+                } catch (e) {}
             },
             onerror: function() {
                 if (DEBUG) console.warn("⚠️ Failed to sync merchant notes");
             }
         });
+    }
+
+    function getMerchantNotesList(merchantName) {
+        if (!merchantName) return [];
+
+        let allNotes = getMerchantNotes();
+        let merchantKey = merchantName.toLowerCase();
+
+        return allNotes[merchantKey] || [];
     }
 
     function fetchMerchantNotesFromAPI() {
@@ -1543,6 +1753,123 @@
             },
             onerror: function() {
                 if (DEBUG) console.warn("⚠️ Failed to fetch merchant notes from API");
+            }
+        });
+    }
+
+    // ===== SHIPPING COSTS SYSTEM =====
+    function getShippingCosts() {
+        return GM_getValue('jalapenoShippingCosts', {});
+    }
+
+    function getShippingCostsList(merchantName) {
+        if (!merchantName) return null;
+
+        let allCosts = getShippingCosts();
+        let merchantKey = merchantName.toLowerCase();
+
+        return allCosts[merchantKey] || null;
+    }
+
+    function saveShippingCost(merchantName, shippingData) {
+        if (!merchantName || !shippingData) return false;
+
+        let merchantKey = merchantName.toLowerCase();
+
+        let newCostData = {
+            cost: shippingData.cost,
+            freeDeliveryFrom: shippingData.freeDeliveryFrom,
+            note: shippingData.note || '',
+            savedAt: new Date().toISOString(),
+            savedBy: getModeratorName()
+        };
+
+        // 1. Zapisujemy lokalnie (tzw. Optimistic UI update - żeby interfejs zareagował od razu)
+        let allCosts = getShippingCosts();
+        allCosts[merchantKey] = newCostData;
+        GM_setValue('jalapenoShippingCosts', allCosts);
+
+        // 2. Wysyłamy TYLKO DELTĘ do Google Apps Script
+        if (SHIPPING_COSTS_API_URL && !SHIPPING_COSTS_API_URL.includes('WSTAW_TU')) {
+            GM_xmlhttpRequest({
+                method: "POST",
+                url: SHIPPING_COSTS_API_URL,
+                data: JSON.stringify({
+                    action: 'updateShippingCost',
+                    merchantName: merchantKey,
+                    shippingData: newCostData
+                }),
+                headers: { "Content-Type": "application/json" },
+                onload: function(response) {
+                    // Opcjonalnie synchronizujemy naszą lokalną pamięć z najnowszą paczką zwróconą z serwera (na wypadek, gdyby inny moderator w międzyczasie coś dodał)
+                    try {
+                        let res = JSON.parse(response.responseText);
+                        if (res.costs) GM_setValue('jalapenoShippingCosts', res.costs);
+                    } catch(e) {}
+                }
+            });
+        }
+        return true;
+    }
+
+    function deleteShippingCost(merchantName) {
+        if (!merchantName) return false;
+        let merchantKey = merchantName.toLowerCase();
+
+        // 1. Usunięcie lokalne
+        let allCosts = getShippingCosts();
+        if (allCosts[merchantKey]) {
+            delete allCosts[merchantKey];
+            GM_setValue('jalapenoShippingCosts', allCosts);
+        }
+
+        // 2. Wysłanie informacji o usunięciu (DELTY) na serwer
+        if (SHIPPING_COSTS_API_URL && !SHIPPING_COSTS_API_URL.includes('WSTAW_TU')) {
+            GM_xmlhttpRequest({
+                method: "POST",
+                url: SHIPPING_COSTS_API_URL,
+                data: JSON.stringify({
+                    action: 'deleteShippingCost',
+                    merchantName: merchantKey
+                }),
+                headers: { "Content-Type": "application/json" },
+                onload: function(response) {
+                    try {
+                        let res = JSON.parse(response.responseText);
+                        if (res.costs) GM_setValue('jalapenoShippingCosts', res.costs);
+                    } catch(e) {}
+                }
+            });
+        }
+        return true;
+    }
+
+    function fetchShippingCostsFromAPI() {
+        if (!SHIPPING_COSTS_API_URL || SHIPPING_COSTS_API_URL.includes('WSTAW_TU')) {
+            if (DEBUG) console.warn("⚠️ SHIPPING_COSTS_API_URL not configured");
+            return;
+        }
+
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: SHIPPING_COSTS_API_URL,
+            data: JSON.stringify({
+                action: 'getShippingCosts'
+            }),
+            headers: { "Content-Type": "application/json" },
+            onload: function(response) {
+                try {
+                    let data = JSON.parse(response.responseText);
+                    if (data && data.costs && typeof data.costs === 'object') {
+                        GM_setValue('jalapenoShippingCosts', data.costs);
+                        if (DEBUG) console.log("✅ Shipping costs updated directly from API");
+                    }
+                } catch (e) {
+                    if (DEBUG) console.warn("⚠️ Error parsing shipping costs from API:", e);
+                }
+            },
+            onerror: function() {
+                if (DEBUG) console.warn("⚠️ Failed to fetch shipping costs from API");
             }
         });
     }
@@ -2208,40 +2535,6 @@
         }
     }
 
-    let setVuetifyCheckbox = (labelText, desiredState) => {
-        let elements = Array.from(document.querySelectorAll('div, span, p'));
-        let targetEl = elements.find(el => {
-            return Array.from(el.childNodes).some(node =>
-                node.nodeType === Node.TEXT_NODE && node.textContent.trim().includes(labelText)
-            );
-        });
-
-        if (!targetEl) return;
-
-        let parentRow = targetEl.closest('.layout.align-center') || targetEl.parentElement;
-        let wrapper = parentRow ? parentRow.querySelector('.v-input--selection-controls') : null;
-
-        if (!wrapper) {
-            parentRow = parentRow.parentElement;
-            wrapper = parentRow ? parentRow.querySelector('.v-input--selection-controls') : null;
-            if (!wrapper) return;
-        }
-
-        let input = wrapper.querySelector('input[type="checkbox"]');
-        let isChecked = false;
-
-        if (input) {
-            isChecked = input.checked || input.getAttribute('aria-checked') === 'true';
-        } else {
-            isChecked = wrapper.classList.contains('v-input--is-label-active') || wrapper.classList.contains('v-input--is-dirty');
-        }
-
-        if (isChecked !== desiredState) {
-            let clickTarget = wrapper.querySelector('.v-input--selection-controls__ripple') || input;
-            if (clickTarget) clickTarget.click();
-        }
-    };
-
     function checkDeal() {
         let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
         let currentTitle = getCurrentTitle();
@@ -2389,6 +2682,8 @@
                         e.target.style.backgroundColor = "";
                         e.target.style.color = "";
                         e.target.title = "";
+                        // Odśwież boczny panel przy ręcznym wpisywaniu
+                        if (settings.enableShippingCosts) setTimeout(updateShippingCostAlert, 200);
                     }
                 }, true);
 
@@ -2404,6 +2699,8 @@
                                 el.style.color = "";
                                 el.style.padding = "";
                             });
+                            // Odśwież boczny panel po kliknięciu checkboxa
+                            if (settings.enableShippingCosts) setTimeout(updateShippingCostAlert, 200);
                         }
                     }
                 }, true);
@@ -2514,30 +2811,6 @@
                     window.jpDealCheckersAttached = false;
                 }
 
-                let highlightShippingField = (expectedValue) => {
-                    let attempts = 0;
-                    let interval = setInterval(() => {
-                        let inputNode = getShippingInput();
-
-                        if (inputNode && !inputNode.disabled) {
-                            clearInterval(interval);
-                            inputNode.dataset.jpShipping = "true";
-
-                            if (inputNode.value === "") {
-                                inputNode.classList.add('jp-shipping-alert');
-                                inputNode.placeholder = `👉 Wpisz: ${expectedValue}`;
-                                inputNode.title = `Jalapeño: Wymagane ręczne wpisanie ${expectedValue}`;
-                            } else {
-                                inputNode.classList.remove('jp-shipping-alert');
-                                inputNode.placeholder = "Shipping costs";
-                            }
-                        } else if (attempts > 20) {
-                            clearInterval(interval);
-                        }
-                        attempts++;
-                    }, 50);
-                };
-
                 let canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
                 let linkToCheck = (canonicalUrlNode && canonicalUrlNode.value.trim() !== "")
                                     ? canonicalUrlNode.value.toLowerCase()
@@ -2589,8 +2862,7 @@
                                 freeDelLabel.style.backgroundColor = "";
                                 freeDelLabel.style.color = "";
                             }
-                            //test
-                            //highlightShippingField("8,99");
+
                             if (!window.jpUserEditedShipping && !window.jpAutoShippingSet) {
                                 window.jpAutoShippingSet = true;
                                 setTimeout(() => {
@@ -2651,7 +2923,7 @@
                         { keys: ['Obi'], url: 'https://www.obi.pl/', local: false },
                         { keys: ['sinsay'], url: 'https://www.sinsay.com/pl/pl/', local: false },
                         { keys: ['ikea'], url: 'https://www.ikea.com/pl/pl/', local: false },
-                        { keys: ['zabka', 'żabka'], url: 'https://www.zabka.pl/', local: true },
+                        { keys: ['zabka', 'żabka', 'zabce', 'zappsy', 'zappsów'], url: 'https://www.zabka.pl/', local: true },
                         { keys: ['half price', 'halfprice'], url: 'https://www.halfprice.eu/en', local: true },
                     ];
 
@@ -2688,8 +2960,23 @@
             } else {
                 rightCol.innerHTML = `<div style="color:var(--jp-text-muted); font-size:11px; padding-top: 15px;">${t('lblHistDisabled')}</div>`;
             }
+
             toolsBox.appendChild(leftCol);
             toolsBox.appendChild(rightCol);
+
+            // TWORZENIE BOCZNEGO PANELU DOSTAWY (Po prawej stronie od .mb-3)
+            let mainFormPanel = document.querySelector('.layout.column.mb-3.px-4') || document.querySelector('.mb-3');
+            if (mainFormPanel && !document.getElementById('jp-shipping-side-panel')) {
+                // Ustawiamy główny panel jako punkt odniesienia (bez psucia jego siatki)
+                mainFormPanel.style.position = 'relative';
+
+                let sidePanel = document.createElement('div');
+                sidePanel.id = 'jp-shipping-side-panel';
+                sidePanel.className = 'jp-shipping-side-panel';
+
+                // Wstrzykujemy nasz panel bezpośrednio do głównego formularza
+                mainFormPanel.appendChild(sidePanel);
+            }
 
             let targetDiv = document.querySelector('.layout.column.mb-3.px-4');
             if (targetDiv && targetDiv.parentNode) {
@@ -2786,6 +3073,204 @@
                 });
             };
 
+            // Funkcja do edycji kosztu dostawy
+            const editShippingCost = (merchantName, callback) => {
+                let targetContainer = document.getElementById('jp-shipping-side-panel');
+                if (!targetContainer) return;
+
+                let currentCosts = getShippingCostsList(merchantName);
+                let costValue = currentCosts ? currentCosts.cost : '';
+                let freeDeliveryValue = currentCosts ? currentCosts.freeDeliveryFrom : '';
+                let noteValue = currentCosts ? currentCosts.note : '';
+
+                targetContainer.innerHTML = `
+                    <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 12px;">🚚 Edycja: ${merchantName}</div>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Koszt dostawy (PLN):</label>
+                            <input type="number" class="jp-shipping-cost-cost" value="${costValue}" step="0.01" min="0" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Darmowa dostawa od (PLN):</label>
+                            <input type="number" class="jp-shipping-cost-free-from" value="${freeDeliveryValue}" step="0.01" min="0" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Notatka (opcjonalnie):</label>
+                            <input type="text" class="jp-shipping-cost-note" value="${noteValue}" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="jp-shipping-cost-save-edit" style="flex: 1; background-color: #2e7d32; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">💾 Zapisz</button>
+                        <button class="jp-shipping-cost-cancel-edit" style="flex: 1; background-color: #757575; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Anuluj</button>
+                    </div>
+                `;
+
+                let costInput = targetContainer.querySelector('.jp-shipping-cost-cost');
+                costInput.focus();
+
+                targetContainer.querySelector('.jp-shipping-cost-save-edit').addEventListener('click', () => {
+                    let cost = targetContainer.querySelector('.jp-shipping-cost-cost').value.trim();
+                    let freeFrom = targetContainer.querySelector('.jp-shipping-cost-free-from').value.trim();
+                    let note = targetContainer.querySelector('.jp-shipping-cost-note').value.trim();
+
+                    // Zapisujemy pod warunkiem, że cokolwiek wpisano
+                    if (cost || freeFrom || note) {
+                        saveShippingCost(merchantName, {
+                            cost: cost ? parseFloat(cost) : 0,
+                            freeDeliveryFrom: freeFrom ? parseFloat(freeFrom) : 0,
+                            note: note
+                        });
+                    }
+                    callback();
+                });
+
+                targetContainer.querySelector('.jp-shipping-cost-cancel-edit').addEventListener('click', () => {
+                    callback();
+                });
+            };
+
+            const updateShippingCostAlert = () => {
+                let targetContainer = document.getElementById('jp-shipping-side-panel');
+                if (!targetContainer) return;
+
+                if (!settings.enableShippingCosts) {
+                    targetContainer.style.display = 'none';
+                    return;
+                } else {
+                    targetContainer.style.display = 'flex';
+                }
+
+                let merchantName = getMerchantNameForNotes();
+                if (!merchantName || merchantName === '---') {
+                    targetContainer.innerHTML = `<div style="color:var(--jp-text-muted); font-size:12px; text-align:center;">Wybierz lub wpisz sklep, aby zobaczyć koszty dostawy...</div>`;
+                    return;
+                }
+
+                let shippingCosts = getShippingCostsList(merchantName);
+
+                // Jeśli brak danych w bazie, pokazujemy tylko przyciski do pobrania/dodania
+                if (!shippingCosts) {
+                    targetContainer.innerHTML = `
+                        <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
+                        <div style="font-size: 12px; color: var(--jp-text-muted); margin-bottom: 12px; line-height: 1.4;">Brak zapisanych kosztów dostawy dla tego sklepu.</div>
+                        <button class="jp-shipping-cost-pull-btn" style="width: 100%; background-color: #ff9800; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s;">📥 Pobierz z formularza obok</button>
+                        <button class="jp-shipping-cost-add-btn" style="width: 100%; background-color: #2196f3; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;">➕ Wpisz ręcznie</button>
+                    `;
+
+                    targetContainer.querySelector('.jp-shipping-cost-pull-btn').addEventListener('click', () => {
+                        let nativeInput = document.querySelector('input[placeholder="Shipping costs"], input[data-jp-shipping="true"]');
+                        let allLabels = Array.from(document.querySelectorAll('label'));
+                        let freeDelLabel = allLabels.find(l => l.innerText.trim().includes("Free Delivery"));
+                        let wrapper = freeDelLabel ? freeDelLabel.closest('.v-input--selection-controls') : null;
+                        let checkbox = wrapper ? wrapper.querySelector('input[type="checkbox"]') : null;
+                        let isFreeChecked = checkbox ? (checkbox.checked || checkbox.getAttribute('aria-checked') === 'true') : (wrapper && (wrapper.classList.contains('v-input--is-label-active') || wrapper.classList.contains('v-input--is-dirty')));
+
+                        if (isFreeChecked) {
+                            saveShippingCost(merchantName, { cost: 0, freeDeliveryFrom: 0, note: '' });
+                            updateShippingCostAlert();
+                        } else if (nativeInput && nativeInput.value.trim() !== "") {
+                            let parsedVal = parseFloat(nativeInput.value.replace(',', '.').replace(/[^\d.]/g, ''));
+                            if (!isNaN(parsedVal)) {
+                                saveShippingCost(merchantName, { cost: parsedVal, freeDeliveryFrom: 0, note: '' });
+                                updateShippingCostAlert();
+                            } else {
+                                alert('❌ Błąd: Nie można rozpoznać kwoty w polu formularza.');
+                            }
+                        } else {
+                            alert('❌ Błąd: Pole kosztów jest puste, a dostawa nie jest darmowa.');
+                        }
+                    });
+
+                    targetContainer.querySelector('.jp-shipping-cost-add-btn').addEventListener('click', () => {
+                        editShippingCost(merchantName, updateShippingCostAlert);
+                    });
+                    return;
+                }
+
+                // ==============================================
+                // ISTNIEJĄ KOSZTY - Logika sprawdzania rozbieżności
+                // ==============================================
+                let price = getCurrentPrice() || 0;
+                let nativeInput = document.querySelector('input[placeholder="Shipping costs"], input[data-jp-shipping="true"]');
+                let nativeValue = nativeInput ? nativeInput.value.trim() : "";
+                let parsedNativeValue = nativeValue ? parseFloat(nativeValue.replace(',', '.').replace(/[^\d.]/g, '')) : null;
+
+                // Czy powinna być zastosowana darmowa wysyłka?
+                let shouldBeFree = (shippingCosts.freeDeliveryFrom > 0 && price >= shippingCosts.freeDeliveryFrom) || shippingCosts.cost === 0;
+
+                let allLabels = Array.from(document.querySelectorAll('label'));
+                let freeDelLabel = allLabels.find(l => l.innerText.trim().includes("Free Delivery"));
+                let wrapper = freeDelLabel ? freeDelLabel.closest('.v-input--selection-controls') : null;
+                let checkbox = wrapper ? wrapper.querySelector('input[type="checkbox"]') : null;
+                let isFreeChecked = checkbox ? (checkbox.checked || checkbox.getAttribute('aria-checked') === 'true') : (wrapper && (wrapper.classList.contains('v-input--is-label-active') || wrapper.classList.contains('v-input--is-dirty')));
+
+                let needsUpdate = false;
+
+                // Sprawdzamy czy to co wpisane zgadza się z regułami w bazie
+                if (shouldBeFree) {
+                    if (!isFreeChecked) needsUpdate = true;
+                } else {
+                    if (isFreeChecked || parsedNativeValue !== shippingCosts.cost) needsUpdate = true;
+                }
+
+                // Renderowanie zielonego przycisku tylko jeśli występuje rozbieżność
+                let applyBtnHtml = needsUpdate ?
+                    `<button class="jp-shipping-apply-btn" style="width: 100%; background-color: #4caf50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 5px rgba(76, 175, 80, 0.4);">🚀 Zastosuj koszty w okazji</button>` : '';
+
+                // Wyświetlanie struktury
+                targetContainer.innerHTML = `
+                    <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
+                    <div style="background: var(--jp-input-bg); border: 1px solid #4fc3f7; border-left: 4px solid #4fc3f7; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 13px; color: var(--jp-text); line-height: 1.6;">
+                        <div style="margin-bottom: 4px;">💵 <b>Koszt:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.cost} PLN</span></div>
+                        ${shippingCosts.freeDeliveryFrom > 0 ? `<div style="margin-bottom: 4px;">🎁 <b>Darmowa od:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.freeDeliveryFrom} PLN</span></div>` : ''}
+                        ${shippingCosts.note ? `<div>📌 <b>Info:</b> ${shippingCosts.note}</div>` : ''}
+                    </div>
+                    ${applyBtnHtml}
+                    <div style="display: flex; gap: 8px;">
+                        <button class="jp-shipping-cost-btn" title="Edytuj koszt" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">✏️ Edytuj</button>
+                        <button class="jp-shipping-cost-delete-btn" title="Usuń" style="flex: 1; background-color: #f44336; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">🗑️ Usuń</button>
+                    </div>
+                `;
+
+                // Podpięcie zdarzenia dla zielonego przycisku
+                if (needsUpdate) {
+                    targetContainer.querySelector('.jp-shipping-apply-btn').addEventListener('click', () => {
+                        if (shouldBeFree) {
+                            setVuetifyCheckbox("Free Delivery", true, true);
+                            if (nativeInput && nativeInput.value !== "") {
+                                nativeInput.focus();
+                                nativeInput.value = '';
+                                nativeInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                                nativeInput.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                                nativeInput.blur();
+                            }
+                        } else {
+                            if (isFreeChecked) {
+                                setVuetifyCheckbox("Free Delivery", false, true);
+                            }
+                            setShippingCost(shippingCosts.cost.toString().replace('.', ','));
+                        }
+
+                        window.jpUserEditedShipping = true; // Zabezpiecza przed nadpisaniem np. przez Amazon rules
+
+                        // Odśwież panel po chwili, żeby Vue miało czas załapać zmianę i ukryć zielony przycisk
+                        setTimeout(() => updateShippingCostAlert(), 400);
+                    });
+                }
+
+                // Podpięcie reszty przycisków
+                targetContainer.querySelector('.jp-shipping-cost-btn').addEventListener('click', () => {
+                    editShippingCost(merchantName, updateShippingCostAlert);
+                });
+
+                targetContainer.querySelector('.jp-shipping-cost-delete-btn').addEventListener('click', () => {
+                    if (confirm('⚠️ Czy na pewno chcesz usunąć ten koszt dostawy z bazy?')) {
+                        deleteShippingCost(merchantName);
+                        updateShippingCostAlert();
+                    }
+                });
+            };
+
             // MERCHANT NOTES UPDATE
             const updateMerchantNoteAlert = () => {
                 if (!settings.enableMerchantNotes) {
@@ -2842,6 +3327,7 @@
                 alertHTML += `
                     <button class="jp-merchant-note-edit-btn" style="width: 100%; background-color: #4a7a59; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 500; transition: all 0.2s ease;">+ ${t('btnAddMerchantNote')}</button>
                 `;
+
 
                 merchantNoteAlert.innerHTML = alertHTML;
 
@@ -3069,6 +3555,18 @@
                 }
             }
 
+            // Inicjalizuj shipping costs
+            if (settings.enableShippingCosts) {
+                updateShippingCostAlert();
+
+                // Obserwaj zmiany merchant input
+                let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+                if (merchantInput) {
+                    merchantInput.addEventListener('change', updateShippingCostAlert);
+                    merchantInput.addEventListener('input', debounce(updateShippingCostAlert, 300));
+                }
+            }
+
             // Zawsze inicjalizuj lock buttons (niezależnie od merchant notes)
             updateLockButtons();
 
@@ -3233,7 +3731,11 @@
 
             let priceInputNode = document.querySelector('input[placeholder="Price"]');
             if (priceInputNode) {
-                priceInputNode.addEventListener('input', debounce(() => checkAutomations(), 400));
+                priceInputNode.addEventListener('input', debounce(() => {
+                    checkAutomations();
+                    // Zmiana ceny wymusza sprawdzenie, czy nie wszedł limit na darmową dostawę
+                    if (settings.enableShippingCosts) updateShippingCostAlert();
+                }, 400));
             }
         }
         return true;
@@ -3241,6 +3743,7 @@
 
     fetchExchangeRates(() => {});
     fetchMerchantNotesFromAPI();
+    loadDatabase();
 
     // Funkcja do wyciągnięcia slug-a z URL-a referer-a
     function getPromoSlugFromPage() {
@@ -3574,6 +4077,5 @@
             highlightBannedAndUnauthenticated();
             lastBannedHighlightCheck = now;
         }
-
     }, 300);
 })();
