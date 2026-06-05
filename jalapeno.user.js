@@ -1107,7 +1107,7 @@
         toast.textContent = message;
         toast.style.cssText = `
             position: fixed;
-            bottom: 30px;
+            top: 30px;
             right: 30px;
             background-color: ${isError ? '#f44336' : '#4caf50'};
             color: white;
@@ -1119,7 +1119,7 @@
             z-index: 10000;
             opacity: 0;
             transition: opacity 0.3s ease, transform 0.3s ease;
-            transform: translateY(20px);
+            transform: translateY(-20px);
             pointer-events: none;
         `;
         document.body.appendChild(toast);
@@ -1133,7 +1133,7 @@
         // Usunięcie po 3 sekundach
         setTimeout(() => {
             toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
+            toast.style.transform = 'translateY(-20px)';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
