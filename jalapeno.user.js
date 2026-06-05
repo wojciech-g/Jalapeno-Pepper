@@ -1101,6 +1101,43 @@
 
     injectThemeCSS();
 
+    // --- FUNKCJA DO POWIADOMIEŃ (TOAST) ---
+    function showToast(message, isError = false) {
+        let toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: ${isError ? '#f44336' : '#4caf50'};
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateY(20px);
+            pointer-events: none;
+        `;
+        document.body.appendChild(toast);
+
+        // Animacja wjazdu
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+
+        // Usunięcie po 3 sekundach
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(20px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     function openSettings() {
         const modalHtml = `
             <div class="modal-overlay" id="modal-overlay"></div>
@@ -3008,11 +3045,20 @@
                     }
                 }
 
-                // 3. Fallback: wyciągnij domenę z linku
-                let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
-                if (urlTextarea && urlTextarea.value.trim()) {
+                // 3. Fallback: wyciągnij domenę z linku (najpierw canonical, potem mainUrl)
+                let canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
+                let mainUrlNode = document.querySelector('textarea[name="mainUrl"]');
+
+                let fallbackUrl = "";
+                if (canonicalUrlNode && canonicalUrlNode.value.trim() !== "") {
+                    fallbackUrl = canonicalUrlNode.value.trim();
+                } else if (mainUrlNode && mainUrlNode.value.trim() !== "") {
+                    fallbackUrl = mainUrlNode.value.trim();
+                }
+
+                if (fallbackUrl) {
                     try {
-                        let domain = new URL(urlTextarea.value.trim()).hostname.replace(/^www\./, '');
+                        let domain = new URL(fallbackUrl).hostname.replace(/^www\./, '');
                         if (domain) return domain;
                     } catch(e) {}
                 }
@@ -3488,9 +3534,9 @@
                         editLockBtn.disabled = true;
                         try {
                             await sendLockRequest('edit', 'lock');
-                            alert(`✅ Edit lock włączony`);
+                            showToast(`✅ Edit lock włączony`);
                         } catch (err) {
-                            alert(`❌ Błąd: ${err}`);
+                            showToast(`❌ Błąd: ${err}`, true);
                         } finally {
                             editLockBtn.disabled = false;
                         }
@@ -3503,9 +3549,9 @@
                         editUnlockBtn.disabled = true;
                         try {
                             await sendLockRequest('edit', 'unlock');
-                            alert(`✅ Edit lock wyłączony`);
+                            showToast(`✅ Edit lock wyłączony`);
                         } catch (err) {
-                            alert(`❌ Błąd: ${err}`);
+                            showToast(`❌ Błąd: ${err}`, true);
                         } finally {
                             editUnlockBtn.disabled = false;
                         }
@@ -3518,9 +3564,9 @@
                         expireLockBtn.disabled = true;
                         try {
                             await sendLockRequest('expire', 'lock');
-                            alert(`✅ Expire lock włączony`);
+                            showToast(`✅ Expire lock włączony`);
                         } catch (err) {
-                            alert(`❌ Błąd: ${err}`);
+                            showToast(`❌ Błąd: ${err}`, true);
                         } finally {
                             expireLockBtn.disabled = false;
                         }
@@ -3533,16 +3579,15 @@
                         expireUnlockBtn.disabled = true;
                         try {
                             await sendLockRequest('expire', 'unlock');
-                            alert(`✅ Expire lock wyłączony`);
+                            showToast(`✅ Expire lock wyłączony`);
                         } catch (err) {
-                            alert(`❌ Błąd: ${err}`);
+                            showToast(`❌ Błąd: ${err}`, true);
                         } finally {
                             expireUnlockBtn.disabled = false;
                         }
                     });
                 }
             };
-
             // Inicjalizuj
             if (settings.enableMerchantNotes) {
                 updateMerchantNoteAlert();
