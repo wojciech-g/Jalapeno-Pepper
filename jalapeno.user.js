@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.0
+// @version      4.8.1
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 10 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -26,7 +26,7 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbxPY1KVfIZ-MdhBG_QPYhE-H8QsDCqIp2OkD9nBKU8-tGh8mF5OReV0KRVFMecUX0xUcQ/exec";
     const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbyLBnmCCfJPnmc1owPB-pcxENNXkRuLEb0jkgmBOseU4bpFQVFsPMojJUcxD8vd-x3d/exec";
     const SHIPPING_COSTS_API_URL = "https://script.google.com/macros/s/AKfycbw-oGcwhBWyvNjr4qosje8MbDXBeiVJeoUa5BLQ1cKUJK51LnvjMw0o7oHNfax72eE1/exec";
-    const DEBUG = false; // Ustaw na true aby włączyć debugowanie
+    const DEBUG = true; // Ustaw na true aby włączyć debugowanie
     let fakePromoDB = {};
     let exchangeRates = null;
 
@@ -64,7 +64,8 @@
         enableApproveReasons: true,
         enableLockButtons: true,
         enableBannedHighlight: true,
-        shippingPanelTopOffset: 135
+        shippingPanelTopOffset: 135,
+        enablePriceWarning: true,
     };
 
     let settings = Object.assign({}, DEFAULT_SETTINGS, GM_getValue('jalapenoSettings', {}));
@@ -172,6 +173,7 @@
             mLockButtons: "Lock/Unlock przyciski (Edit Lock & Expire Lock)",
             mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'",
             lblShippingOffset: "Wysokość panelu dostawy (px):",
+            mPriceWarning: "Ostrzeżenie o wzroście ceny (>1%)",
         },
         en: {
             titleSettings: "⚙️ Jalapeño Settings",
@@ -274,6 +276,7 @@
             mLockButtons: "Lock/Unlock buttons (Edit Lock & Expire Lock)",
             mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words",
             lblShippingOffset: "Shipping panel top offset (px):",
+            mPriceWarning: "Price increase warning (>1%)",
         }
     };
 
@@ -1205,6 +1208,7 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-approve-reasons" ${settings.enableApproveReasons ? 'checked' : ''}> ${t('mApproveReasons')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lock-buttons" ${settings.enableLockButtons ? 'checked' : ''}> ${t('mLockButtons')}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-banned-highlight" ${settings.enableBannedHighlight ? 'checked' : ''}> ${t('mBannedHighlight')}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-price-warning" ${settings.enablePriceWarning ? 'checked' : ''}> ${t('mPriceWarning')}</label>
                     </div>
                 </div>
 
@@ -1352,7 +1356,8 @@
                 enableApproveReasons: document.getElementById('set-approve-reasons').checked,
                 enableLockButtons: document.getElementById('set-lock-buttons').checked,
                 enableBannedHighlight: document.getElementById('set-banned-highlight').checked,
-                shippingPanelTopOffset: parseInt(document.getElementById('set-shipping-offset').value) || 0
+                shippingPanelTopOffset: parseInt(document.getElementById('set-shipping-offset').value) || 0,
+                enablePriceWarning: document.getElementById('set-price-warning').checked,
             });
         };
 
@@ -2572,6 +2577,243 @@
         }
     }
 
+    // ===== SYSTEM WERYFIKACJI WZROSTU CENY (TOAST Z ZAMYKANIEM) =====
+    function checkPriceIncrease(threadId) {
+        if (!threadId) return;
+
+        let url = `https://www.pepper.pl/admin/thread-edit-log/${threadId}`;
+
+        let xsrfToken = "";
+        let match = document.cookie.match(/xsrf_t=([^;]+)/);
+        if (match) {
+            xsrfToken = decodeURIComponent(match[1]).replace(/^"|"$/g, '');
+        }
+
+        fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                "Accept": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-XSRF-TOKEN": xsrfToken
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            let changesArray = null;
+
+            if (data && data.changes) {
+                changesArray = data.changes;
+            } else if (data && data.data && data.data.thread && data.data.thread.changes) {
+                changesArray = data.data.thread.changes;
+            } else if (data && data.data && data.data.changes) {
+                changesArray = data.data.changes;
+            } else if (Array.isArray(data)) {
+                let itemWithChanges = data.find(item => item && item.changes);
+                if (itemWithChanges) changesArray = itemWithChanges.changes;
+            }
+
+            if (!changesArray || changesArray.length === 0) return;
+
+            let priceChanges = changesArray.filter(c => c.property === "price");
+            if (priceChanges.length === 0) return;
+
+            let allPrices = priceChanges.flatMap(c => [parseFloat(c.old_value), parseFloat(c.new_value)])
+                                        .filter(p => !isNaN(p) && p > 0);
+
+            let lowestPrice = Math.min(...allPrices);
+            let currentPrice = getCurrentPrice();
+
+            if (currentPrice === null || isNaN(currentPrice)) {
+                priceChanges.sort((a, b) => a.created_at - b.created_at);
+                currentPrice = parseFloat(priceChanges[priceChanges.length - 1].new_value);
+            }
+
+            if (isNaN(lowestPrice) || isNaN(currentPrice) || lowestPrice <= 0) return;
+
+            let increasePercent = ((currentPrice - lowestPrice) / lowestPrice) * 100;
+
+            // Sprawdzamy czy wzrosła o >1%
+            if (increasePercent > 1) {
+                if (document.querySelector('.jp-price-warning-toast')) return;
+
+                let alertBox = document.createElement('div');
+                alertBox.className = 'jp-price-warning-toast';
+                alertBox.style.cssText = `
+                    position: fixed;
+                    top: 85px;
+                    right: 20px;
+                    background-color: #e65100;
+                    color: white;
+                    padding: 15px 35px 15px 15px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                    border: 2px solid #ff9800;
+                    z-index: 10000;
+                    transition: opacity 0.3s ease, transform 0.3s ease;
+                    transform: translateX(100%);
+                    opacity: 0;
+                `;
+
+                let formattedOld = lowestPrice.toFixed(2).replace('.', ',');
+                let formattedNew = currentPrice.toFixed(2).replace('.', ',');
+
+                alertBox.innerHTML = `
+                    <div style="cursor: pointer; position: absolute; top: 5px; right: 10px; font-size: 16px; opacity: 0.8;" onclick="this.parentElement.remove()">✖</div>
+                    <div style="font-size: 18px; margin-bottom: 6px; padding-right: 15px;">
+                        📈 <strong>UWAGA! Cena wzrosła o ${increasePercent.toFixed(1)}% względem najniższej!</strong>
+                    </div>
+                    <span style="font-size: 15px; font-weight: normal;">Najniższa w logach: <strong>${formattedOld} zł</strong> ➔ Obecna: <strong>${formattedNew} zł</strong> (zweryfikuj z edit log)</span>
+                `;
+
+                document.body.appendChild(alertBox);
+
+                // Animacja wyjazdu z prawej krawędzi
+                requestAnimationFrame(() => {
+                    alertBox.style.opacity = '1';
+                    alertBox.style.transform = 'translateX(0)';
+                });
+            }
+        })
+        .catch(e => {
+            if (DEBUG) console.error("❌ JALAPEÑO: Błąd:", e);
+        });
+    }
+
+    /// ===== SYSTEM WERYFIKACJI WZROSTU CENY NA LIŚCIE OKAZJI (Kolejka) =====
+    let queueFetchDelay = 0;
+
+    function checkQueuePriceIncreases() {
+        if (!settings.enablePriceWarning) return;
+        // Uruchamiaj tylko na stronach list (kolejkach) moderacyjnych
+        if (!window.location.href.includes('/admin-v2/moderation/deals/')) return;
+
+        let dealLinks = Array.from(document.querySelectorAll('a[href^="/admin-v2/moderation/thread/"]')).slice(0, 10);
+
+        dealLinks.forEach(link => {
+            let match = link.href.match(/thread\/(\d+)/);
+            if (!match) return;
+            let threadId = match[1];
+
+            // Szukamy głównego kontenera tekstu dla danej okazji na liście
+            let container = link.closest('.flex.xs12.py-0.pl-4');
+            if (!container) return;
+
+            // Zapobiega ponownemu sprawdzaniu tej samej okazji
+            if (container.dataset.jpPriceChecked) return;
+            container.dataset.jpPriceChecked = "pending";
+
+            if (DEBUG) console.log(`⏳ JALAPEÑO: Kolejkuję sprawdzenie logów dla okazji ID: ${threadId}`);
+
+            let xsrfToken = "";
+            let cookieMatch = document.cookie.match(/xsrf_t=([^;]+)/);
+            if (cookieMatch) {
+                xsrfToken = decodeURIComponent(cookieMatch[1]).replace(/^"|"$/g, '');
+            }
+
+            // Rozkładamy zapytania w czasie
+            setTimeout(() => {
+                if (DEBUG) console.log(`📡 JALAPEÑO: Pobieram dane (fetch) dla ID: ${threadId}...`);
+
+                fetch(`https://www.pepper.pl/admin/thread-edit-log/${threadId}`, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-XSRF-TOKEN": xsrfToken
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    container.dataset.jpPriceChecked = "done";
+                    let changesArray = null;
+
+                    if (data && data.changes) {
+                        changesArray = data.changes;
+                    } else if (data && data.data && data.data.thread && data.data.thread.changes) {
+                        changesArray = data.data.thread.changes;
+                    } else if (data && data.data && data.data.changes) {
+                        changesArray = data.data.changes;
+                    } else if (Array.isArray(data)) {
+                        let itemWithChanges = data.find(item => item && item.changes);
+                        if (itemWithChanges) changesArray = itemWithChanges.changes;
+                    }
+
+                    if (!changesArray || changesArray.length === 0) {
+                        if (DEBUG) console.log(`ℹ️ JALAPEÑO [ID: ${threadId}]: Brak zmian w logach.`);
+                        return;
+                    }
+
+                    let priceChanges = changesArray.filter(c => c.property === "price");
+                    if (priceChanges.length === 0) {
+                        if (DEBUG) console.log(`ℹ️ JALAPEÑO [ID: ${threadId}]: Historia edycji istnieje, ale brak w niej zmian ceny.`);
+                        return;
+                    }
+
+                    let allPrices = priceChanges.flatMap(c => [parseFloat(c.old_value), parseFloat(c.new_value)])
+                                                .filter(p => !isNaN(p) && p > 0);
+
+                    let lowestPrice = Math.min(...allPrices);
+
+                    priceChanges.sort((a, b) => a.created_at - b.created_at);
+                    let currentPrice = parseFloat(priceChanges[priceChanges.length - 1].new_value);
+
+                    if (isNaN(lowestPrice) || isNaN(currentPrice) || lowestPrice <= 0) {
+                        if (DEBUG) console.warn(`⚠️ JALAPEÑO [ID: ${threadId}]: Wykryto nieprawidłowe wartości cen (najniższa: ${lowestPrice}, obecna: ${currentPrice}).`);
+                        return;
+                    }
+
+                    let increasePercent = ((currentPrice - lowestPrice) / lowestPrice) * 100;
+
+                    if (DEBUG) {
+                        console.log(`📊 JALAPEÑO [ID: ${threadId}]: Kalkulacja:`);
+                        console.log(`   ➔ Najniższa znaleziona cena: ${lowestPrice} zł`);
+                        console.log(`   ➔ Najnowsza (obecna) cena: ${currentPrice} zł`);
+                        console.log(`   ➔ Wyliczony wzrost: ${increasePercent.toFixed(2)}%`);
+                    }
+
+                    // Jeśli cena wzrosła o >1% tworzymy etykietę ostrzegawczą
+                    if (increasePercent > 1) {
+                        if (DEBUG) console.log(`🚨 JALAPEÑO [ID: ${threadId}]: Zmiana powyżej 1%! Dodaję etykietę na ekran.`);
+
+                        let formattedOld = lowestPrice.toFixed(2).replace('.', ',');
+                        let formattedNew = currentPrice.toFixed(2).replace('.', ',');
+
+                        let badge = document.createElement('div');
+                        badge.style.cssText = `
+                            background-color: var(--jp-stat-del-bg);
+                            border-left: 4px solid var(--jp-stat-del-bo);
+                            color: var(--jp-stat-del-co);
+                            padding: 4px 8px;
+                            font-size: 12px;
+                            font-weight: bold;
+                            margin-bottom: 6px;
+                            border-radius: 3px;
+                            display: inline-block;
+                        `;
+                        badge.innerHTML = `📈 UWAGA: Cena wzrosła o ${increasePercent.toFixed(1)}% (z ${formattedOld} zł na ${formattedNew} zł)`;
+
+                        container.prepend(badge);
+                    } else {
+                        if (DEBUG) console.log(`✅ JALAPEÑO [ID: ${threadId}]: Cena nie wzrosła lub zmiana wynosi poniżej 1%.`);
+                    }
+                })
+                .catch(e => {
+                    container.dataset.jpPriceChecked = "error";
+                    if (DEBUG) console.error(`❌ JALAPEÑO [ID: ${threadId}]: Błąd krytyczny podczas pobierania danych z API:`, e);
+                });
+            }, queueFetchDelay);
+
+            queueFetchDelay += 150;
+        });
+
+        if (dealLinks.length === 0) queueFetchDelay = 0;
+        else setTimeout(() => { queueFetchDelay = 0; }, queueFetchDelay + 500);
+    }
+
     function checkDeal() {
         let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
         let currentTitle = getCurrentTitle();
@@ -3022,6 +3264,14 @@
                 urlTextarea.parentNode.appendChild(toolsBox);
             }
 
+            // OSTRZEŻENIE O WZROŚCIE CENY (Zależne od ustawień)
+            if (settings.enablePriceWarning) {
+                let threadMatch = window.location.href.match(/moderation\/thread\/(\d+)/);
+                if (threadMatch && threadMatch[1]) {
+                    checkPriceIncrease(threadMatch[1]);
+                }
+            }
+
             // ========== MERCHANT NOTES & LOCK BUTTONS - NIEZALEŻNE ==========
             let merchantNoteAlert = null;
 
@@ -3134,11 +3384,11 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
                         <div>
                             <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Koszt dostawy (PLN):</label>
-                            <input type="number" class="jp-shipping-cost-cost" value="${costValue}" step="0.01" min="0" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                            <input type="text" class="jp-shipping-cost-cost" value="${costValue}" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Darmowa dostawa od (PLN):</label>
-                            <input type="number" class="jp-shipping-cost-free-from" value="${freeDeliveryValue}" step="0.01" min="0" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
+                            <input type="text" class="jp-shipping-cost-free-from" value="${freeDeliveryValue}" style="width: 100%; padding: 8px; background: var(--jp-input-bg); border: 1px solid var(--jp-border); color: var(--jp-input-text); border-radius: 4px; box-sizing: border-box; margin-top: 4px;">
                         </div>
                         <div>
                             <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Notatka (opcjonalnie):</label>
@@ -3161,9 +3411,13 @@
 
                     // Zapisujemy pod warunkiem, że cokolwiek wpisano
                     if (cost || freeFrom || note) {
+                        // Zamiana przecinków na kropki i usuwanie liter przed parseFloat
+                        let safeCost = cost ? parseFloat(cost.replace(',', '.').replace(/[^\d.]/g, '')) : 0;
+                        let safeFreeFrom = freeFrom ? parseFloat(freeFrom.replace(',', '.').replace(/[^\d.]/g, '')) : 0;
+
                         saveShippingCost(merchantName, {
-                            cost: cost ? parseFloat(cost) : 0,
-                            freeDeliveryFrom: freeFrom ? parseFloat(freeFrom) : 0,
+                            cost: safeCost,
+                            freeDeliveryFrom: safeFreeFrom,
                             note: note
                         });
                     }
@@ -4087,6 +4341,9 @@
             window.jpLastCheckedUrl = null;
             window.jpUserEditedShipping = false;
             window.jpAutoShippingSet = false;
+
+            let oldWarningBox = document.querySelector('.jp-price-warning-toast');
+            if (oldWarningBox) oldWarningBox.remove();
         }
 
         // 2. WCZESNE ZAKOŃCZENIE - Uruchamia logikę tylko na właściwych podstronach
@@ -4108,6 +4365,7 @@
         checkInfractionNoteAutomator();
         displayMerchantNotesOnPage();
         checkApproveMessageModal();
+        checkQueuePriceIncreases();
 
         let now = Date.now();
         if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
