@@ -84,6 +84,41 @@ Keep track of store-specific rules, warnings, or tips. The script allows you to 
 
 <img width="1219" height="200" alt="Zrzut ekranu 2026-05-31 o 16 58 08" src="https://github.com/user-attachments/assets/6a065b26-1c91-4fcf-9017-af5e15c1ffaa" />
 
+### 🚚 10. Custom Shipping Costs Database
+A dedicated side panel attached to the main form that displays and manages delivery costs for specific stores.
+* **API Sync:** Fetches and saves shipping rules (base cost and free delivery thresholds) directly from a shared Google Apps Script backend to keep the whole team updated.
+* **Smart Application:** If the deal's current price and entered shipping cost don't match the established database rules, a green "Apply" button appears, allowing you to fix it with one click.
+* **Manual Override:** You can easily add, edit, or delete shipping costs for any store straight from the UI.
+
+<img width="1024" height="500" alt="No data found in database" src="https://github.com/user-attachments/assets/6a54292f-0eb2-4ec0-bd92-a20bd79d60a1" />
+(Implemented already, but needs translation)
+
+<img width="1794" height="877" alt="ChatGPT Image 9 cze 2026, 12_25_25" src="https://github.com/user-attachments/assets/fe97cc9e-65a2-416c-803c-ae27c9d3f560" />
+(AI generated, translated mockup)
+
+### 🔒 11. Quick Lock Controls (Edit & Expire)
+A set of handy buttons injected directly into the moderation panel to quickly lock or unlock deals, preventing unwanted modifications by authors.
+* **Edit Lock / Unlock:** Instantly block the author from modifying the deal.
+* **Expire Lock / Unlock:** Prevent the deal from being expired or un-expired.
+* **Seamless Integration:** Triggers background API requests without reloading the page, saving you the hassle of navigating through extra menus to secure a deal.
+
+<img width="1207" height="154" alt="Zrzut ekranu 2026-06-9 o 12 45 19" src="https://github.com/user-attachments/assets/be11df10-8af3-4b5b-b0de-4fd614554319" />
+
+<img width="1207" height="154" alt="Zrzut ekranu 2026-06-9 o 12 45 31" src="https://github.com/user-attachments/assets/62a793ae-90a8-4c89-86ee-d6d65510af7e" />
+
+### 🚨 12. Price Increase Warning (>1%)
+Protects against authors artificially inflating prices after posting to manipulate the deal's temperature.
+* **Queue Detection:** Scans the edit logs of the first 10 deals directly on the moderation list (`New Deals`). If a price increased by more than 1% from its lowest recorded point, a prominent red warning badge appears above the title.
+* **In-Deal Toast Alert:** When you open a deal, a sliding warning toast will instantly notify you of the exact percentage increase, displaying both the lowest recorded price and the current one.
+
+<img width="1024" height="500" alt="No data found in database (1)" src="https://github.com/user-attachments/assets/9db6d59f-3cba-4479-973f-a8193a736609" />
+
+### 🔴 13. Banned & Unauthenticated Highlighting
+Automatically scans the page and visually emphasizes specific user statuses, making it impossible to miss problematic or deactivated accounts.
+* **"Banned" Alert:** Wraps the word "banned" in a highly visible, bright red badge so you can instantly spot users who have been restricted.
+* **"Unauthenticated" Alert:** Highlights the word "unauthenticated" with a prominent yellow warning box.
+* **Global Scope:** Works everywhere across the administration panel—including history logs, inspector views, and user profiles.
+
 ---
 
 ## ⚙️ Settings and Configuration
