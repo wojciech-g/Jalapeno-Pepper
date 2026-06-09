@@ -155,7 +155,7 @@ Jalapeño works quietly in the background to prevent human errors and streamline
 ---
 
 ## 🛠️ Technologies and API
-* **Fake Promo Database:** Google Apps Script (Web App)
+* **Fake Promo | Merchant Notes | Shipping costs Database:** Google Apps Script (Web App)
 * **Exchange Rates:** Open Exchange Rates API (`open.er-api.com`)
 * **Styling:** Injected CSS with CSS variables support (Light/Dark Mode).
 
