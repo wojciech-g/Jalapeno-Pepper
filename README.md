@@ -81,8 +81,10 @@ Keep track of store-specific rules, warnings, or tips. The script allows you to 
 * Fully synced across the team using a backend API (Google Apps Script).
 
 <img width="1219" height="446" alt="Zrzut ekranu 2026-05-31 o 16 57 26" src="https://github.com/user-attachments/assets/520336e3-8243-410b-97cb-de495b26ee8b" />
+Add or remove merchant note.
 
 <img width="1219" height="200" alt="Zrzut ekranu 2026-05-31 o 16 58 08" src="https://github.com/user-attachments/assets/6a065b26-1c91-4fcf-9017-af5e15c1ffaa" />
+Edit merchant note,
 
 ### 🚚 10. Custom Shipping Costs Database
 A dedicated side panel attached to the main form that displays and manages delivery costs for specific stores.
@@ -118,6 +120,8 @@ Automatically scans the page and visually emphasizes specific user statuses, mak
 * **"Banned" Alert:** Wraps the word "banned" in a highly visible, bright red badge so you can instantly spot users who have been restricted.
 * **"Unauthenticated" Alert:** Highlights the word "unauthenticated" with a prominent yellow warning box.
 * **Global Scope:** Works everywhere across the administration panel—including history logs, inspector views, and user profiles.
+
+<img width="1211" height="173" alt="Zrzut ekranu 2026-06-9 o 12 57 58" src="https://github.com/user-attachments/assets/cd5b9b43-a0b9-4928-805a-e3ad862cc3d0" />
 
 ---
 
