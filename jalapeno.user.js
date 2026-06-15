@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.4
-// @description  Skrypt optymalizujący pracę moderatorów z ponad 18 funkcjonalnościami.
+// @version      4.8.5
+// @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
@@ -1276,7 +1276,7 @@
       mLensBtn: "🔍 Wyszukaj z Google Lens",
       mLensTitle: "Otwórz bieżący obraz w Google Lens",
       mLensDescription: "Opis produktu z AI Overview (Google Lens)",
-      mLensAiCopied: "Opis po polsku skopiowany do schowka. Wróć do zakładki Pepper — wklei się automatycznie do opisu.",
+      mLensAiCopied: "Opis po polsku skopiowany do schowka. Wróć do Peppera i kliknij przycisk AI w edytorze opisu.",
       mLensAiPasted: "Opis z Lens wklejony do opisu okazji",
       mLensAiNothingPending: "Brak gotowego opisu — kliknij przycisk AI w edytorze opisu, aby otworzyć Lens",
       mLensAiOpenEditor: 'Najpierw otwórz "Edytuj opis"',
@@ -1444,7 +1444,7 @@
       mLensBtn: "🔍 Search with Google Lens",
       mLensTitle: "Open current image in Google Lens",
       mLensDescription: "Product description from AI Overview (Google Lens)",
-      mLensAiCopied: "Polish description copied to clipboard. Return to the Pepper tab — it will auto-paste into the description.",
+      mLensAiCopied: "Polish description copied to clipboard. Return to Pepper and click the AI button in the description editor.",
       mLensAiPasted: "Lens description pasted into deal description",
       mLensAiNothingPending: "No ready description — click the AI button in the description editor to open Lens",
       mLensAiOpenEditor: 'Open "Edit description" first',
@@ -2508,15 +2508,15 @@
   var PENDING_DESC_KEY = "jpPendingLensDescription";
   var PENDING_DESC_TS_KEY = "jpPendingLensDescriptionTs";
   var LENS_FLOW_KEY = "jpLensFlowActive";
-  var LENS_PASTED_KEY = "jpLensDescriptionPasted";
   var _watchedIframes3 = /* @__PURE__ */ new WeakSet();
   var _innerObservers = /* @__PURE__ */ new WeakMap();
   var _pasteInitialized = false;
   var _googleInitialized = false;
   var _lastProcessedOverview = "";
   var _toolbarDebounceTimer = null;
-  var _autoPasteScheduled = false;
-  var _autoPasteDone = false;
+  function isLensFlowActive() {
+    return GM_getValue(LENS_FLOW_KEY, "") === "1";
+  }
   function translateToPolish(text) {
     const CHUNK_SIZE = 3500;
     const translateChunk = (chunk) => new Promise((resolve, reject) => {
@@ -2751,6 +2751,7 @@
     const scan = () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
+        if (!isLensFlowActive()) return;
         const text = extractAiOverviewText();
         if (text) processAiOverview(text);
       }, 1500);
@@ -2840,9 +2841,9 @@
       showToast(t("mLensAiOpenEditor"), true);
       return false;
     }
-    sessionStorage.setItem(LENS_PASTED_KEY, "1");
-    sessionStorage.removeItem(LENS_FLOW_KEY);
     GM_setValue(PENDING_DESC_KEY, "");
+    GM_setValue(PENDING_DESC_TS_KEY, 0);
+    GM_setValue(LENS_FLOW_KEY, "");
     increment("lensDescriptionsInserted");
     showToast(t("mLensAiPasted"));
     if (btn) {
@@ -2872,8 +2873,9 @@
     }
   }
   function handleAiToolbarClick(btn) {
-    if (getPendingDescription() && sessionStorage.getItem(LENS_PASTED_KEY) !== "1") {
-      if (pastePendingDescription(btn)) return;
+    if (getPendingDescription()) {
+      pastePendingDescription(btn);
+      return;
     }
     openLensForDescription(btn);
   }
@@ -2902,38 +2904,11 @@
     _innerObservers.set(iframe, innerObs);
     innerObs.observe(iframeDoc.body, { childList: true, subtree: true });
   }
-  function scheduleAutoPaste() {
-    if (_autoPasteScheduled || _autoPasteDone) return;
-    if (sessionStorage.getItem(LENS_PASTED_KEY) === "1") return;
-    if (sessionStorage.getItem(LENS_FLOW_KEY) !== "1") return;
-    if (!getPendingDescription()) return;
-    _autoPasteScheduled = true;
-    setTimeout(() => {
-      _autoPasteScheduled = false;
-      if (_autoPasteDone || sessionStorage.getItem(LENS_PASTED_KEY) === "1") return;
-      if (tryAutoPaste()) {
-        _autoPasteDone = true;
-      }
-    }, 1200);
-  }
-  function tryAutoPaste() {
-    if (sessionStorage.getItem(LENS_PASTED_KEY) === "1") return false;
-    if (sessionStorage.getItem(LENS_FLOW_KEY) !== "1") return false;
-    if (!getPendingDescription()) return false;
-    if (pastePendingDescription()) {
-      sessionStorage.setItem(LENS_PASTED_KEY, "1");
-      return true;
-    }
-    return false;
-  }
   function watchForDescriptionToolbar3() {
     function doCheckAndInject() {
       injectLensAiToolbarBtn(document);
       const iframe = document.querySelector('iframe[src*="description/edit"]');
-      if (!iframe) {
-        _autoPasteScheduled = false;
-        return;
-      }
+      if (!iframe) return;
       let iframeDoc;
       try {
         iframeDoc = iframe.contentDocument;
@@ -2941,12 +2916,9 @@
         return;
       }
       if (!iframeDoc?.body) return;
-      const toolbarReady = injectLensAiToolbarBtn(iframeDoc);
-      if (!toolbarReady) {
+      if (!injectLensAiToolbarBtn(iframeDoc)) {
         watchIframeToolbar3(iframe, iframeDoc);
-        return;
       }
-      scheduleAutoPaste();
     }
     function checkAndInject() {
       clearTimeout(_toolbarDebounceTimer);
@@ -2962,12 +2934,10 @@
     watchForDescriptionToolbar3();
   }
   function markLensFlowStarted() {
-    sessionStorage.setItem(LENS_FLOW_KEY, "1");
-    sessionStorage.removeItem(LENS_PASTED_KEY);
+    GM_setValue(LENS_FLOW_KEY, "1");
     GM_setValue(PENDING_DESC_KEY, "");
     GM_setValue(PENDING_DESC_TS_KEY, 0);
-    _autoPasteDone = false;
-    _autoPasteScheduled = false;
+    _lastProcessedOverview = "";
   }
 
   // src/features/updateCheck.js
