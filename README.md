@@ -1,6 +1,6 @@
 # 🌶️ Jalapeño - PepperModPL add-on
 
-![Version](https://img.shields.io/badge/Version-4.8.4-brightgreen)
+![Version](https://img.shields.io/badge/Version-4.8.5-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Tampermonkey%20%7C%20Violentmonkey-orange)
 ![For](https://img.shields.io/badge/For-Pepper.pl%20Moderation-blue)
 
