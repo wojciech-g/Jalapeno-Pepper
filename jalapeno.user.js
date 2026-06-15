@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.3
-// @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
+// @version      4.8.4
+// @description  Skrypt optymalizujący pracę moderatorów z ponad 18 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
@@ -22,6 +22,7 @@
 // @connect      www.pepper.pl
 // @connect      open.er-api.com
 // @connect      translate.googleapis.com
+// @connect      raw.githubusercontent.com
 // @connect      *
 // ==/UserScript==
 
@@ -1282,6 +1283,7 @@
       mLensAiOpenLens: "🔍 Lens otwarty — poczekaj na AI Overview i wróć tutaj",
       mLensAiNoImage: "Brak zdjęcia okazji — dodaj obrazek przed użyciem opisu AI",
       mToolbarLensAiTitle: "Otwórz Lens i wygeneruj opis produktu (AI Overview)",
+      mUpdateAvailable: "Dostępna nowa wersja Jalapeño {v} — kliknij ikonę Tampermonkey → Jalapeño → Sprawdź aktualizacje",
       mClipboardUnavailable: "❌ Schowek nie obsługuje obrazów w tej przeglądarce",
       mCopiedBarcode: "📋 Barcode skopiowany jako PNG",
       mCopyBarcodeError: "❌ Nie udało się skopiować barcode: ",
@@ -1449,6 +1451,7 @@
       mLensAiOpenLens: "🔍 Lens opened — wait for AI Overview and return here",
       mLensAiNoImage: "No deal image found — add an image before using AI description",
       mToolbarLensAiTitle: "Open Lens and generate product description (AI Overview)",
+      mUpdateAvailable: "New Jalapeño version {v} available — open Tampermonkey → Jalapeño → Check for updates",
       mClipboardUnavailable: "❌ Clipboard image API not available in this browser",
       mCopiedBarcode: "📋 Barcode copied as PNG image",
       mCopyBarcodeError: "❌ Could not copy barcode: ",
@@ -2967,6 +2970,38 @@
     _autoPasteScheduled = false;
   }
 
+  // src/features/updateCheck.js
+  var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js";
+  var LAST_CHECK_KEY = "jpLastUpdateCheck";
+  function isNewerVersion(remote, local) {
+    const r = remote.split(".").map((n) => parseInt(n, 10) || 0);
+    const l = local.split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(r.length, l.length); i++) {
+      if ((r[i] || 0) > (l[i] || 0)) return true;
+      if ((r[i] || 0) < (l[i] || 0)) return false;
+    }
+    return false;
+  }
+  function checkForScriptUpdate() {
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    if (GM_getValue(LAST_CHECK_KEY) === today) return;
+    GM_setValue(LAST_CHECK_KEY, today);
+    const localVersion = typeof GM_info !== "undefined" && GM_info.script ? GM_info.script.version : null;
+    if (!localVersion) return;
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: UPDATE_CHECK_URL,
+      timeout: 12e3,
+      onload(res) {
+        const match = res.responseText.match(/@version\s+([\d.]+)/);
+        if (!match) return;
+        const remoteVersion = match[1];
+        if (!isNewerVersion(remoteVersion, localVersion)) return;
+        showToast(t("mUpdateAvailable").replace("{v}", remoteVersion), true);
+      }
+    });
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -3028,6 +3063,7 @@
       return;
     }
     initAnalytics();
+    checkForScriptUpdate();
     function saveSettings(newSettings) {
       settings3 = newSettings;
       GM_setValue("jalapenoSettings", settings3);
