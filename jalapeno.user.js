@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.5
+// @version      4.8.6
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -13,6 +13,8 @@
 // @match        *://www.google.com/*
 // @match        *://www.google.pl/*
 // @match        *://lens.google.com/*
+// @match        *://*.allegro.pl/*
+// @match        *://allegro.pl/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -23,6 +25,8 @@
 // @connect      open.er-api.com
 // @connect      translate.googleapis.com
 // @connect      raw.githubusercontent.com
+// @connect      allegro.pl
+// @connect      a.allegroimg.com
 // @connect      *
 // ==/UserScript==
 
@@ -1275,6 +1279,15 @@
       mExpandLinksFailed: "Nie udało się rozwinąć linków: ",
       mLensBtn: "🔍 Wyszukaj z Google Lens",
       mLensTitle: "Otwórz bieżący obraz w Google Lens",
+      mAllegroImages: "Zdjęcia z galerii Allegro",
+      mAllegroImgBtn: "Pull Image (Allegro)",
+      mAllegroImgTitle: "Pobierz główne zdjęcie z oferty Allegro i wgraj do okazji",
+      mAllegroImgCopied: "✅ Link do zdjęcia skopiowany do schowka",
+      mAllegroImgUploaded: "✅ Zdjęcie wgrane do okazji",
+      mAllegroImgPulling: "⏳ Pobieranie…",
+      mAllegroImgNone: "Nie znaleziono zdjęć produktu w galerii Allegro",
+      mAllegroImgNoUrl: "Brak linku do oferty Allegro (mainUrl / canonicalUrl)",
+      mAllegroImgUploadFailed: "Nie udało się wgrać zdjęcia: ",
       mLensDescription: "Opis produktu z AI Overview (Google Lens)",
       mLensAiCopied: "Opis po polsku skopiowany do schowka. Wróć do Peppera i kliknij przycisk AI w edytorze opisu.",
       mLensAiPasted: "Opis z Lens wklejony do opisu okazji",
@@ -1313,6 +1326,8 @@
       statEanDetections: "Wykrycia EAN",
       statBarcodeGenerations: "Generacje barcodów",
       statReverseSearches: "Wyszukiwania obrazem",
+      statAllegroImages: "Wgrane zdjęcia Allegro (Pepper)",
+      statAllegroImageCopies: "Skopiowane linki (Allegro)",
       statLensDescriptions: "Wygenerowane opisy AI (Lens)",
       statLensDescriptionsInserted: "Wklejone opisy AI",
       statTotalAutomations: "Łącznie automatyzacji",
@@ -1441,6 +1456,15 @@
       mExpandLinksExpandFailed: "Found {n} shortened link(s), but could not expand them",
       mExpandLinksSuccess: 'Expanded {n} link(s) — make any change, then click "Zapisz edycję"',
       mExpandLinksFailed: "Could not expand links: ",
+      mAllegroImages: "Allegro gallery images",
+      mAllegroImgBtn: "Pull Image (Allegro)",
+      mAllegroImgTitle: "Pull main image from Allegro offer into the deal",
+      mAllegroImgCopied: "✅ Image link copied to clipboard",
+      mAllegroImgUploaded: "✅ Image uploaded to deal",
+      mAllegroImgPulling: "⏳ Pulling…",
+      mAllegroImgNone: "No product images found in Allegro gallery",
+      mAllegroImgNoUrl: "No Allegro offer link in mainUrl / canonicalUrl",
+      mAllegroImgUploadFailed: "Could not upload image: ",
       mLensBtn: "🔍 Search with Google Lens",
       mLensTitle: "Open current image in Google Lens",
       mLensDescription: "Product description from AI Overview (Google Lens)",
@@ -1481,6 +1505,8 @@
       statEanDetections: "EAN detections",
       statBarcodeGenerations: "Barcode generations",
       statReverseSearches: "Reverse image searches",
+      statAllegroImages: "Allegro images pulled (Pepper)",
+      statAllegroImageCopies: "Allegro links copied",
       statLensDescriptions: "Lens AI descriptions generated",
       statLensDescriptionsInserted: "Lens AI descriptions inserted",
       statTotalAutomations: "Total automations triggered",
@@ -1598,12 +1624,14 @@
       eanDetections: 0,
       barcodeGenerations: 0,
       reverseImageSearches: 0,
+      allegroImageCopies: 0,
+      allegroImagePulls: 0,
       lensDescriptionsGenerated: 0,
       lensDescriptionsInserted: 0
     }, stored);
     s.totalAutomationsTriggered = s.autoShippingFilled + s.autoMerchantNotesInserted + s.autoApproveReasonsUsed + s.autoTemplatesUsed + s.autoHoldNotesUsed + s.autoInfractionNotesUsed + s.lockButtonsUsed;
     s.totalWarningsShown = s.fakePromoWarningsShown + s.priceWarningsShown;
-    s.totalInspectorActions = s.eanDetections + s.barcodeGenerations + s.reverseImageSearches + s.lensDescriptionsGenerated + s.lensDescriptionsInserted;
+    s.totalInspectorActions = s.eanDetections + s.barcodeGenerations + s.reverseImageSearches + s.allegroImageCopies + s.allegroImagePulls + s.lensDescriptionsGenerated + s.lensDescriptionsInserted;
     s.manualActionsAvoided = s.autoShippingFilled + s.autoMerchantNotesInserted + s.autoApproveReasonsUsed + s.autoTemplatesUsed + s.autoHoldNotesUsed + s.autoInfractionNotesUsed + s.lockButtonsUsed;
     return s;
   }
@@ -2972,6 +3000,302 @@
     });
   }
 
+  // src/features/allegroImages.js
+  var FETCH_TIMEOUT_MS = 12e3;
+  var PEPPER_UPLOAD_URL = "https://www.pepper.pl/image/upload-from-image-uri-or-image-file/thread_medium";
+  var UI_ASSET_PATTERN = /action-common|arrowhead/i;
+  var PRODUCT_IMAGE_PATTERN = /a\.allegroimg\.com\/s\d+\/[a-f0-9]+\/[a-f0-9]+/i;
+  function isProductImageUrl(src) {
+    return Boolean(src && !UI_ASSET_PATTERN.test(src) && PRODUCT_IMAGE_PATTERN.test(src));
+  }
+  function toAllegroOriginalUrl(src) {
+    return src.replace(/\/s\d+\//, "/original/");
+  }
+  function imageDedupeKey(src) {
+    const match = src.match(/a\.allegroimg\.com\/s\d+\/([^/]+\/[^/]+)/i);
+    return match ? match[1] : null;
+  }
+  function extractAllegroGalleryImages(gallery) {
+    if (!gallery) return [];
+    const byKey = /* @__PURE__ */ new Map();
+    gallery.querySelectorAll('img[src*="a.allegroimg.com"]').forEach((img) => {
+      const src = img.getAttribute("src");
+      if (!isProductImageUrl(src)) return;
+      const key = imageDedupeKey(src);
+      if (!key || byKey.has(key)) return;
+      byKey.set(key, toAllegroOriginalUrl(src));
+    });
+    const images = [...byKey.values()];
+    const primary = gallery.querySelector('img[fetchpriority="high"][src*="allegroimg.com"]');
+    if (primary && isProductImageUrl(primary.getAttribute("src"))) {
+      const primaryUrl = toAllegroOriginalUrl(primary.getAttribute("src"));
+      return [primaryUrl, ...images.filter((url) => url !== primaryUrl)];
+    }
+    return images;
+  }
+  function extractAllegroGalleryFromHtml(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const gallery = doc.querySelector('[data-box-name="showoffer.gallery"]');
+    if (gallery) return extractAllegroGalleryImages(gallery);
+    const fallback = /* @__PURE__ */ new Map();
+    doc.querySelectorAll('img[src*="a.allegroimg.com"]').forEach((img) => {
+      const src = img.getAttribute("src");
+      if (!isProductImageUrl(src)) return;
+      const key = imageDedupeKey(src);
+      if (!key || fallback.has(key)) return;
+      fallback.set(key, toAllegroOriginalUrl(src));
+    });
+    return [...fallback.values()];
+  }
+  function getXsrfToken() {
+    const match = document.cookie.match(/xsrf_t=([^;]+)/);
+    return match ? decodeURIComponent(match[1]).replace(/^"|"$/g, "") : "";
+  }
+  function gmFetchHtml(url) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url,
+        timeout: FETCH_TIMEOUT_MS,
+        headers: {
+          "User-Agent": navigator.userAgent,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7"
+        },
+        onload(res) {
+          if (res.status >= 400) {
+            reject(new Error("HTTP " + res.status));
+            return;
+          }
+          resolve(res.responseText || "");
+        },
+        onerror: () => reject(new Error("Network error")),
+        ontimeout: () => reject(new Error("Request timed out"))
+      });
+    });
+  }
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  function getDealUrlFromForm() {
+    const canonical = document.querySelector('textarea[name="canonicalUrl"]')?.value?.trim();
+    if (canonical) return canonical;
+    const main = document.querySelector('textarea[name="mainUrl"]')?.value?.trim();
+    return main || null;
+  }
+  function isAllegroOfferUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return /(^|\.)allegro\.pl$/i.test(parsed.hostname) && /\/oferta\//i.test(parsed.pathname);
+    } catch (_) {
+      return /allegro\.pl\/oferta\//i.test(url);
+    }
+  }
+  function extractUploadedImageUrl(data) {
+    if (!data) return null;
+    const image = data.image || data;
+    const slot = data.slot;
+    if (image.thread_medium?.url) return image.thread_medium.url;
+    if (image.raw?.thread_medium?.url) return image.raw.thread_medium.url;
+    if (slot && image.raw?.[slot]?.url) return image.raw[slot].url;
+    for (const bucket of ["raw", "thread_medium", "thread_large", "thread_small"]) {
+      const entry = image[bucket];
+      if (!entry) continue;
+      if (typeof entry.url === "string") return entry.url;
+      if (typeof entry === "object") {
+        const first = Object.values(entry).find((v) => v && typeof v.url === "string");
+        if (first) return first.url;
+      }
+    }
+    if (typeof image.url === "string") return image.url;
+    if (typeof data.url === "string") return data.url;
+    return null;
+  }
+  function applyImageToEditor(imageUrl, responseData) {
+    const editor = document.querySelector(".imageEditor");
+    if (!editor || !imageUrl) return;
+    const img = editor.querySelector("img[src]");
+    if (img && !img.src.startsWith("data:image/gif")) {
+      img.src = imageUrl;
+    }
+    const vImg = editor.querySelector(".v-image__image");
+    if (vImg) {
+      vImg.style.backgroundImage = `url("${imageUrl}")`;
+    }
+    let node = editor;
+    while (node) {
+      const vm = node.__vue__;
+      if (vm) {
+        if (responseData?.image && vm.$data?.image !== void 0) {
+          vm.$data.image = responseData.image;
+          vm.$forceUpdate?.();
+          return;
+        }
+        if (vm.$data?.value !== void 0 && responseData?.image) {
+          vm.$data.value = responseData.image;
+          vm.$forceUpdate?.();
+          return;
+        }
+      }
+      node = node.parentElement;
+    }
+  }
+  function uploadImageFromUri(imageUrl) {
+    const fd = new FormData();
+    fd.append("image_url", imageUrl);
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: PEPPER_UPLOAD_URL,
+        headers: {
+          "X-XSRF-TOKEN": getXsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json"
+        },
+        data: fd,
+        onload(res) {
+          try {
+            const parsed = JSON.parse(res.responseText || "{}");
+            if (parsed?.status === "success") {
+              const uploadedUrl = extractUploadedImageUrl(parsed.data);
+              if (uploadedUrl) {
+                applyImageToEditor(uploadedUrl, parsed.data);
+                resolve(uploadedUrl);
+                return;
+              }
+              reject(new Error("No image URL in upload response"));
+              return;
+            }
+            reject(new Error(parsed?.messages?.[0] || "HTTP " + res.status));
+          } catch (err) {
+            reject(new Error("Upload response parse failed: " + err.message));
+          }
+        },
+        onerror: () => reject(new Error("Upload network error")),
+        ontimeout: () => reject(new Error("Upload timed out"))
+      });
+    });
+  }
+  async function pullAllegroImageIntoDeal(offerUrl) {
+    if (!isAllegroOfferUrl(offerUrl)) {
+      showToast(t("mAllegroImgNoUrl"), "error");
+      return;
+    }
+    try {
+      const html = await gmFetchHtml(offerUrl);
+      const images = extractAllegroGalleryFromHtml(html);
+      if (!images.length) {
+        showToast(t("mAllegroImgNone"), "error");
+        return;
+      }
+      await uploadImageFromUri(images[0]);
+      increment("allegroImagePulls");
+      showToast(t("mAllegroImgUploaded"));
+    } catch (err) {
+      console.warn("[JP AllegroImages] Pull failed:", err);
+      showToast(t("mAllegroImgUploadFailed") + (err.message || ""), "error");
+    }
+  }
+  function initPepperAllegroButton() {
+    if (document.getElementById("jp-allegro-img-btn")) return;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20;
+    const RETRY_MS = 500;
+    function tryInject() {
+      const editor = document.querySelector(".imageEditor");
+      if (!editor) {
+        if (++attempts < MAX_ATTEMPTS) setTimeout(tryInject, RETRY_MS);
+        return;
+      }
+      const btn = document.createElement("button");
+      btn.id = "jp-allegro-img-btn";
+      btn.className = "jp-lens-btn";
+      btn.type = "button";
+      btn.textContent = t("mAllegroImgBtn");
+      btn.title = t("mAllegroImgTitle");
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const dealUrl = getDealUrlFromForm();
+        if (!dealUrl) {
+          showToast(t("mAllegroImgNoUrl"), "error");
+          return;
+        }
+        const origLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = t("mAllegroImgPulling");
+        try {
+          await pullAllegroImageIntoDeal(dealUrl);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = origLabel;
+        }
+      });
+      const anchor = document.getElementById("jp-lens-btn") || editor;
+      anchor.insertAdjacentElement("afterend", btn);
+    }
+    tryInject();
+  }
+  function initAllegroGalleryClickCopy() {
+    if (window.__jpAllegroGalleryCopyBound) return;
+    let attached = false;
+    function attach(gallery2) {
+      if (attached || !gallery2) return;
+      attached = true;
+      window.__jpAllegroGalleryCopyBound = true;
+      gallery2.addEventListener("click", async (e) => {
+        const img = e.target.closest('img[src*="a.allegroimg.com"]');
+        if (!img) return;
+        const src = img.getAttribute("src");
+        if (!isProductImageUrl(src)) return;
+        const url = toAllegroOriginalUrl(src);
+        try {
+          await copyText(url);
+          increment("allegroImageCopies");
+          showToast(t("mAllegroImgCopied"));
+        } catch (err) {
+          console.warn("[JP AllegroImages] Copy failed:", err);
+        }
+      }, true);
+    }
+    const gallery = document.querySelector('[data-box-name="showoffer.gallery"]');
+    if (gallery) {
+      attach(gallery);
+      return;
+    }
+    let attempts = 0;
+    const MAX_ATTEMPTS = 30;
+    const RETRY_MS = 500;
+    const tryAttach = () => {
+      const found = document.querySelector('[data-box-name="showoffer.gallery"]');
+      if (found) {
+        attach(found);
+        return;
+      }
+      if (++attempts < MAX_ATTEMPTS) setTimeout(tryAttach, RETRY_MS);
+    };
+    tryAttach();
+  }
+  function initAllegroImages(settings3) {
+    if (!settings3?.enableAllegroImages) return;
+    const onAllegro = /(^|\.)allegro\.pl$/i.test(location.hostname);
+    if (onAllegro) {
+      initAllegroGalleryClickCopy();
+    } else {
+      initPepperAllegroButton();
+    }
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -3023,13 +3347,19 @@
       enableReverseImageSearch: true,
       enableProductInspector: true,
       enableLinkExpander: true,
-      enableLensDescription: true
+      enableLensDescription: true,
+      enableAllegroImages: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
     initI18n(settings3);
+    const isAllegroContext = /(^|\.)allegro\.pl$/i.test(location.hostname);
     if (isGoogleLensContext) {
       initLensAiOverview(settings3);
+      return;
+    }
+    if (isAllegroContext) {
+      initAllegroImages(settings3);
       return;
     }
     initAnalytics();
@@ -3114,6 +3444,7 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lens-description" ${settings3.enableLensDescription ? "checked" : ""}> ${t("mLensDescription")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-product-inspector" ${settings3.enableProductInspector ? "checked" : ""}> ${t("mProductInspector")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-link-expander" ${settings3.enableLinkExpander ? "checked" : ""}> ${t("mLinkExpander")}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-allegro-images" ${settings3.enableAllegroImages ? "checked" : ""}> ${t("mAllegroImages")}</label>
                     </div>
                 </div>
 
@@ -3234,6 +3565,8 @@
                             <span>${t("statEanDetections")}</span><strong>${stats.eanDetections}</strong>
                             <span>${t("statBarcodeGenerations")}</span><strong>${stats.barcodeGenerations}</strong>
                             <span>${t("statReverseSearches")}</span><strong>${stats.reverseImageSearches}</strong>
+                            <span>${t("statAllegroImages")}</span><strong>${stats.allegroImagePulls || 0}</strong>
+                            <span>${t("statAllegroImageCopies")}</span><strong>${stats.allegroImageCopies || 0}</strong>
                             <span>${t("statLensDescriptions")}</span><strong>${stats.lensDescriptionsGenerated}</strong>
                             <span>${t("statLensDescriptionsInserted")}</span><strong>${stats.lensDescriptionsInserted}</strong>
                         </div>
@@ -3318,7 +3651,8 @@
           enableReverseImageSearch: document.getElementById("set-image-search").checked,
           enableLensDescription: document.getElementById("set-lens-description").checked,
           enableProductInspector: document.getElementById("set-product-inspector").checked,
-          enableLinkExpander: document.getElementById("set-link-expander").checked
+          enableLinkExpander: document.getElementById("set-link-expander").checked,
+          enableAllegroImages: document.getElementById("set-allegro-images").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -4914,6 +5248,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         if (settings3.enableReverseImageSearch) initReverseImageSearch();
         if (settings3.enableLensDescription) initLensDescriptionPaste(settings3);
         if (settings3.enableLinkExpander) initLinkExpander();
+        if (settings3.enableAllegroImages) initAllegroImages(settings3);
         if (settings3.enablePriceWarning) {
           let threadMatch = window.location.href.match(/moderation\/thread\/(\d+)/);
           if (threadMatch && threadMatch[1]) {
