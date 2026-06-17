@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.8
+// @version      4.8.9
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -4458,7 +4458,7 @@
       }
       return true;
     }
-    function fetchShippingCostsFromAPI() {
+    function fetchShippingCostsFromAPI(onUpdated) {
       if (!SHIPPING_COSTS_API_URL || SHIPPING_COSTS_API_URL.includes("WSTAW_TU")) {
         if (DEBUG) console.warn("⚠️ SHIPPING_COSTS_API_URL not configured");
         return;
@@ -4476,6 +4476,7 @@
             if (data && data.costs && typeof data.costs === "object") {
               GM_setValue("jalapenoShippingCosts", data.costs);
               if (DEBUG) console.log("✅ Shipping costs updated directly from API");
+              if (typeof onUpdated === "function") onUpdated();
             }
           } catch (e) {
             if (DEBUG) console.warn("⚠️ Error parsing shipping costs from API:", e);
@@ -4485,6 +4486,9 @@
           if (DEBUG) console.warn("⚠️ Failed to fetch shipping costs from API");
         }
       });
+    }
+    if (settings3.enableShippingCosts) {
+      fetchShippingCostsFromAPI();
     }
     function displayMerchantNote(merchantName, merchantElement = null) {
       if (!settings3.enableMerchantNotes || !merchantName) return;
@@ -5690,6 +5694,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           });
         };
         let lastCountedShippingMerchant = null;
+        fetchShippingCostsFromAPI(() => updateShippingCostAlert());
         const updateShippingCostAlert = () => {
           let targetContainer = document.getElementById("jp-shipping-side-panel");
           if (!targetContainer) return;
