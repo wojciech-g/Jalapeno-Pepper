@@ -130,27 +130,5 @@ Baza kategorii (`baza_kategorii_finalna.json`) jest hostowana na GitHubie w tym 
 
 ---
 
-## 🛠️ Dla deweloperów
-
-```bash
-# Zbuduj tylko skrypt dla edytorów
-npm run build:cat
-
-# Wynik:
-dist/jalapeno-categories.user.js
-```
-
-Źródła:
-
-| Plik | Rola |
-|---|---|
-| `src/categories-main.js` | UI panelu, motywy, nasłuch tytułu |
-| `src/features/categoryCore.js` | Logika dopasowania (współdzielona z Jalapeño) |
-| `meta-categories.txt` | Nagłówek Tampermonkey (`@match`, `@version`, …) |
-
-Przed publikacją podbij `@version` w `meta-categories.txt`, zbuduj skrypt i wgraj `jalapeno-categories.user.js` do katalogu głównego repozytorium na GitHubie.
-
----
-
 👤 **Autor:** [Xcited](https://www.pepper.pl/profile/Xcited)  
 🔗 **Repozytorium:** [Jalapeno-Pepper](https://github.com/wojciech-g/Jalapeno-Pepper)
