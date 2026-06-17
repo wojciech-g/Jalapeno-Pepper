@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.9
+// @version      4.9.0
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -3320,10 +3320,96 @@
     }
   }
 
-  // src/features/categoryAdvisor.js
+  // src/features/categoryCore.js
   var DB_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_kategorii_finalna.json";
+  var STOP_WORDS = /* @__PURE__ */ new Set([
+    "wszystkie",
+    "wszystkich",
+    "wszystko",
+    "wszystkim",
+    "dla",
+    "przy",
+    "przez",
+    "jako",
+    "oraz",
+    "albo",
+    "czy",
+    "jest",
+    "nie",
+    "tak",
+    "ten",
+    "tej",
+    "temu",
+    "tego",
+    "jak",
+    "gdy",
+    "ale",
+    "lub",
+    "nad",
+    "pod",
+    "bez",
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    // Częste fragmenty tytułów okazji — mało specyficzne kategorialnie
+    "pro",
+    "plus",
+    "mini",
+    "max",
+    "ultra",
+    "lite",
+    "super",
+    "mega",
+    "prime",
+    "premium",
+    "black",
+    "white",
+    "edition",
+    "rabat",
+    "rabatowy",
+    "okazja",
+    "okazji",
+    "taniej",
+    "darmowa",
+    "darmowy",
+    "dostawa",
+    "nowy",
+    "nowa",
+    "nowe",
+    "smart",
+    "original",
+    "basic"
+  ]);
+  var POSITION_WEIGHTS = [4, 3, 2, 1];
   var _knowledgeBase = null;
+  var _wordMeta = null;
   var _loadPromise = null;
+  function buildWordMeta(kb) {
+    const meta = {};
+    for (const [word, entry] of Object.entries(kb)) {
+      const cats = Object.entries(entry);
+      const total = cats.reduce((s, [, d]) => s + d.count, 0);
+      if (!total) continue;
+      const sorted = cats.sort((a, b) => b[1].count - a[1].count);
+      const topShare = sorted[0][1].count / total;
+      const numCats = cats.length;
+      const skip = numCats >= 6 && topShare < 0.35;
+      let weight = 1;
+      if (!skip) {
+        if (topShare >= 0.65 && numCats <= 3) weight = 3;
+        else if (topShare >= 0.45) weight = 2;
+        else if (numCats >= 5) weight = 0.5;
+        else weight = 1;
+        if (numCats > 3) {
+          weight *= Math.max(0.35, topShare);
+        }
+      }
+      meta[word] = { total, numCats, topShare, weight, skip };
+    }
+    return meta;
+  }
   function loadKnowledgeBase() {
     if (_knowledgeBase) return Promise.resolve(_knowledgeBase);
     if (_loadPromise) return _loadPromise;
@@ -3335,6 +3421,7 @@
         onload(res) {
           try {
             _knowledgeBase = JSON.parse(res.responseText);
+            _wordMeta = buildWordMeta(_knowledgeBase);
             resolve(_knowledgeBase);
           } catch (e) {
             reject(new Error("JSON parse error: " + e.message));
@@ -3349,35 +3436,58 @@
   function normalizeWord(word) {
     return word.toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]/g, "");
   }
+  function filterResults(results) {
+    if (!results.length) return results;
+    const filtered = [results[0]];
+    const top = results[0].percent;
+    for (let i = 1; i < results.length; i++) {
+      const r = results[i];
+      if (filtered.length >= 4) break;
+      if (i === 1 && r.percent >= 5) {
+        filtered.push(r);
+        continue;
+      }
+      if (r.percent >= Math.max(10, top * 0.35)) {
+        filtered.push(r);
+      }
+    }
+    return filtered;
+  }
   function getAutoSuggestions(title) {
-    if (!_knowledgeBase || !title) return null;
-    const words = title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2);
-    const firstWords = words.slice(0, 3);
+    if (!_knowledgeBase || !_wordMeta || !title) return null;
+    const words = title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2 && !STOP_WORDS.has(w)).slice(0, 4);
+    if (!words.length) return null;
     const scores = {};
     const examples = {};
-    firstWords.forEach((word) => {
+    words.forEach((word, idx) => {
       const entry = _knowledgeBase[word];
-      if (!entry) return;
+      const meta = _wordMeta[word];
+      if (!entry || !meta || meta.skip) return;
+      const posW = POSITION_WEIGHTS[idx] ?? 1;
+      const wordW = meta.weight;
       for (const [cat, data] of Object.entries(entry)) {
-        scores[cat] = (scores[cat] || 0) + data.count;
+        const contribution = data.count * posW * wordW;
+        scores[cat] = (scores[cat] || 0) + contribution;
         if (!examples[cat]) examples[cat] = /* @__PURE__ */ new Set();
         data.examples.forEach((ex) => examples[cat].add(`${ex.title}|||${ex.date}`));
       }
     });
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
     if (!total) return null;
-    return Object.entries(scores).map(([cat, score]) => ({
+    const results = Object.entries(scores).map(([cat, score]) => ({
       category: cat,
       percent: Math.round(score / total * 100),
       examples: [...examples[cat]].slice(0, 3).map((s) => {
-        const [title2, date] = s.split("|||");
-        return { title: title2, date };
+        const [t2, d] = s.split("|||");
+        return { title: t2, date: d };
       })
     })).sort((a, b) => b.percent - a.percent);
+    return filterResults(results);
   }
   function searchManual(query) {
     if (!_knowledgeBase || query.length < 3) return null;
     const q = normalizeWord(query);
+    if (STOP_WORDS.has(q)) return null;
     const keys = Object.keys(_knowledgeBase).filter((k) => k.startsWith(q)).slice(0, 3);
     if (!keys.length) return null;
     const out = {};
@@ -3386,14 +3496,14 @@
     });
     return out;
   }
-  function renderSuggestionList(suggestions) {
+  function renderSuggestionList(suggestions, percentClass = "jp-cat-percent") {
     return suggestions.map((s) => {
       const ex = s.examples.map(
-        (e) => `<li class="jp-cat-example"><em>${e.title}</em><span class="jp-cat-date">${e.date || ""}</span></li>`
+        (e) => `<li class="jp-cat-example"><em>${e.title}</em><span class="jp-cat-date"> ${e.date || ""}</span></li>`
       ).join("");
       return `<div class="jp-cat-result">
             <div class="jp-cat-result-header">
-                <span class="jp-cat-percent">${s.percent}%</span>
+                <span class="${percentClass}">${s.percent}%</span>
                 <span class="jp-cat-name">${s.category}</span>
             </div>
             ${ex ? `<ul class="jp-cat-examples">${ex}</ul>` : ""}
@@ -3410,10 +3520,12 @@
       })).sort((a, b) => b.percent - a.percent);
       return `<div class="jp-cat-word-block">
             <div class="jp-cat-word-label">${word}</div>
-            ${renderSuggestionList(sorted)}
+            ${renderSuggestionList(filterResults(sorted))}
         </div>`;
     }).join("");
   }
+
+  // src/features/categoryAdvisor.js
   function initCategoryAdvisor(container, settings3) {
     if (!settings3?.enableCategoryAdvisor) return;
     if (document.getElementById("jp-cat-panel")) return;
