@@ -1,10 +1,12 @@
 # 🌶️ Jalapeño - PepperModPL add-on
 
-![Version](https://img.shields.io/badge/Version-4.8.9-brightgreen)
+![Version](https://img.shields.io/badge/Version-4.9.0-brightgreen)
 ![Platform](https://img.shields.io/badge/Platform-Tampermonkey%20%7C%20Violentmonkey-orange)
 ![For](https://img.shields.io/badge/For-Pepper.pl%20Moderation-blue)
 
 **Jalapeño** is a powerful, unofficial extension designed to facilitate and speed up the daily workflow of Pepper.pl moderators. The script automates repetitive tasks, provides essential contextual information, and protects against approving fake or cyclic promotions.
+
+> 👥 **Dla edytorów (nie moderatorów):** lekki skrypt z podpowiedziami kategorii — osobna instalacja, opis w **[README-editors.md](README-editors.md)**.
 
 ---
 
