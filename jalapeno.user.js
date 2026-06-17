@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.6
+// @version      4.8.7
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1279,6 +1279,15 @@
       mExpandLinksFailed: "Nie udało się rozwinąć linków: ",
       mLensBtn: "🔍 Wyszukaj z Google Lens",
       mLensTitle: "Otwórz bieżący obraz w Google Lens",
+      mCategoryAdvisor: "Asystent Kategorii (AI)",
+      mCatAdvisorTitle: "🤖 Asystent Kategorii",
+      mCatAdvisorLoading: "Ładowanie bazy kategorii…",
+      mCatAdvisorLoadFailed: "Nie udało się załadować bazy kategorii",
+      mCatAdvisorAutoLabel: "Podpowiedzi dla tytułu",
+      mCatAdvisorSearchLabel: "Szukaj w bazie",
+      mCatAdvisorSearchPlaceholder: "Wpisz słowo kluczowe (min. 3 znaki)…",
+      mCatAdvisorNoData: "Brak danych dla tego tytułu",
+      mCatAdvisorNotFound: "Nic nie znaleziono",
       mAllegroImages: "Zdjęcia z galerii Allegro",
       mAllegroImgBtn: "Pull Image (Allegro)",
       mAllegroImgTitle: "Pobierz główne zdjęcie z oferty Allegro i wgraj do okazji",
@@ -1326,6 +1335,8 @@
       statEanDetections: "Wykrycia EAN",
       statBarcodeGenerations: "Generacje barcodów",
       statReverseSearches: "Wyszukiwania obrazem",
+      statCategoryAdvisorAuto: "Podpowiedzi kategorii (auto)",
+      statCategoryAdvisorSearch: "Wyszukiwania w bazie kategorii",
       statAllegroImages: "Wgrane zdjęcia Allegro (Pepper)",
       statAllegroImageCopies: "Skopiowane linki (Allegro)",
       statLensDescriptions: "Wygenerowane opisy AI (Lens)",
@@ -1456,6 +1467,15 @@
       mExpandLinksExpandFailed: "Found {n} shortened link(s), but could not expand them",
       mExpandLinksSuccess: 'Expanded {n} link(s) — make any change, then click "Zapisz edycję"',
       mExpandLinksFailed: "Could not expand links: ",
+      mCategoryAdvisor: "Category Advisor (AI)",
+      mCatAdvisorTitle: "🤖 Category Advisor",
+      mCatAdvisorLoading: "Loading category database…",
+      mCatAdvisorLoadFailed: "Failed to load category database",
+      mCatAdvisorAutoLabel: "Suggestions for title",
+      mCatAdvisorSearchLabel: "Search database",
+      mCatAdvisorSearchPlaceholder: "Type keyword (min. 3 chars)…",
+      mCatAdvisorNoData: "No data for this title",
+      mCatAdvisorNotFound: "Nothing found",
       mAllegroImages: "Allegro gallery images",
       mAllegroImgBtn: "Pull Image (Allegro)",
       mAllegroImgTitle: "Pull main image from Allegro offer into the deal",
@@ -1505,6 +1525,8 @@
       statEanDetections: "EAN detections",
       statBarcodeGenerations: "Barcode generations",
       statReverseSearches: "Reverse image searches",
+      statCategoryAdvisorAuto: "Category auto-suggestions shown",
+      statCategoryAdvisorSearch: "Category searches",
       statAllegroImages: "Allegro images pulled (Pepper)",
       statAllegroImageCopies: "Allegro links copied",
       statLensDescriptions: "Lens AI descriptions generated",
@@ -1626,12 +1648,14 @@
       reverseImageSearches: 0,
       allegroImageCopies: 0,
       allegroImagePulls: 0,
+      categoryAdvisorAutoShown: 0,
+      categoryAdvisorSearches: 0,
       lensDescriptionsGenerated: 0,
       lensDescriptionsInserted: 0
     }, stored);
     s.totalAutomationsTriggered = s.autoShippingFilled + s.autoMerchantNotesInserted + s.autoApproveReasonsUsed + s.autoTemplatesUsed + s.autoHoldNotesUsed + s.autoInfractionNotesUsed + s.lockButtonsUsed;
     s.totalWarningsShown = s.fakePromoWarningsShown + s.priceWarningsShown;
-    s.totalInspectorActions = s.eanDetections + s.barcodeGenerations + s.reverseImageSearches + s.allegroImageCopies + s.allegroImagePulls + s.lensDescriptionsGenerated + s.lensDescriptionsInserted;
+    s.totalInspectorActions = s.eanDetections + s.barcodeGenerations + s.reverseImageSearches + s.allegroImageCopies + s.allegroImagePulls + s.categoryAdvisorAutoShown + s.categoryAdvisorSearches + s.lensDescriptionsGenerated + s.lensDescriptionsInserted;
     s.manualActionsAvoided = s.autoShippingFilled + s.autoMerchantNotesInserted + s.autoApproveReasonsUsed + s.autoTemplatesUsed + s.autoHoldNotesUsed + s.autoInfractionNotesUsed + s.lockButtonsUsed;
     return s;
   }
@@ -3296,6 +3320,174 @@
     }
   }
 
+  // src/features/categoryAdvisor.js
+  var DB_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_kategorii_finalna.json";
+  var _knowledgeBase = null;
+  var _loadPromise = null;
+  function loadKnowledgeBase() {
+    if (_knowledgeBase) return Promise.resolve(_knowledgeBase);
+    if (_loadPromise) return _loadPromise;
+    _loadPromise = new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: DB_URL,
+        timeout: 15e3,
+        onload(res) {
+          try {
+            _knowledgeBase = JSON.parse(res.responseText);
+            resolve(_knowledgeBase);
+          } catch (e) {
+            reject(new Error("JSON parse error: " + e.message));
+          }
+        },
+        onerror: () => reject(new Error("Network error loading category DB")),
+        ontimeout: () => reject(new Error("Timeout loading category DB"))
+      });
+    });
+    return _loadPromise;
+  }
+  function normalizeWord(word) {
+    return word.toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]/g, "");
+  }
+  function getAutoSuggestions(title) {
+    if (!_knowledgeBase || !title) return null;
+    const words = title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2);
+    const firstWords = words.slice(0, 3);
+    const scores = {};
+    const examples = {};
+    firstWords.forEach((word) => {
+      const entry = _knowledgeBase[word];
+      if (!entry) return;
+      for (const [cat, data] of Object.entries(entry)) {
+        scores[cat] = (scores[cat] || 0) + data.count;
+        if (!examples[cat]) examples[cat] = /* @__PURE__ */ new Set();
+        data.examples.forEach((ex) => examples[cat].add(`${ex.title}|||${ex.date}`));
+      }
+    });
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    if (!total) return null;
+    return Object.entries(scores).map(([cat, score]) => ({
+      category: cat,
+      percent: Math.round(score / total * 100),
+      examples: [...examples[cat]].slice(0, 3).map((s) => {
+        const [title2, date] = s.split("|||");
+        return { title: title2, date };
+      })
+    })).sort((a, b) => b.percent - a.percent);
+  }
+  function searchManual(query) {
+    if (!_knowledgeBase || query.length < 3) return null;
+    const q = normalizeWord(query);
+    const keys = Object.keys(_knowledgeBase).filter((k) => k.startsWith(q)).slice(0, 3);
+    if (!keys.length) return null;
+    const out = {};
+    keys.forEach((k) => {
+      out[k] = _knowledgeBase[k];
+    });
+    return out;
+  }
+  function renderSuggestionList(suggestions) {
+    return suggestions.map((s) => {
+      const ex = s.examples.map(
+        (e) => `<li class="jp-cat-example"><em>${e.title}</em><span class="jp-cat-date">${e.date || ""}</span></li>`
+      ).join("");
+      return `<div class="jp-cat-result">
+            <div class="jp-cat-result-header">
+                <span class="jp-cat-percent">${s.percent}%</span>
+                <span class="jp-cat-name">${s.category}</span>
+            </div>
+            ${ex ? `<ul class="jp-cat-examples">${ex}</ul>` : ""}
+        </div>`;
+    }).join("");
+  }
+  function renderManualResults(rawData) {
+    return Object.entries(rawData).map(([word, cats]) => {
+      const total = Object.values(cats).reduce((s, c) => s + c.count, 0);
+      const sorted = Object.entries(cats).map(([cat, d]) => ({
+        category: cat,
+        percent: Math.round(d.count / total * 100),
+        examples: d.examples.slice(0, 2)
+      })).sort((a, b) => b.percent - a.percent);
+      return `<div class="jp-cat-word-block">
+            <div class="jp-cat-word-label">${word}</div>
+            ${renderSuggestionList(sorted)}
+        </div>`;
+    }).join("");
+  }
+  function initCategoryAdvisor(container, settings3) {
+    if (!settings3?.enableCategoryAdvisor) return;
+    if (document.getElementById("jp-cat-panel")) return;
+    const panel = document.createElement("div");
+    panel.id = "jp-cat-panel";
+    panel.className = "jp-inspector-panel";
+    const header = document.createElement("div");
+    header.className = "jp-inspector-header jp-cat-toggle";
+    header.innerHTML = `<span>${t("mCatAdvisorTitle")}</span><span class="jp-cat-chevron">▾</span>`;
+    const body = document.createElement("div");
+    body.className = "jp-cat-body";
+    body.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorLoading")}</span>`;
+    panel.appendChild(header);
+    panel.appendChild(body);
+    container.appendChild(panel);
+    let collapsed = false;
+    header.addEventListener("click", () => {
+      collapsed = !collapsed;
+      body.style.display = collapsed ? "none" : "";
+      header.querySelector(".jp-cat-chevron").textContent = collapsed ? "▸" : "▾";
+    });
+    loadKnowledgeBase().then(() => {
+      body.innerHTML = `
+            <div id="jp-cat-auto-section">
+                <div class="jp-cat-section-label">${t("mCatAdvisorAutoLabel")}</div>
+                <div id="jp-cat-auto-results" class="jp-cat-results"></div>
+            </div>
+            <div id="jp-cat-search-section">
+                <div class="jp-cat-section-label">${t("mCatAdvisorSearchLabel")}</div>
+                <input id="jp-cat-search-input"
+                       class="jp-cat-search-input"
+                       type="text"
+                       placeholder="${t("mCatAdvisorSearchPlaceholder")}"
+                       autocomplete="off">
+                <div id="jp-cat-search-results" class="jp-cat-results"></div>
+            </div>`;
+      const autoResults = body.querySelector("#jp-cat-auto-results");
+      const searchInput = body.querySelector("#jp-cat-search-input");
+      const searchResults = body.querySelector("#jp-cat-search-results");
+      const titleInput = document.querySelector('input[placeholder="Thread title"]');
+      function updateAuto() {
+        const title = titleInput ? titleInput.value : "";
+        const suggestions = getAutoSuggestions(title);
+        if (!suggestions || !suggestions.length) {
+          autoResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
+          return;
+        }
+        autoResults.innerHTML = renderSuggestionList(suggestions);
+        increment("categoryAdvisorAutoShown");
+      }
+      if (titleInput) {
+        updateAuto();
+        titleInput.addEventListener("input", updateAuto);
+      }
+      searchInput.addEventListener("input", () => {
+        const query = searchInput.value.trim();
+        if (query.length < 3) {
+          searchResults.innerHTML = "";
+          return;
+        }
+        const data = searchManual(query);
+        if (!data) {
+          searchResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNotFound")}</span>`;
+          return;
+        }
+        searchResults.innerHTML = renderManualResults(data);
+        increment("categoryAdvisorSearches");
+      });
+    }).catch((err) => {
+      console.warn("[JP CategoryAdvisor] DB load failed:", err);
+      body.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorLoadFailed")}</span>`;
+    });
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -3348,7 +3540,8 @@
       enableProductInspector: true,
       enableLinkExpander: true,
       enableLensDescription: true,
-      enableAllegroImages: true
+      enableAllegroImages: true,
+      enableCategoryAdvisor: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -3445,6 +3638,7 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-product-inspector" ${settings3.enableProductInspector ? "checked" : ""}> ${t("mProductInspector")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-link-expander" ${settings3.enableLinkExpander ? "checked" : ""}> ${t("mLinkExpander")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-allegro-images" ${settings3.enableAllegroImages ? "checked" : ""}> ${t("mAllegroImages")}</label>
+                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-category-advisor" ${settings3.enableCategoryAdvisor ? "checked" : ""}> ${t("mCategoryAdvisor")}</label>
                     </div>
                 </div>
 
@@ -3567,6 +3761,8 @@
                             <span>${t("statReverseSearches")}</span><strong>${stats.reverseImageSearches}</strong>
                             <span>${t("statAllegroImages")}</span><strong>${stats.allegroImagePulls || 0}</strong>
                             <span>${t("statAllegroImageCopies")}</span><strong>${stats.allegroImageCopies || 0}</strong>
+                            <span>${t("statCategoryAdvisorAuto")}</span><strong>${stats.categoryAdvisorAutoShown || 0}</strong>
+                            <span>${t("statCategoryAdvisorSearch")}</span><strong>${stats.categoryAdvisorSearches || 0}</strong>
                             <span>${t("statLensDescriptions")}</span><strong>${stats.lensDescriptionsGenerated}</strong>
                             <span>${t("statLensDescriptionsInserted")}</span><strong>${stats.lensDescriptionsInserted}</strong>
                         </div>
@@ -3652,7 +3848,8 @@
           enableLensDescription: document.getElementById("set-lens-description").checked,
           enableProductInspector: document.getElementById("set-product-inspector").checked,
           enableLinkExpander: document.getElementById("set-link-expander").checked,
-          enableAllegroImages: document.getElementById("set-allegro-images").checked
+          enableAllegroImages: document.getElementById("set-allegro-images").checked,
+          enableCategoryAdvisor: document.getElementById("set-category-advisor").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -3838,6 +4035,89 @@
         }
         .jp-inspector-barcode svg { max-width: 100%; height: auto; }
         .jp-inspector-barcode-actions { display: flex; gap: 4px; }
+        /* ===== Category Advisor ===== */
+        .jp-cat-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .jp-cat-chevron { font-size: 10px; color: var(--jp-text-muted); }
+        .jp-cat-body {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .jp-cat-section-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: var(--jp-text-muted);
+            margin-bottom: 4px;
+        }
+        .jp-cat-results {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .jp-cat-result {
+            padding: 4px 6px;
+            border-radius: 3px;
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-btn-border);
+        }
+        .jp-cat-result-header { display: flex; align-items: baseline; gap: 5px; }
+        .jp-cat-percent {
+            font-weight: bold;
+            color: var(--jp-link);
+            font-size: 12px;
+            min-width: 28px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .jp-cat-name { font-weight: bold; color: var(--jp-text); }
+        .jp-cat-examples {
+            margin: 3px 0 0 28px;
+            padding: 0;
+            list-style: circle;
+        }
+        .jp-cat-example {
+            font-size: 10px;
+            color: var(--jp-text-muted);
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .jp-cat-date { color: var(--jp-text-muted); opacity: 0.7; }
+        .jp-cat-word-block { margin-bottom: 4px; }
+        .jp-cat-word-label {
+            font-weight: bold;
+            font-size: 10px;
+            color: var(--jp-link);
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 3px;
+            padding: 1px 5px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+        #jp-cat-search-section { border-top: 1px dashed var(--jp-border); padding-top: 6px; }
+        .jp-cat-search-input {
+            width: 100%;
+            padding: 4px 6px;
+            font-size: 11px;
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 3px;
+            background: var(--jp-input-bg);
+            color: var(--jp-input-text);
+            box-sizing: border-box;
+            margin-bottom: 4px;
+            font-family: inherit;
+        }
+
         .jp-inspector-empty {
             color: var(--jp-text-muted);
             font-size: 10px;
@@ -5229,6 +5509,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           rightCol.innerHTML = `<div style="color:var(--jp-text-muted); font-size:11px; padding-top: 15px;">${t("lblHistDisabled")}</div>`;
         }
         if (settings3.enableProductInspector) initProductInspector(leftCol);
+        if (settings3.enableCategoryAdvisor) initCategoryAdvisor(leftCol, settings3);
         toolsBox.appendChild(leftCol);
         toolsBox.appendChild(rightCol);
         let mainFormPanel = document.querySelector(".layout.column.mb-3.px-4") || document.querySelector(".mb-3");
