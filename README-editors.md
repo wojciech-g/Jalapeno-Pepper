@@ -66,7 +66,11 @@ skrypt na bieżąco:
 - pokazuje listę kategorii z **procentowym prawdopodobieństwem**,
 - pod każdą kategorią wyświetla **przykładowe okazje** z bazy (tytuł + data).
 
-Przykład: tytuł *„Nike Air Max”* → głównie **Moda** i **Sport i turystyka**, bez szumu z „Air Fryer” czy „HBO Max”.
+Przykład 1: 
+<img width="1158" height="493" alt="Zrzut ekranu 2026-06-17 o 19 06 01" src="https://github.com/user-attachments/assets/e9747edf-cc31-48b5-9b89-f1759d6c6d19" />
+
+Przykład 2:
+<img width="1228" height="900" alt="Zrzut ekranu 2026-06-17 o 19 05 00" src="https://github.com/user-attachments/assets/e2094d8c-891c-4efb-9cdd-13e1bfa44d92" />
 
 Algorytm:
 
