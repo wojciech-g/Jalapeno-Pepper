@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.8.7
+// @version      4.8.8
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -3417,18 +3417,15 @@
   function initCategoryAdvisor(container, settings3) {
     if (!settings3?.enableCategoryAdvisor) return;
     if (document.getElementById("jp-cat-panel")) return;
-    const panel = document.createElement("div");
-    panel.id = "jp-cat-panel";
-    panel.className = "jp-inspector-panel";
     const header = document.createElement("div");
     header.className = "jp-inspector-header jp-cat-toggle";
     header.innerHTML = `<span>${t("mCatAdvisorTitle")}</span><span class="jp-cat-chevron">▾</span>`;
     const body = document.createElement("div");
+    body.id = "jp-cat-panel";
     body.className = "jp-cat-body";
     body.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorLoading")}</span>`;
-    panel.appendChild(header);
-    panel.appendChild(body);
-    container.appendChild(panel);
+    container.appendChild(header);
+    container.appendChild(body);
     let collapsed = false;
     header.addEventListener("click", () => {
       collapsed = !collapsed;
@@ -4035,6 +4032,30 @@
         }
         .jp-inspector-barcode svg { max-width: 100%; height: auto; }
         .jp-inspector-barcode-actions { display: flex; gap: 4px; }
+        /* ===== Category Advisor side panel ===== */
+        .jp-cat-side-panel {
+            width: 260px;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            right: 100%;
+            top: 0;
+            margin-right: 10px;
+            z-index: 1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            font-size: 11px;
+            color: var(--jp-text);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .jp-cat-side-panel .jp-inspector-panel {
+            border: none;
+            padding: 0;
+            background: transparent;
+        }
+
         /* ===== Category Advisor ===== */
         .jp-cat-toggle {
             display: flex;
@@ -5509,16 +5530,24 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           rightCol.innerHTML = `<div style="color:var(--jp-text-muted); font-size:11px; padding-top: 15px;">${t("lblHistDisabled")}</div>`;
         }
         if (settings3.enableProductInspector) initProductInspector(leftCol);
-        if (settings3.enableCategoryAdvisor) initCategoryAdvisor(leftCol, settings3);
         toolsBox.appendChild(leftCol);
         toolsBox.appendChild(rightCol);
         let mainFormPanel = document.querySelector(".layout.column.mb-3.px-4") || document.querySelector(".mb-3");
-        if (mainFormPanel && !document.getElementById("jp-shipping-side-panel")) {
+        if (mainFormPanel) {
           mainFormPanel.style.position = "relative";
-          let sidePanel = document.createElement("div");
-          sidePanel.id = "jp-shipping-side-panel";
-          sidePanel.className = "jp-shipping-side-panel";
-          mainFormPanel.appendChild(sidePanel);
+          if (!document.getElementById("jp-shipping-side-panel")) {
+            let sidePanel = document.createElement("div");
+            sidePanel.id = "jp-shipping-side-panel";
+            sidePanel.className = "jp-shipping-side-panel";
+            mainFormPanel.appendChild(sidePanel);
+          }
+          if (settings3.enableCategoryAdvisor && !document.getElementById("jp-cat-side-panel")) {
+            let catSidePanel = document.createElement("div");
+            catSidePanel.id = "jp-cat-side-panel";
+            catSidePanel.className = "jp-cat-side-panel";
+            mainFormPanel.appendChild(catSidePanel);
+            initCategoryAdvisor(catSidePanel, settings3);
+          }
         }
         let targetDiv = document.querySelector(".layout.column.mb-3.px-4");
         if (targetDiv && targetDiv.parentNode) {
