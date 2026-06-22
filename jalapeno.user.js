@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.2
+// @version      4.9.3
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -6300,9 +6300,16 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           linksWrapper.innerHTML = buttonsHtml;
         };
         renderQuickLinks(currentTitle);
+        const skipAutoShippingRules = () => window.jpUserEditedShipping || window.jpUserForcedFreeDelivery;
+        const cancelPendingAutoShipping = () => {
+          window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
+          window.jpAutoShippingSet = false;
+        };
         if (typeof window.jpUserEditedShipping === "undefined") {
           window.jpUserEditedShipping = false;
           window.jpAutoShippingSet = false;
+          window.jpUserForcedFreeDelivery = false;
+          window.jpAutoShippingAbortGen = 0;
           document.body.addEventListener("input", (e) => {
             if (e.isTrusted && e.target && e.target.tagName === "INPUT" && e.target.placeholder === "Shipping costs") {
               window.jpUserEditedShipping = true;
@@ -6317,7 +6324,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               let wrapper = e.target.closest(".v-input--selection-controls");
               if (wrapper && wrapper.innerText.includes("Free Delivery")) {
                 window.jpUserEditedShipping = true;
-                window.jpAutoShippingSet = false;
+                window.jpUserForcedFreeDelivery = false;
+                cancelPendingAutoShipping();
                 let coloredElements = Array.from(wrapper.querySelectorAll("*")).filter((x) => x.style && x.style.backgroundColor);
                 coloredElements.forEach((el) => {
                   el.style.backgroundColor = "";
@@ -6412,7 +6420,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         };
         const applyUserFreeDelivery = async () => {
           window.jpUserEditedShipping = true;
-          window.jpAutoShippingSet = false;
+          window.jpUserForcedFreeDelivery = true;
+          cancelPendingAutoShipping();
           let nativeInput = getShippingInput();
           setVuetifyCheckbox("Free Delivery", true, true);
           await afterVueUpdate(nativeInput || document.body);
@@ -6431,19 +6440,16 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         const handleFloatingBtnClick = async (floatBtn, e) => {
           e.preventDefault();
           if (settings3.floatingButtonAutoFreeDelivery) {
-            window.jpUserEditedShipping = true;
+            await applyUserFreeDelivery();
+            if (settings3.enableShippingCosts) {
+              setTimeout(() => updateShippingCostAlert(), 400);
+            }
           }
           let titleInput = document.querySelector('input[placeholder="Thread title"]');
           if (titleInput && settings3.customFloatingText) {
             let currentVal = titleInput.value;
             if (!currentVal.includes(settings3.customFloatingText.trim())) {
               await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
-            }
-          }
-          if (settings3.floatingButtonAutoFreeDelivery) {
-            await applyUserFreeDelivery();
-            if (settings3.enableShippingCosts) {
-              setTimeout(() => updateShippingCostAlert(), 400);
             }
           }
           floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
@@ -6464,12 +6470,14 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           } else if (window.jpLastCheckedUrl !== urlFingerprint) {
             window.jpLastCheckedUrl = urlFingerprint;
             window.jpUserEditedShipping = false;
+            window.jpUserForcedFreeDelivery = false;
             window.jpAutoShippingSet = false;
+            window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
             window.jpDealCheckersAttached = false;
             window.jpAutoLocalStoreCounted = null;
           }
           let linkToCheck = getAutomationLink(urlTextarea2.value, canonicalUrlNode?.value);
-          if (settings3.enableAutoAmazonShipping && shouldApplyAmazonPlShipping(urlTextarea2.value, canonicalUrlNode?.value)) {
+          if (settings3.enableAutoAmazonShipping && !skipAutoShippingRules() && shouldApplyAmazonPlShipping(urlTextarea2.value, canonicalUrlNode?.value)) {
             let price = getCurrentPrice();
             if (price !== null) {
               let allLabels = Array.from(document.querySelectorAll("label"));
@@ -6489,14 +6497,14 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                   shipInput.placeholder = "Shipping costs";
                 }
                 window.jpAutoShippingSet = false;
-                if (!window.jpUserEditedShipping) {
+                if (!skipAutoShippingRules()) {
                   setVuetifyCheckbox("Free Delivery", true, true);
                 }
               } else if (price > 0 && price < 65) {
-                if (!window.jpUserEditedShipping && isChecked) {
+                if (!skipAutoShippingRules() && isChecked) {
                   isChecked = false;
                 }
-                if (isChecked && freeDelLabel && !window.jpUserEditedShipping) {
+                if (isChecked && freeDelLabel && !skipAutoShippingRules()) {
                   freeDelLabel.style.backgroundColor = "#ff5252";
                   freeDelLabel.style.color = "#fff";
                   freeDelLabel.title = "BŁĄD: Amazon poniżej 65 zł ma płatną wysyłkę! Odznacz darmową dostawę.";
@@ -6506,37 +6514,44 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                   freeDelLabel.style.backgroundColor = "";
                   freeDelLabel.style.color = "";
                 }
-                if (!window.jpUserEditedShipping && !window.jpAutoShippingSet) {
+                if (!skipAutoShippingRules() && !window.jpAutoShippingSet) {
                   window.jpAutoShippingSet = true;
+                  const runGen = window.jpAutoShippingAbortGen || 0;
                   increment("autoShippingFilled");
                   (async () => {
+                    if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                    if (skipAutoShippingRules()) return;
                     setVuetifyCheckbox("Free Delivery", false, true);
                     await afterVueUpdate(getShippingInput());
-                    if (!window.jpUserEditedShipping) {
-                      await setShippingCost("8,99");
-                    }
+                    if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                    if (skipAutoShippingRules()) return;
+                    await setShippingCost("8,99");
                   })();
                 }
               }
             }
           }
-          if (settings3.enableAutoAmazonShipping && isAllegroLink(linkToCheck) && !window.jpUserEditedShipping) {
+          if (settings3.enableAutoAmazonShipping && isAllegroLink(linkToCheck) && !skipAutoShippingRules()) {
             let shipInput = getShippingInput();
             if (shipInput && shipInput.value.trim() === "") {
               increment("autoShippingFilled");
+              const runGen = window.jpAutoShippingAbortGen || 0;
               setTimeout(() => {
-                if (!window.jpUserEditedShipping) {
+                if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                if (!skipAutoShippingRules()) {
                   setShippingCost("10,49");
                 }
               }, 150);
             }
           }
-          if (settings3.enableAutoAmazonShipping && isZalandoLoungeLink(linkToCheck) && !window.jpUserEditedShipping) {
+          if (settings3.enableAutoAmazonShipping && isZalandoLoungeLink(linkToCheck) && !skipAutoShippingRules()) {
             let shipInput = getShippingInput();
             if (shipInput && shipInput.value.trim() === "") {
               increment("autoShippingFilled");
+              const runGen = window.jpAutoShippingAbortGen || 0;
               setTimeout(() => {
-                if (!window.jpUserEditedShipping) {
+                if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                if (!skipAutoShippingRules()) {
                   setShippingCost("9,95");
                 }
               }, 150);
@@ -7550,7 +7565,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         window.jpDealCheckersAttached = false;
         window.jpLastCheckedUrl = null;
         window.jpUserEditedShipping = false;
+        window.jpUserForcedFreeDelivery = false;
         window.jpAutoShippingSet = false;
+        window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
         let oldWarningBox = document.querySelector(".jp-price-warning-toast");
         if (oldWarningBox) oldWarningBox.remove();
       }
