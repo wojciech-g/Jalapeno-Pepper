@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.0
+// @version      4.9.1
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -848,9 +848,10 @@
     u = u.replace(/^https?:\/\//, "").replace(/^(www\.|m\.|mobile\.)/, "");
     return u.split("?")[0].replace(/\/$/, "");
   }
-  function generateSmartQuery(title) {
+  function generateSmartQuery(title, optSettings) {
+    const s = optSettings ?? settings;
     let clean = title.replace(/\[.*?\]|\(.*?\)|\{.*?\}/g, " ");
-    let custom = settings.customStopWords.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    let custom = (s.customStopWords || "").split(",").map((x) => x.trim()).filter((x) => x.length > 0);
     const stopWords = [
       ...custom,
       "okazja",
@@ -994,8 +995,9 @@
     let query = words.slice(0, 4).join(" ");
     return query;
   }
-  function getFallbackWord(title) {
-    let custom = settings.customStopWords.split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0);
+  function getFallbackWord(title, optSettings) {
+    const s = optSettings ?? settings;
+    let custom = (s.customStopWords || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => x.length > 0);
     const categories = [
       ...custom,
       "telewizor",
@@ -1118,6 +1120,146 @@
     return "";
   }
 
+  // src/utils/storeUrl.js
+  var SHORTENER_HOSTS = /* @__PURE__ */ new Set([
+    "a.co",
+    "amzn.asia",
+    "amzn.com",
+    "amzn.eu",
+    "amzn.to",
+    "app.link",
+    "bit.ly",
+    "buff.ly",
+    "cutt.ly",
+    "goo.gl",
+    "is.gd",
+    "ow.ly",
+    "rb.gy",
+    "rebrand.ly",
+    "s.click.aliexpress.com",
+    "shorturl.at",
+    "soo.gd",
+    "t.co",
+    "tiny.cc",
+    "tinyurl.com"
+  ]);
+  var AMAZON_SHORTENER_HOSTS = /* @__PURE__ */ new Set(["a.co", "amzn.asia", "amzn.com", "amzn.eu", "amzn.to"]);
+  var FOREIGN_AMAZON_HOST_RE = /^amazon\.(com|de|co\.uk|fr|it|es|nl|se|com\.be|com\.tr|ae|sa|in|jp|ca|com\.mx|com\.au|com\.br|sg|eg|cn)$/i;
+  function isShortenerUrl(url) {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url.trim());
+      const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+      if (SHORTENER_HOSTS.has(host)) return true;
+      if (host.startsWith("amzn.")) return true;
+      if (/^\/d\/[a-z0-9]+$/i.test(parsed.pathname)) return true;
+      if (host.includes("amazon") && /^\/gp\/aws\/redirect/i.test(parsed.pathname)) return true;
+      return false;
+    } catch (_) {
+      return /amzn\.(eu|to|asia|com)/i.test(url) || /\ba\.co\//i.test(url);
+    }
+  }
+  function isAmazonPlLink(url) {
+    if (!url) return false;
+    try {
+      const host = new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase();
+      return host === "amazon.pl" || host.endsWith(".amazon.pl");
+    } catch (_) {
+      return /\bamazon\.pl\b/i.test(url);
+    }
+  }
+  function isForeignAmazonLink(url) {
+    if (!url) return false;
+    try {
+      const host = new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase();
+      if (isAmazonPlLink(url)) return false;
+      if (FOREIGN_AMAZON_HOST_RE.test(host)) return true;
+      if (/^amazon\./i.test(host) && host !== "amazon.pl" && !host.endsWith(".amazon.pl")) {
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return /amazon\.(com|de|co\.uk|fr|it|es)\b/i.test(url);
+    }
+  }
+  function isAmazonShortenerLink(url) {
+    if (!url) return false;
+    try {
+      const host = new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase();
+      return AMAZON_SHORTENER_HOSTS.has(host) || host.startsWith("amzn.");
+    } catch (_) {
+      return /amzn\.(eu|to|asia|com)/i.test(url) || /\ba\.co\//i.test(url);
+    }
+  }
+  function shouldApplyAmazonPlShipping(mainUrl, canonicalUrl) {
+    const candidates = [mainUrl, canonicalUrl].map((u) => (u || "").trim()).filter(Boolean);
+    if (!candidates.length) return false;
+    if (candidates.some(isForeignAmazonLink)) return false;
+    if (candidates.some(isAmazonPlLink)) return true;
+    const link = getAutomationLink(mainUrl, canonicalUrl);
+    return isAmazonShortenerLink(link);
+  }
+  function getAutomationLink(mainUrl, canonicalUrl) {
+    const main = (mainUrl || "").trim();
+    const canon = (canonicalUrl || "").trim();
+    const candidates = [main, canon].filter(Boolean);
+    if (!candidates.length) return "";
+    const directStore = candidates.find((u) => !isShortenerUrl(u));
+    if (directStore) return directStore.toLowerCase();
+    if (main) return main.toLowerCase();
+    return canon.toLowerCase();
+  }
+  function isShortenerHostname(host) {
+    if (!host) return false;
+    const h = host.replace(/^www\./i, "").toLowerCase();
+    return SHORTENER_HOSTS.has(h) || h.startsWith("amzn.");
+  }
+  function hostnameFromUrl(url) {
+    if (!url) return null;
+    try {
+      return new URL(url.trim()).hostname.replace(/^www\./i, "").toLowerCase();
+    } catch (_) {
+      return null;
+    }
+  }
+  function getStoreMerchantDomain(mainUrl, canonicalUrl) {
+    const main = (mainUrl || "").trim();
+    const canon = (canonicalUrl || "").trim();
+    const candidates = [main, canon].filter(Boolean);
+    if (!candidates.length) return null;
+    const link = getAutomationLink(main, canon);
+    let domain = hostnameFromUrl(link);
+    if (!domain || isShortenerHostname(domain)) {
+      const direct = candidates.find((u) => !isShortenerUrl(u));
+      domain = direct ? hostnameFromUrl(direct) : domain;
+    }
+    if (!domain) return null;
+    if (isShortenerHostname(domain)) {
+      if (shouldApplyAmazonPlShipping(main, canon)) return "amazon.pl";
+      if (candidates.some(isForeignAmazonLink)) {
+        const foreign = candidates.find(isForeignAmazonLink);
+        return hostnameFromUrl(foreign);
+      }
+      return domain;
+    }
+    return domain;
+  }
+  function isShortenerMerchantName(name) {
+    if (!name) return false;
+    const trimmed = name.trim().toLowerCase().replace(/^www\./, "");
+    if (isShortenerHostname(trimmed)) return true;
+    return /^(amzn\.(eu|to|asia|com)|a\.co)$/i.test(trimmed);
+  }
+  function isAllegroLink(url) {
+    return (url || "").toLowerCase().includes("allegro.pl");
+  }
+  function isZalandoLoungeLink(url) {
+    return (url || "").toLowerCase().includes("zalando-lounge.pl");
+  }
+  function getDealUrlFingerprint(mainUrl, canonicalUrl) {
+    return `${mainUrl || ""}|${canonicalUrl || ""}`;
+  }
+
   // src/ui/toast.js
   function showToast(message, isError = false) {
     let toast = document.createElement("div");
@@ -1161,6 +1303,7 @@
       titleSettings: "⚙️ Ustawienia Jalapeño",
       secAppearance: "🎨 Wygląd i Interfejs",
       secModules: "🚀 Aktywne Moduły",
+      secFloatingBtn: "✨ Szybki dopisek (latający przycisk)",
       secConfig: "⚙️ Konfiguracja Szczegółowa",
       secHistory: "📜 Personalizacja Historii",
       lblFontColor: "Kolor czcionki (Tryb nocny):",
@@ -1180,6 +1323,8 @@
       defCurrency: "Kalkulator - Domyślna waluta:",
       histCount: "Ilość wyników w historii (1-10):",
       stopWords: "Własne 'Stop Words' (oddzielone przecinkiem):",
+      categoryIgnoreWords: "Asystent kategorii — ignorowane słowa (nagrody):",
+      categoryIgnoreWordsHint: "Dodatkowe słowa (poza wspólną bazą na GitHub). Oddziel przecinkami.",
       hideBtns: "Ukryj przyciski:",
       btnCancel: "Anuluj",
       btnSave: "Zapisz ustawienia",
@@ -1196,9 +1341,16 @@
       mTemplates: "Szablony wiad. (Hold)",
       mInfracNote: "Auto Notatka (Kary/Usunięcia)",
       mFloatingBtn: "Latający przycisk (Szybki dopisek)",
+      mFloatingBtnEnable: "Pokaż przycisk ✨ nad panelem dostawy",
+      mFloatingBtnShort: "Szybki dopisek",
+      mFloatingBtnDone: "Gotowe",
+      mFloatingBtnTitle: "Dodaj do tytułu: {text}",
       mMoveApprove: "Przesuń przycisk 'Approve & Send PM'",
-      lblFloatingText: "Personalizacja - Latający przycisk. Podaj tekst do doklejenia w tytule:",
-      lblFloatingFreeDel: "Włącz też darmową dostawę",
+      lblFloatingText: "Tekst doklejany do tytułu:",
+      lblFloatingTextPlaceholder: "np.  | Smart! Okazja",
+      lblFloatingTextHint: "Kliknięcie przycisku ✨ dopisze ten tekst na końcu tytułu okazji.",
+      lblFloatingFreeDel: "Zaznacz też „Free Delivery”",
+      lblFloatingFreeDelHint: "Po dopisaniu tytułu automatycznie włączy darmową dostawę w formularzu.",
       hStatus: "Status (Aktywna/Wygasła/Skasowana)",
       hPrice: "Cena",
       hTemp: "Temperatura",
@@ -1258,6 +1410,7 @@
       mLockButtons: "Lock/Unlock przyciski (Edit Lock & Expire Lock)",
       mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'",
       lblShippingOffset: "Wysokość panelu dostawy (px):",
+      lblShippingOffsetHint: "Odstęp od góry formularza — dotyczy przycisku ✨ i panelu dostawy po prawej.",
       mPriceWarning: "Ostrzeżenie o wzroście ceny (>1%)",
       mImageSearch: "Wyszukiwanie obrazem (Google Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
@@ -1288,6 +1441,26 @@
       mCatAdvisorSearchPlaceholder: "Wpisz słowo kluczowe (min. 3 znaki)…",
       mCatAdvisorNoData: "Brak danych dla tego tytułu",
       mCatAdvisorNotFound: "Nic nie znaleziono",
+      mCatAdvisorPepperLoading: "Szukam podobnych wstawek na Pepper…",
+      mCatAdvisorPepperFallback: " (fallback)",
+      mCatCombinedTitle: "Łączny ranking",
+      mCatRewardsTitle: "Nagrody (baza Slack / GitHub)",
+      mCatPepperTitle: "Poprzednie wstawki (Pepper)",
+      mCatRewardsNone: "Brak dopasowania w bazie nagród",
+      mCatPepperNone: "Brak podobnych okazji",
+      mCatStatsRewards: "kat. z nagród",
+      mCatStatsPepperDeals: "podobnych okazji",
+      mCatStatsWeight: "Waga",
+      mCatStatsSearch: "szukano",
+      mCatKeywordsLabel: "Słowa kluczowe",
+      mCatIgnoredLabel: "Twoje ignorowane",
+      mCatSharedIgnoreLabel: "Baza ignorowanych",
+      mCatIgnoreAddPlaceholder: "Dodaj słowo do bazy ignorowanych…",
+      mCatIgnoreAddBtn: "Dodaj do bazy",
+      mCatIgnoreAdded: "Dodano „{word}” — działa od razu",
+      mCatIgnoreDuplicate: "To słowo jest już w bazie",
+      mCatIgnoreBuiltin: "Słowo już ignorowane domyślnie",
+      mCatIgnoreTooShort: "Za krótkie słowo (min. 2 znaki)",
       mAllegroImages: "Zdjęcia z galerii Allegro",
       mAllegroImgBtn: "Pull Image (Allegro)",
       mAllegroImgTitle: "Pobierz główne zdjęcie z oferty Allegro i wgraj do okazji",
@@ -1351,6 +1524,7 @@
       titleSettings: "⚙️ Jalapeño Settings",
       secAppearance: "🎨 Appearance & UI",
       secModules: "🚀 Active Modules",
+      secFloatingBtn: "✨ Quick append (floating button)",
       secConfig: "⚙️ Advanced Configuration",
       secHistory: "📜 History Personalization",
       lblFontColor: "Font Color (Dark Mode):",
@@ -1370,6 +1544,8 @@
       defCurrency: "Converter - Default currency:",
       histCount: "History results count (1-10):",
       stopWords: "Custom 'Stop Words' (comma separated):",
+      categoryIgnoreWords: "Category advisor — ignored words (rewards DB):",
+      categoryIgnoreWordsHint: "Extra words (on top of shared GitHub list). Comma-separated.",
       hideBtns: "Hide buttons:",
       btnCancel: "Cancel",
       btnSave: "Save settings",
@@ -1386,9 +1562,16 @@
       mTemplates: "Hold Msg Templates",
       mInfracNote: "Auto Infraction Note",
       mFloatingBtn: "Floating Button (Quick append)",
+      mFloatingBtnEnable: "Show ✨ button above shipping panel",
+      mFloatingBtnShort: "Quick append",
+      mFloatingBtnDone: "Done",
+      mFloatingBtnTitle: "Append to title: {text}",
       mMoveApprove: "Move 'Approve & Send PM' button",
-      lblFloatingText: "Personalization - Floating button. Enter text to append to title:",
-      lblFloatingFreeDel: "Also enable Free Delivery",
+      lblFloatingText: "Text appended to title:",
+      lblFloatingTextPlaceholder: "e.g.  | Smart! Deal",
+      lblFloatingTextHint: "Clicking ✨ appends this text to the end of the deal title.",
+      lblFloatingFreeDel: "Also check “Free Delivery”",
+      lblFloatingFreeDelHint: "After appending the title, automatically enables free delivery in the form.",
       hStatus: "Status (Active/Expired/Deleted)",
       hPrice: "Price",
       hTemp: "Temperature",
@@ -1448,6 +1631,7 @@
       mLockButtons: "Lock/Unlock buttons (Edit Lock & Expire Lock)",
       mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words",
       lblShippingOffset: "Shipping panel top offset (px):",
+      lblShippingOffsetHint: "Distance from top of the form — applies to ✨ button and shipping panel on the right.",
       mPriceWarning: "Price increase warning (>1%)",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
@@ -1476,6 +1660,26 @@
       mCatAdvisorSearchPlaceholder: "Type keyword (min. 3 chars)…",
       mCatAdvisorNoData: "No data for this title",
       mCatAdvisorNotFound: "Nothing found",
+      mCatAdvisorPepperLoading: "Searching similar submissions on Pepper…",
+      mCatAdvisorPepperFallback: " (fallback)",
+      mCatCombinedTitle: "Combined ranking",
+      mCatRewardsTitle: "Rewards (Slack / GitHub DB)",
+      mCatPepperTitle: "Previous submissions (Pepper)",
+      mCatRewardsNone: "No match in rewards database",
+      mCatPepperNone: "No similar deals found",
+      mCatStatsRewards: "reward categories",
+      mCatStatsPepperDeals: "similar deals",
+      mCatStatsWeight: "Weight",
+      mCatStatsSearch: "searched",
+      mCatKeywordsLabel: "Keywords",
+      mCatIgnoredLabel: "Your ignored",
+      mCatSharedIgnoreLabel: "Ignore DB",
+      mCatIgnoreAddPlaceholder: "Add word to ignore database…",
+      mCatIgnoreAddBtn: "Add to DB",
+      mCatIgnoreAdded: "Added „{word}” — active now",
+      mCatIgnoreDuplicate: "Word already in database",
+      mCatIgnoreBuiltin: "Word already ignored by default",
+      mCatIgnoreTooShort: "Word too short (min. 2 chars)",
       mAllegroImages: "Allegro gallery images",
       mAllegroImgBtn: "Pull Image (Allegro)",
       mAllegroImgTitle: "Pull main image from Allegro offer into the deal",
@@ -2223,7 +2427,7 @@
   }
 
   // src/features/linkExpander.js
-  var SHORTENER_HOSTS = /* @__PURE__ */ new Set([
+  var SHORTENER_HOSTS2 = /* @__PURE__ */ new Set([
     "a.co",
     "amzn.asia",
     "amzn.com",
@@ -2253,7 +2457,7 @@
     try {
       const parsed = new URL(url);
       const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
-      if (SHORTENER_HOSTS.has(host)) return true;
+      if (SHORTENER_HOSTS2.has(host)) return true;
       if (host.startsWith("amzn.")) return true;
       if (/^\/d\/[a-z0-9]+$/i.test(parsed.pathname)) return true;
       if (host.includes("amazon") && /^\/gp\/aws\/redirect/i.test(parsed.pathname)) return true;
@@ -3322,6 +3526,36 @@
 
   // src/features/categoryCore.js
   var DB_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_kategorii_finalna.json";
+  var IGNORE_WORDS_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_ignorowanych_slow.json";
+  var EXAMPLE_TITLE_MAX_LEN = 52;
+  var FALLBACK_SHARED_IGNORES = [
+    "lcd",
+    "oled",
+    "led",
+    "usb",
+    "wifi",
+    "bluetooth",
+    "hdmi",
+    "nvme",
+    "ssd",
+    "gb",
+    "tb",
+    "mhz",
+    "ghz",
+    "rgb",
+    "ips",
+    "fhd",
+    "qhd",
+    "uhd",
+    "4k",
+    "8k",
+    "wifi6",
+    "ax",
+    "ac",
+    "gen",
+    "v2",
+    "v3"
+  ];
   var STOP_WORDS = /* @__PURE__ */ new Set([
     "wszystkie",
     "wszystkich",
@@ -3380,12 +3614,105 @@
     "nowe",
     "smart",
     "original",
-    "basic"
+    "basic",
+    // "All in One", "ALL INCLUSIVE" — myli z kategorią Podróże
+    "all",
+    "one",
+    "inclusive"
   ]);
+  var _sharedIgnoreWords = /* @__PURE__ */ new Set();
+  function addSharedIgnoreWord(raw) {
+    const w = normalizeWord(String(raw || "").trim());
+    if (w.length < 2) return { ok: false, error: "short" };
+    if (STOP_WORDS.has(w)) return { ok: false, error: "builtin" };
+    if (_sharedIgnoreWords.has(w)) return { ok: false, error: "duplicate" };
+    _sharedIgnoreWords.add(w);
+    return { ok: true, word: w };
+  }
+  function getSharedIgnoreWords() {
+    return [..._sharedIgnoreWords];
+  }
+  function getEffectiveStopWords() {
+    return /* @__PURE__ */ new Set([...STOP_WORDS, ..._sharedIgnoreWords]);
+  }
+  function getTitleKeywords(title) {
+    if (!title) return [];
+    const stops = getEffectiveStopWords();
+    return title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2 && !stops.has(w)).slice(0, 4);
+  }
   var POSITION_WEIGHTS = [4, 3, 2, 1];
   var _knowledgeBase = null;
   var _wordMeta = null;
   var _loadPromise = null;
+  var _ignoreLoadPromise = null;
+  function applySharedIgnoreData(data) {
+    const words = Array.isArray(data) ? data : data?.words || [];
+    _sharedIgnoreWords = new Set(
+      words.map((w) => normalizeWord(String(w))).filter((w) => w.length > 0)
+    );
+    if (!_sharedIgnoreWords.size) {
+      _sharedIgnoreWords = new Set(FALLBACK_SHARED_IGNORES);
+    }
+  }
+  function loadSharedIgnoreWords() {
+    if (_sharedIgnoreWords.size) return Promise.resolve(_sharedIgnoreWords);
+    if (_ignoreLoadPromise) return _ignoreLoadPromise;
+    _ignoreLoadPromise = new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: IGNORE_WORDS_URL,
+        timeout: 12e3,
+        onload(res) {
+          try {
+            applySharedIgnoreData(JSON.parse(res.responseText));
+          } catch (_) {
+            _sharedIgnoreWords = new Set(FALLBACK_SHARED_IGNORES);
+          }
+          resolve(_sharedIgnoreWords);
+        },
+        onerror: () => {
+          _sharedIgnoreWords = new Set(FALLBACK_SHARED_IGNORES);
+          resolve(_sharedIgnoreWords);
+        },
+        ontimeout: () => {
+          _sharedIgnoreWords = new Set(FALLBACK_SHARED_IGNORES);
+          resolve(_sharedIgnoreWords);
+        }
+      });
+    });
+    return _ignoreLoadPromise;
+  }
+  function fetchKnowledgeBase() {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: DB_URL,
+        timeout: 15e3,
+        onload(res) {
+          try {
+            resolve(JSON.parse(res.responseText));
+          } catch (e) {
+            reject(new Error("JSON parse error: " + e.message));
+          }
+        },
+        onerror: () => reject(new Error("Network error loading category DB")),
+        ontimeout: () => reject(new Error("Timeout loading category DB"))
+      });
+    });
+  }
+  function loadKnowledgeBase() {
+    if (_knowledgeBase) return Promise.resolve(_knowledgeBase);
+    if (_loadPromise) return _loadPromise;
+    _loadPromise = Promise.all([fetchKnowledgeBase(), loadSharedIgnoreWords()]).then(([kb]) => {
+      _knowledgeBase = kb;
+      _wordMeta = buildWordMeta(_knowledgeBase);
+      return _knowledgeBase;
+    }).catch((err) => {
+      _loadPromise = null;
+      throw err;
+    });
+    return _loadPromise;
+  }
   function buildWordMeta(kb) {
     const meta = {};
     for (const [word, entry] of Object.entries(kb)) {
@@ -3410,29 +3737,6 @@
     }
     return meta;
   }
-  function loadKnowledgeBase() {
-    if (_knowledgeBase) return Promise.resolve(_knowledgeBase);
-    if (_loadPromise) return _loadPromise;
-    _loadPromise = new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: DB_URL,
-        timeout: 15e3,
-        onload(res) {
-          try {
-            _knowledgeBase = JSON.parse(res.responseText);
-            _wordMeta = buildWordMeta(_knowledgeBase);
-            resolve(_knowledgeBase);
-          } catch (e) {
-            reject(new Error("JSON parse error: " + e.message));
-          }
-        },
-        onerror: () => reject(new Error("Network error loading category DB")),
-        ontimeout: () => reject(new Error("Timeout loading category DB"))
-      });
-    });
-    return _loadPromise;
-  }
   function normalizeWord(word) {
     return word.toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]/g, "");
   }
@@ -3455,7 +3759,8 @@
   }
   function getAutoSuggestions(title) {
     if (!_knowledgeBase || !_wordMeta || !title) return null;
-    const words = title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2 && !STOP_WORDS.has(w)).slice(0, 4);
+    const stops = getEffectiveStopWords();
+    const words = title.split(/\s+/).map(normalizeWord).filter((w) => w.length > 2 && !stops.has(w)).slice(0, 4);
     if (!words.length) return null;
     const scores = {};
     const examples = {};
@@ -3469,7 +3774,9 @@
         const contribution = data.count * posW * wordW;
         scores[cat] = (scores[cat] || 0) + contribution;
         if (!examples[cat]) examples[cat] = /* @__PURE__ */ new Set();
-        data.examples.forEach((ex) => examples[cat].add(`${ex.title}|||${ex.date}`));
+        data.examples.forEach((ex) => {
+          examples[cat].add(`${ex.title}|||${ex.date || ""}|||${ex.url || ""}`);
+        });
       }
     });
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
@@ -3477,17 +3784,251 @@
     const results = Object.entries(scores).map(([cat, score]) => ({
       category: cat,
       percent: Math.round(score / total * 100),
-      examples: [...examples[cat]].slice(0, 3).map((s) => {
-        const [t2, d] = s.split("|||");
-        return { title: t2, date: d };
-      })
+      examples: [...examples[cat]].slice(0, 3).map(parseStoredExample)
     })).sort((a, b) => b.percent - a.percent);
     return filterResults(results);
+  }
+  function mergeCategorySuggestions(rewardsResults, pepperData) {
+    const pepperResults = pepperData?.suggestions || null;
+    const dealCount = pepperData?.dealCount || 0;
+    const emptyWeights = { rewards: 1, pepper: 0 };
+    if (!rewardsResults?.length && !pepperResults?.length) {
+      return { merged: null, weights: emptyWeights };
+    }
+    const tagRewards = (list) => list.map((r) => ({
+      ...r,
+      sources: ["rewards"],
+      examples: r.examples.map((e) => ({ ...e, source: "rewards" }))
+    }));
+    const tagPepper = (list) => list.map((r) => ({
+      ...r,
+      sources: ["pepper"],
+      examples: (r.examples || []).map((e) => ({ ...e, source: "pepper" }))
+    }));
+    if (!pepperResults?.length) {
+      return { merged: tagRewards(rewardsResults), weights: { rewards: 1, pepper: 0 } };
+    }
+    if (!rewardsResults?.length) {
+      return { merged: tagPepper(pepperResults), weights: { rewards: 0, pepper: 1 } };
+    }
+    let rewardsW = 0.65;
+    let pepperW = 0.35;
+    if (dealCount < 3) {
+      rewardsW = 0.78;
+      pepperW = 0.22;
+    } else if (dealCount >= 10) {
+      rewardsW = 0.55;
+      pepperW = 0.45;
+    }
+    const rewardsTop = rewardsResults[0];
+    const pepperTop = pepperResults[0];
+    if (rewardsTop.category !== pepperTop.category && pepperTop.percent >= 50 && dealCount >= 6 && rewardsTop.percent < 30) {
+      rewardsW = 0.45;
+      pepperW = 0.55;
+    }
+    const weights = { rewards: rewardsW, pepper: pepperW };
+    const rewardsPct = Object.fromEntries(rewardsResults.map((r) => [r.category, r.percent]));
+    const pepperPct = Object.fromEntries(pepperResults.map((r) => [r.category, r.percent]));
+    const scores = {};
+    const exampleMap = {};
+    for (const r of rewardsResults) {
+      scores[r.category] = (scores[r.category] || 0) + r.percent * rewardsW;
+      if (!exampleMap[r.category]) exampleMap[r.category] = [];
+      for (const ex of r.examples) {
+        if (exampleMap[r.category].length < 4) {
+          exampleMap[r.category].push({ ...ex, source: "rewards" });
+        }
+      }
+    }
+    for (const r of pepperResults) {
+      scores[r.category] = (scores[r.category] || 0) + r.percent * pepperW;
+      if (!exampleMap[r.category]) exampleMap[r.category] = [];
+      for (const ex of r.examples || []) {
+        if (exampleMap[r.category].length < 4 && !exampleMap[r.category].some((e) => e.title === ex.title)) {
+          exampleMap[r.category].push({ ...ex, source: "pepper" });
+        }
+      }
+    }
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    if (!total) return { merged: null, weights };
+    const merged = Object.entries(scores).map(([category, score]) => {
+      const hasRewards = category in rewardsPct;
+      const hasPepper = category in pepperPct;
+      const sources = [];
+      if (hasRewards) sources.push("rewards");
+      if (hasPepper) sources.push("pepper");
+      return {
+        category,
+        percent: Math.round(score / total * 100),
+        rewardsPercent: hasRewards ? rewardsPct[category] : null,
+        pepperPercent: hasPepper ? pepperPct[category] : null,
+        examples: (exampleMap[category] || []).slice(0, 3),
+        sources
+      };
+    }).sort((a, b) => b.percent - a.percent);
+    return { merged: filterResults(merged), weights };
+  }
+  function buildCategorySuggestionView(rewardsResults, pepperData, opts = {}) {
+    const pepperList = pepperData?.suggestions || [];
+    const rewards = (rewardsResults || []).map((r) => ({
+      ...r,
+      examples: r.examples.map((e) => ({ ...e, source: "rewards" }))
+    }));
+    const pepper = pepperList.map((r) => ({
+      ...r,
+      examples: (r.examples || []).map((e) => ({ ...e, source: "pepper" }))
+    }));
+    const { merged, weights } = mergeCategorySuggestions(rewardsResults, pepperData);
+    return {
+      rewards,
+      pepper,
+      merged,
+      loadingPepper: !!opts.loadingPepper,
+      meta: {
+        rewardsCount: rewards.length,
+        pepperDealCount: pepperData?.dealCount || 0,
+        pepperQuery: pepperData?.query || null,
+        pepperFallback: !!pepperData?.isFallback,
+        weights,
+        hasRewards: rewards.length > 0,
+        hasPepper: pepper.length > 0
+      }
+    };
+  }
+  var CATEGORY_VIEW_LABELS_PL = {
+    combinedTitle: "Łączny ranking",
+    rewardsTitle: "Nagrody (baza Slack / GitHub)",
+    pepperTitle: "Poprzednie wstawki (Pepper)",
+    rewardsShort: "Nagrody",
+    pepperShort: "Wstawki",
+    rewardsNone: "Brak dopasowania w bazie nagród",
+    pepperNone: "Brak podobnych okazji",
+    pepperLoading: "Szukam podobnych wstawek…",
+    statsRewards: "kat. z nagród",
+    statsPepperDeals: "podobnych okazji",
+    statsWeight: "Waga",
+    statsSearch: "szukano",
+    pepperFallback: " (fallback)",
+    keywordsLabel: "Słowa kluczowe",
+    ignoredLabel: "Twoje ignorowane",
+    sharedIgnoreLabel: "Baza ignorowanych"
+  };
+  function renderCategorySuggestionView(view, labels = {}, percentClass = "jp-cat-percent") {
+    const L = { ...CATEGORY_VIEW_LABELS_PL, ...labels };
+    const { rewards, pepper, merged, meta, loadingPepper } = view;
+    if (!merged?.length && !rewards.length && !pepper.length && !loadingPepper) {
+      return "";
+    }
+    let html = '<div class="jp-cat-advisor-view">';
+    html += '<div class="jp-cat-stats-bar">';
+    const statParts = [];
+    if (meta.hasRewards) {
+      statParts.push(`🏆 <b>${meta.rewardsCount}</b> ${L.statsRewards}`);
+    }
+    if (loadingPepper) {
+      statParts.push(`<span class="jp-cat-merge-loading">${L.pepperLoading}</span>`);
+    } else if (meta.hasPepper) {
+      statParts.push(`📊 <b>${meta.pepperDealCount}</b> ${L.statsPepperDeals}`);
+      if (meta.pepperQuery) {
+        const fb = meta.pepperFallback ? L.pepperFallback : "";
+        statParts.push(`${L.statsSearch}: <em>${meta.pepperQuery}</em>${fb}`);
+      }
+    }
+    if (meta.hasRewards && meta.hasPepper && !loadingPepper) {
+      const rW = Math.round(meta.weights.rewards * 100);
+      const pW = Math.round(meta.weights.pepper * 100);
+      statParts.push(`${L.statsWeight}: 🏆 ${rW}% · 📊 ${pW}%`);
+    }
+    if (meta.keywords?.length) {
+      statParts.push(`${L.keywordsLabel}: <em>${meta.keywords.join(", ")}</em>`);
+    }
+    if (meta.sharedIgnores?.length) {
+      statParts.push(`${L.sharedIgnoreLabel}: ${meta.sharedIgnores.length}`);
+    }
+    html += statParts.join(" · ") || "—";
+    html += "</div>";
+    if (merged?.length) {
+      html += `<div class="jp-cat-block jp-cat-block-combined">`;
+      html += `<div class="jp-cat-block-title">${L.combinedTitle}</div>`;
+      html += merged.map((s) => renderCombinedRow(s, percentClass)).join("");
+      html += "</div>";
+    }
+    html += '<div class="jp-cat-sources-split">';
+    html += '<div class="jp-cat-block jp-cat-block-rewards">';
+    html += `<div class="jp-cat-block-title jp-cat-block-title-rewards">🏆 ${L.rewardsTitle}</div>`;
+    html += rewards.length ? renderSourceList(rewards, "rewards", percentClass) : `<div class="jp-cat-empty-src">${L.rewardsNone}</div>`;
+    html += "</div>";
+    html += '<div class="jp-cat-block jp-cat-block-pepper">';
+    html += `<div class="jp-cat-block-title jp-cat-block-title-pepper">📊 ${L.pepperTitle}</div>`;
+    if (loadingPepper) {
+      html += `<div class="jp-cat-empty-src jp-cat-merge-loading">${L.pepperLoading}</div>`;
+    } else {
+      html += pepper.length ? renderSourceList(pepper, "pepper", percentClass) : `<div class="jp-cat-empty-src">${L.pepperNone}</div>`;
+    }
+    html += "</div>";
+    html += "</div></div>";
+    return html;
+  }
+  function parseStoredExample(raw) {
+    const parts = String(raw).split("|||");
+    return {
+      title: parts[0] || "",
+      date: parts[1] || "",
+      url: parts[2] || null
+    };
+  }
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function truncateTitle(title, maxLen = EXAMPLE_TITLE_MAX_LEN) {
+    if (!title || title.length <= maxLen) return title;
+    return `${title.slice(0, maxLen - 1)}…`;
+  }
+  function renderExampleItem(example) {
+    const full = example.title || "";
+    if (!full) return "";
+    const short = truncateTitle(full);
+    const titleAttr = escapeHtml(full);
+    const inner = escapeHtml(short);
+    const datePart = example.date ? `<span class="jp-cat-date">${escapeHtml(example.date)}</span>` : "";
+    const titleEl = example.url ? `<a class="jp-cat-ex-link" href="${escapeHtml(example.url)}" target="_blank" rel="noopener noreferrer" title="${titleAttr}">${inner}</a>` : `<span class="jp-cat-ex-text" title="${titleAttr}">${inner}</span>`;
+    return `<li class="jp-cat-example">${titleEl}${datePart ? ` ${datePart}` : ""}</li>`;
+  }
+  function renderCombinedRow(s, percentClass) {
+    const pills = [];
+    if (s.rewardsPercent != null) {
+      pills.push(`<span class="jp-cat-src-pill jp-cat-src-rewards" title="Nagrody"><span class="jp-cat-src-icon">🏆</span><span class="jp-cat-src-val">${s.rewardsPercent}%</span></span>`);
+    }
+    if (s.pepperPercent != null) {
+      pills.push(`<span class="jp-cat-src-pill jp-cat-src-pepper" title="Wstawki"><span class="jp-cat-src-icon">📊</span><span class="jp-cat-src-val">${s.pepperPercent}%</span></span>`);
+    }
+    const ledBy = s.rewardsPercent != null && (s.pepperPercent == null || s.rewardsPercent >= s.pepperPercent) ? "rewards-led" : s.pepperPercent != null ? "pepper-led" : "";
+    const ex = (s.examples || []).map((e) => renderExampleItem(e)).join("");
+    return `<div class="jp-cat-result jp-cat-result-combined ${ledBy}">
+        <div class="jp-cat-result-header">
+            <span class="${percentClass}">${s.percent}%</span>
+            <span class="jp-cat-name">${escapeHtml(s.category)}</span>
+        </div>
+        ${pills.length ? `<div class="jp-cat-src-pills">${pills.join("")}</div>` : ""}
+        ${ex ? `<ul class="jp-cat-examples">${ex}</ul>` : ""}
+    </div>`;
+  }
+  function renderSourceList(items, source, percentClass) {
+    return items.map((s) => {
+      const ex = (s.examples || []).map((e) => renderExampleItem(e)).join("");
+      return `<div class="jp-cat-result jp-cat-result-${source}">
+            <div class="jp-cat-result-header">
+                <span class="${percentClass}">${s.percent}%</span>
+                <span class="jp-cat-name">${escapeHtml(s.category)}</span>
+            </div>
+            ${ex ? `<ul class="jp-cat-examples">${ex}</ul>` : ""}
+        </div>`;
+    }).join("");
   }
   function searchManual(query) {
     if (!_knowledgeBase || query.length < 3) return null;
     const q = normalizeWord(query);
-    if (STOP_WORDS.has(q)) return null;
+    if (getEffectiveStopWords().has(q)) return null;
     const keys = Object.keys(_knowledgeBase).filter((k) => k.startsWith(q)).slice(0, 3);
     if (!keys.length) return null;
     const out = {};
@@ -3498,13 +4039,11 @@
   }
   function renderSuggestionList(suggestions, percentClass = "jp-cat-percent") {
     return suggestions.map((s) => {
-      const ex = s.examples.map(
-        (e) => `<li class="jp-cat-example"><em>${e.title}</em><span class="jp-cat-date"> ${e.date || ""}</span></li>`
-      ).join("");
+      const ex = s.examples.map((e) => renderExampleItem(e)).join("");
       return `<div class="jp-cat-result">
             <div class="jp-cat-result-header">
                 <span class="${percentClass}">${s.percent}%</span>
-                <span class="jp-cat-name">${s.category}</span>
+                <span class="jp-cat-name">${escapeHtml(s.category)}</span>
             </div>
             ${ex ? `<ul class="jp-cat-examples">${ex}</ul>` : ""}
         </div>`;
@@ -3523,6 +4062,187 @@
             ${renderSuggestionList(filterResults(sorted))}
         </div>`;
     }).join("");
+  }
+
+  // src/features/categoryPepperHistory.js
+  var DEFAULT_OPTS = {
+    maxDeals: 20,
+    enableFallback: true,
+    customStopWords: "",
+    excludeDeal: null
+  };
+  function urlDealFingerprint(url) {
+    if (!url) return "";
+    try {
+      const u = new URL(url.trim());
+      const dp = u.pathname.match(/\/dp\/([A-Z0-9]{10})/i);
+      if (dp) return `dp:${dp[1].toUpperCase()}`;
+      const host = u.hostname.replace(/^www\./i, "").toLowerCase();
+      return `${host}${u.pathname.split("?")[0].replace(/\/$/, "")}`;
+    } catch (_) {
+      return url.trim().toLowerCase();
+    }
+  }
+  function normalizeTitle(title) {
+    return (title || "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+  function buildDealExclusionFromPage(getTitle) {
+    const titleInput = document.querySelector(
+      'input[placeholder="Thread title"], input[name="title"]'
+    );
+    const titleRaw = getTitle?.() || titleInput?.value?.trim() || "";
+    const mainUrl = document.querySelector('textarea[name="mainUrl"]')?.value?.trim() || "";
+    const canonicalUrl = document.querySelector('textarea[name="canonicalUrl"]')?.value?.trim() || "";
+    let threadId = null;
+    const idMatch = window.location.href.match(/(?:-|\/deals\/edit\/)(\d+)(?:\/|$|\?)/);
+    if (idMatch) threadId = parseInt(idMatch[1], 10);
+    const urlFps = new Set(
+      [mainUrl, canonicalUrl].filter(Boolean).map(urlDealFingerprint)
+    );
+    return {
+      title: normalizeTitle(titleRaw),
+      mainUrl,
+      canonicalUrl,
+      threadId,
+      urlFps
+    };
+  }
+  function isCurrentDealThread(threadInfo, ctx) {
+    if (!threadInfo || !ctx) return false;
+    if (ctx.threadId && threadInfo.threadId === ctx.threadId) return true;
+    const link = (threadInfo.link || "").trim();
+    if (link) {
+      if (ctx.mainUrl && link === ctx.mainUrl) return true;
+      if (ctx.canonicalUrl && link === ctx.canonicalUrl) return true;
+      if (ctx.urlFps?.size && ctx.urlFps.has(urlDealFingerprint(link))) return true;
+    }
+    const dealUrl = (threadInfo.url || "").trim();
+    if (ctx.threadId && dealUrl) {
+      if (dealUrl.includes(`/deals/${ctx.threadId}`) || dealUrl.includes(`-${ctx.threadId}`)) {
+        return true;
+      }
+    }
+    if (ctx.title && threadInfo.title) {
+      if (normalizeTitle(threadInfo.title) === ctx.title) return true;
+    }
+    return false;
+  }
+  function parseSearchHtml(html, query, isFallback, excludeDeal) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const deals = doc.querySelectorAll("article.thread, div.thread");
+    const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    const validDeals = [];
+    deals.forEach((deal) => {
+      const vueDataEl = deal.querySelector("[data-vue3]");
+      if (!vueDataEl) return;
+      try {
+        const vueJson = JSON.parse(vueDataEl.getAttribute("data-vue3"));
+        const threadInfo = vueJson.props?.thread;
+        if (!threadInfo) return;
+        if (isCurrentDealThread(threadInfo, excludeDeal)) return;
+        const titleLower = threadInfo.title.toLowerCase();
+        const isMatch = queryWords.length === 0 || queryWords.some((word) => titleLower.includes(word));
+        if (isMatch || isFallback) {
+          validDeals.push(threadInfo);
+        }
+      } catch (_) {
+      }
+    });
+    return validDeals;
+  }
+  function buildCategoryStats(deals) {
+    const categoryCount = {};
+    const examples = {};
+    let totalCategorized = 0;
+    deals.forEach((threadInfo) => {
+      const cat = threadInfo.mainGroup?.threadGroupName;
+      if (!cat) return;
+      totalCategorized++;
+      categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+      if (!examples[cat]) examples[cat] = [];
+      if (examples[cat].length < 3) {
+        let dateStr = "";
+        if (threadInfo.publishedAt) {
+          const d = new Date(threadInfo.publishedAt * 1e3);
+          dateStr = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+        }
+        examples[cat].push({
+          title: threadInfo.title,
+          date: dateStr,
+          source: "pepper",
+          url: threadInfo.url || null
+        });
+      }
+    });
+    if (totalCategorized === 0) return null;
+    const suggestions = Object.entries(categoryCount).map(([category, count]) => ({
+      category,
+      percent: Math.round(count / totalCategorized * 100),
+      examples: examples[category],
+      source: "pepper"
+    })).sort((a, b) => b.percent - a.percent);
+    return {
+      suggestions: filterResults(suggestions),
+      dealCount: totalCategorized
+    };
+  }
+  function fetchQuery(query, originalTitle, textSettings, opts, isFallback) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: `https://www.pepper.pl/search?q=${encodeURIComponent(query)}`,
+        timeout: 12e3,
+        onload(res) {
+          const deals = parseSearchHtml(
+            res.responseText,
+            query,
+            isFallback,
+            opts.excludeDeal
+          ).slice(0, opts.maxDeals);
+          const stats = buildCategoryStats(deals);
+          if (!stats && opts.enableFallback && !isFallback) {
+            let fallbackQuery = getFallbackWord(originalTitle, textSettings);
+            if (!fallbackQuery) {
+              const words = query.split(" ").filter((w) => w.length > 2);
+              fallbackQuery = words[0] || null;
+            }
+            if (fallbackQuery && fallbackQuery.toLowerCase() !== query.toLowerCase()) {
+              fetchQuery(fallbackQuery, originalTitle, textSettings, opts, true).then((result) => {
+                if (result) {
+                  resolve({ ...result, query: fallbackQuery, isFallback: true });
+                } else {
+                  resolve(null);
+                }
+              });
+              return;
+            }
+          }
+          if (!stats) {
+            resolve(null);
+            return;
+          }
+          resolve({
+            ...stats,
+            query,
+            isFallback
+          });
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+  function fetchPepperCategorySuggestions(title, options = {}) {
+    const opts = { ...DEFAULT_OPTS, ...options };
+    const textSettings = { customStopWords: opts.customStopWords || "" };
+    if (!title || title.trim().length < 3) {
+      return Promise.resolve(null);
+    }
+    const query = generateSmartQuery(title, textSettings);
+    if (!query) {
+      return Promise.resolve(null);
+    }
+    return fetchQuery(query, title, textSettings, opts, false);
   }
 
   // src/features/categoryAdvisor.js
@@ -3558,21 +4278,102 @@
                        placeholder="${t("mCatAdvisorSearchPlaceholder")}"
                        autocomplete="off">
                 <div id="jp-cat-search-results" class="jp-cat-results"></div>
+            </div>
+            <div class="jp-cat-ignore-row">
+                <input id="jp-cat-ignore-add"
+                       type="text"
+                       placeholder="${t("mCatIgnoreAddPlaceholder")}"
+                       autocomplete="off"
+                       spellcheck="false">
+                <button type="button" class="jp-cat-ignore-add-btn" id="jp-cat-ignore-btn" title="${t("mCatIgnoreAddBtn")}">+</button>
             </div>`;
       const autoResults = body.querySelector("#jp-cat-auto-results");
+      const ignoreAddInput = body.querySelector("#jp-cat-ignore-add");
+      const ignoreAddBtn = body.querySelector("#jp-cat-ignore-btn");
       const searchInput = body.querySelector("#jp-cat-search-input");
       const searchResults = body.querySelector("#jp-cat-search-results");
       const titleInput = document.querySelector('input[placeholder="Thread title"]');
-      function updateAuto() {
-        const title = titleInput ? titleInput.value : "";
-        const suggestions = getAutoSuggestions(title);
-        if (!suggestions || !suggestions.length) {
+      let pepperTimer = null;
+      let pepperReqId = 0;
+      const catLabels = () => ({
+        ...CATEGORY_VIEW_LABELS_PL,
+        combinedTitle: t("mCatCombinedTitle"),
+        rewardsTitle: t("mCatRewardsTitle"),
+        pepperTitle: t("mCatPepperTitle"),
+        rewardsNone: t("mCatRewardsNone"),
+        pepperNone: t("mCatPepperNone"),
+        pepperLoading: t("mCatAdvisorPepperLoading"),
+        statsRewards: t("mCatStatsRewards"),
+        statsPepperDeals: t("mCatStatsPepperDeals"),
+        statsWeight: t("mCatStatsWeight"),
+        statsSearch: t("mCatStatsSearch"),
+        pepperFallback: t("mCatAdvisorPepperFallback"),
+        keywordsLabel: t("mCatKeywordsLabel"),
+        sharedIgnoreLabel: t("mCatSharedIgnoreLabel")
+      });
+      function enrichView(view, title) {
+        view.meta.keywords = getTitleKeywords(title);
+        view.meta.sharedIgnores = getSharedIgnoreWords();
+        return view;
+      }
+      function renderAuto(rewardsSuggestions, pepperData, loadingPepper, title) {
+        if (!rewardsSuggestions?.length && !pepperData && !loadingPepper) {
           autoResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
           return;
         }
-        autoResults.innerHTML = renderSuggestionList(suggestions);
+        const view = enrichView(
+          buildCategorySuggestionView(rewardsSuggestions, pepperData, { loadingPepper }),
+          title
+        );
+        if (!view.merged?.length && !view.rewards.length && !view.pepper.length && !loadingPepper) {
+          autoResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
+          return;
+        }
+        autoResults.innerHTML = renderCategorySuggestionView(view, catLabels());
         increment("categoryAdvisorAutoShown");
       }
+      function updateAuto() {
+        const title = titleInput ? titleInput.value : "";
+        const rewardsSuggestions = getAutoSuggestions(title);
+        const excludeDeal = buildDealExclusionFromPage(() => title);
+        clearTimeout(pepperTimer);
+        const reqId = ++pepperReqId;
+        if (!title || title.trim().length < 3) {
+          renderAuto(rewardsSuggestions, null, false, title);
+          return;
+        }
+        renderAuto(rewardsSuggestions, null, true, title);
+        pepperTimer = setTimeout(() => {
+          fetchPepperCategorySuggestions(title, {
+            customStopWords: settings3.customStopWords || "",
+            excludeDeal
+          }).then((pepperData) => {
+            if (reqId !== pepperReqId) return;
+            renderAuto(getAutoSuggestions(title), pepperData, false, title);
+            if (pepperData) increment("categoryAdvisorPepperMerged");
+          });
+        }, 450);
+      }
+      function submitIgnoreWord() {
+        const raw = ignoreAddInput.value.trim();
+        if (!raw) return;
+        const result = addSharedIgnoreWord(raw);
+        if (!result.ok) {
+          const msg = result.error === "duplicate" ? t("mCatIgnoreDuplicate") : result.error === "builtin" ? t("mCatIgnoreBuiltin") : t("mCatIgnoreTooShort");
+          showToast(msg, true);
+          return;
+        }
+        ignoreAddInput.value = "";
+        showToast(t("mCatIgnoreAdded").replace("{word}", result.word), false);
+        updateAuto();
+      }
+      ignoreAddBtn.addEventListener("click", submitIgnoreWord);
+      ignoreAddInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submitIgnoreWord();
+        }
+      });
       if (titleInput) {
         updateAuto();
         titleInput.addEventListener("input", updateAuto);
@@ -3734,7 +4535,6 @@
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hold-note" ${settings3.enableAutoHoldNote ? "checked" : ""}> ${t("mHoldNote")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-infraction-note" ${settings3.enableInfractionNote ? "checked" : ""}> ${t("mInfracNote")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-templates" ${settings3.enableMessageTemplates ? "checked" : ""}> ${t("mTemplates")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-floating-btn" ${settings3.enableFloatingButton ? "checked" : ""}> ${t("mFloatingBtn")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings3.enableMoveApproveBtn ? "checked" : ""}> ${t("mMoveApprove")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-merchant-notes" ${settings3.enableMerchantNotes ? "checked" : ""}> ${t("lblMerchantNotes")}</label>
                         <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-shipping-costs" ${settings3.enableShippingCosts ? "checked" : ""}> ${t("lblShippingCosts")}</label>
@@ -3752,6 +4552,30 @@
                 </div>
 
                 <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
+                    ${t("secFloatingBtn")}
+                </h4>
+                <div class="settings-row settings-row-special">
+                    <label style="font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom: 10px;">
+                        <input type="checkbox" id="set-floating-btn" ${settings3.enableFloatingButton ? "checked" : ""}>
+                        <span>${t("mFloatingBtnEnable")}</span>
+                    </label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label>${t("lblFloatingText")}</label>
+                            <input type="text" id="set-floating-text" value="${settings3.customFloatingText}" placeholder="${t("lblFloatingTextPlaceholder")}" style="width:100%">
+                            <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px;">${t("lblFloatingTextHint")}</div>
+                        </div>
+                        <div>
+                            <label style="font-weight:normal; display:flex; align-items:center; gap:8px; margin-top: 22px; cursor:pointer;">
+                                <input type="checkbox" id="set-floating-freedel" ${settings3.floatingButtonAutoFreeDelivery ? "checked" : ""}>
+                                <span>${t("lblFloatingFreeDel")}</span>
+                            </label>
+                            <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px; margin-left: 22px;">${t("lblFloatingFreeDelHint")}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
                     ${t("secConfig")}
                 </h4>
 
@@ -3764,20 +4588,10 @@
                     </select>
                 </div>
 
-                <div class="settings-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr; gap: 20px; align-items: end; margin-top: 15px;">
-                    <div>
-                        <label>${t("lblFloatingText")}</label>
-                        <input type="text" id="set-floating-text" value="${settings3.customFloatingText}" placeholder="np.  | Smart! Okazja" style="width:100%">
-                    </div>
-                    <div>
-                        <label style="font-weight:normal; display:flex; align-items:center; gap:5px; height: 35px; margin-bottom: 2px; cursor:pointer;">
-                            <input type="checkbox" id="set-floating-freedel" ${settings3.floatingButtonAutoFreeDelivery ? "checked" : ""}> ${t("lblFloatingFreeDel")}
-                        </label>
-                    </div>
-                    <div>
-                        <label>${t("lblShippingOffset")}</label>
-                        <input type="number" id="set-shipping-offset" value="${settings3.shippingPanelTopOffset}" style="width:100%">
-                    </div>
+                <div class="settings-row" style="width: 50%; margin-top: 15px;">
+                    <label>${t("lblShippingOffset")}</label>
+                    <input type="number" id="set-shipping-offset" value="${settings3.shippingPanelTopOffset}" style="width:100%">
+                    <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px;">${t("lblShippingOffsetHint")}</div>
                 </div>
 
                 <div class="settings-row" style="margin-top: 15px;">
@@ -4045,8 +4859,30 @@
         .btn-save { background: #2e7d32; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight:bold;}
         .btn-cancel { background: #777; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; color: white; font-weight:bold;}
 
+        .jp-shipping-stack {
+            width: 300px;
+            position: absolute;
+            left: 100%;
+            top: ${settings3.shippingPanelTopOffset !== void 0 ? settings3.shippingPanelTopOffset : 135}px;
+            margin-left: 10px;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .jp-shipping-stack .mod-floating-btn {
+            position: static;
+            width: 100%;
+            height: auto;
+            min-height: 36px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
         .jp-shipping-side-panel {
-                width: 300px;
+                width: 100%;
                 background: var(--jp-bg);
                 border: 1px solid var(--jp-border);
                 border-radius: 6px;
@@ -4054,11 +4890,7 @@
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
-                position: absolute;
-                left: 100%;
-                top: ${settings3.shippingPanelTopOffset !== void 0 ? settings3.shippingPanelTopOffset : 135}px; /* <--- POZYCJA Z USTAWIEŃ */
-                margin-left: 10px;
-                z-index: 1;
+                position: static;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             }
 
@@ -4197,7 +5029,7 @@
             font-size: 11px;
         }
         .jp-cat-result {
-            padding: 4px 6px;
+            padding: 3px 5px;
             border-radius: 3px;
             background: var(--jp-btn-bg);
             border: 1px solid var(--jp-btn-border);
@@ -4213,18 +5045,125 @@
         }
         .jp-cat-name { font-weight: bold; color: var(--jp-text); }
         .jp-cat-examples {
-            margin: 3px 0 0 28px;
+            margin: 2px 0 0 0;
             padding: 0;
-            list-style: circle;
+            list-style: none;
         }
         .jp-cat-example {
+            font-size: 9px;
+            color: var(--jp-text-muted);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .jp-cat-ex-link {
+            color: var(--jp-link);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .jp-cat-ex-link:hover { opacity: 0.85; }
+        .jp-cat-ex-text { cursor: help; }
+        .jp-cat-date { color: var(--jp-text-muted); opacity: 0.65; margin-left: 4px; }
+        .jp-cat-advisor-view { display: flex; flex-direction: column; gap: 8px; }
+        .jp-cat-stats-bar {
             font-size: 10px;
             color: var(--jp-text-muted);
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 3px;
+            padding: 5px 7px;
+            line-height: 1.45;
+        }
+        .jp-cat-stats-bar b { color: var(--jp-text); }
+        .jp-cat-stats-bar em { font-style: normal; color: var(--jp-input-text); font-weight: 500; }
+        .jp-cat-block-title {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--jp-text-muted);
+            margin-bottom: 4px;
+        }
+        .jp-cat-block-title-rewards { color: #e65100; }
+        .jp-cat-block-title-pepper { color: #1565c0; }
+        .jp-cat-sources-split {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-top: 1px dashed var(--jp-border);
+            padding-top: 6px;
+        }
+        .jp-cat-block { min-width: 0; max-width: 100%; }
+        .jp-cat-advisor-view { max-width: 100%; overflow: hidden; }
+        .jp-cat-ignore-row {
             display: flex;
             gap: 4px;
-            flex-wrap: wrap;
+            align-items: stretch;
+            margin-top: 6px;
+            border-top: 1px dashed var(--jp-border);
+            padding-top: 6px;
         }
-        .jp-cat-date { color: var(--jp-text-muted); opacity: 0.7; }
+        .jp-cat-ignore-row input {
+            flex: 1;
+            min-width: 0;
+            padding: 4px 6px;
+            font-size: 10px;
+            border: 1px solid var(--jp-border);
+            border-radius: 3px;
+            background: var(--jp-input-bg);
+            color: var(--jp-input-text);
+        }
+        .jp-cat-ignore-add-btn {
+            flex-shrink: 0;
+            padding: 0 8px;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1;
+            border: 1px solid var(--jp-border);
+            border-radius: 3px;
+            background: var(--jp-btn-bg);
+            color: var(--jp-text);
+            cursor: pointer;
+        }
+        .jp-cat-ignore-add-btn:hover { background: var(--jp-link); color: #fff; border-color: var(--jp-link); }
+        #jp-cat-search-section { border-top: 1px dashed var(--jp-border); padding-top: 6px; }
+        .jp-cat-block-rewards .jp-cat-result-rewards { border-left: 3px solid #ff9800; }
+        .jp-cat-block-pepper .jp-cat-result-pepper { border-left: 3px solid #42a5f5; }
+        .jp-cat-result-combined.rewards-led { border-left: 3px solid #ff9800; }
+        .jp-cat-result-combined.pepper-led { border-left: 3px solid #42a5f5; }
+        .jp-cat-src-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 3px 0 2px 0;
+        }
+        .jp-cat-src-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            line-height: 1.3;
+            border: 1px solid transparent;
+        }
+        .jp-cat-src-icon { font-size: 10px; line-height: 1; }
+        .jp-cat-src-val { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; }
+        .jp-cat-src-rewards {
+            background: #ff9800;
+            color: #1a1200;
+            border-color: #e65100;
+        }
+        .jp-cat-src-pepper {
+            background: #42a5f5;
+            color: #061a2e;
+            border-color: #1565c0;
+        }
+        .jp-cat-ex-badge { flex-shrink: 0; font-size: 9px; }
+        .jp-cat-empty-src { font-size: 10px; color: var(--jp-text-muted); font-style: italic; padding: 3px 0; }
+        .jp-cat-merge-loading { font-style: italic; opacity: 0.85; }
         .jp-cat-word-block { margin-bottom: 4px; }
         .jp-cat-word-label {
             font-weight: bold;
@@ -4237,7 +5176,6 @@
             display: inline-block;
             margin-bottom: 4px;
         }
-        #jp-cat-search-section { border-top: 1px dashed var(--jp-border); padding-top: 6px; }
         .jp-cat-search-input {
             width: 100%;
             padding: 4px 6px;
@@ -5295,30 +6233,6 @@
           openSettings();
         };
         toolsBox.appendChild(settingsBtn);
-        if (settings3.enableFloatingButton) {
-          let floatBtn = document.createElement("button");
-          floatBtn.innerHTML = "✨";
-          floatBtn.className = "mod-floating-btn";
-          floatBtn.title = "Dodaj tekst: " + settings3.customFloatingText;
-          floatBtn.onclick = async (e) => {
-            e.preventDefault();
-            let titleInput = document.querySelector('input[placeholder="Thread title"]');
-            if (titleInput && settings3.customFloatingText) {
-              let currentVal = titleInput.value;
-              if (!currentVal.includes(settings3.customFloatingText.trim())) {
-                await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
-              }
-            }
-            if (settings3.floatingButtonAutoFreeDelivery) {
-              setVuetifyCheckbox("Free Delivery", true, true);
-            }
-            floatBtn.innerHTML = "✅";
-            setTimeout(() => {
-              floatBtn.innerHTML = "✨";
-            }, 1500);
-          };
-          toolsBox.appendChild(floatBtn);
-        }
         let leftCol = document.createElement("div");
         leftCol.className = "mod-left-col";
         const debounce = (func, delay) => {
@@ -5499,18 +6413,22 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         let checkAutomations = () => {
           let urlTextarea2 = document.querySelector('textarea[name="mainUrl"]');
           if (!urlTextarea2) return;
+          let canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
+          const urlFingerprint = getDealUrlFingerprint(
+            urlTextarea2.value,
+            canonicalUrlNode?.value
+          );
           if (!window.jpLastCheckedUrl) {
-            window.jpLastCheckedUrl = urlTextarea2.value;
-          } else if (window.jpLastCheckedUrl !== urlTextarea2.value) {
-            window.jpLastCheckedUrl = urlTextarea2.value;
+            window.jpLastCheckedUrl = urlFingerprint;
+          } else if (window.jpLastCheckedUrl !== urlFingerprint) {
+            window.jpLastCheckedUrl = urlFingerprint;
             window.jpUserEditedShipping = false;
             window.jpAutoShippingSet = false;
             window.jpDealCheckersAttached = false;
             window.jpAutoLocalStoreCounted = null;
           }
-          let canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
-          let linkToCheck = canonicalUrlNode && canonicalUrlNode.value.trim() !== "" ? canonicalUrlNode.value.toLowerCase() : urlTextarea2.value.toLowerCase();
-          if (settings3.enableAutoAmazonShipping && linkToCheck.includes("amazon.pl")) {
+          let linkToCheck = getAutomationLink(urlTextarea2.value, canonicalUrlNode?.value);
+          if (settings3.enableAutoAmazonShipping && shouldApplyAmazonPlShipping(urlTextarea2.value, canonicalUrlNode?.value)) {
             let price = getCurrentPrice();
             if (price !== null) {
               let allLabels = Array.from(document.querySelectorAll("label"));
@@ -5561,7 +6479,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               }
             }
           }
-          if (settings3.enableAutoAmazonShipping && linkToCheck.includes("allegro.pl") && !window.jpUserEditedShipping) {
+          if (settings3.enableAutoAmazonShipping && isAllegroLink(linkToCheck) && !window.jpUserEditedShipping) {
             let shipInput = getShippingInput();
             if (shipInput && shipInput.value.trim() === "") {
               increment("autoShippingFilled");
@@ -5572,7 +6490,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               }, 150);
             }
           }
-          if (settings3.enableAutoAmazonShipping && linkToCheck.includes("zalando-lounge.pl") && !window.jpUserEditedShipping) {
+          if (settings3.enableAutoAmazonShipping && isZalandoLoungeLink(linkToCheck) && !window.jpUserEditedShipping) {
             let shipInput = getShippingInput();
             if (shipInput && shipInput.value.trim() === "") {
               increment("autoShippingFilled");
@@ -5651,11 +6569,69 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         let mainFormPanel = document.querySelector(".layout.column.mb-3.px-4") || document.querySelector(".mb-3");
         if (mainFormPanel) {
           mainFormPanel.style.position = "relative";
-          if (!document.getElementById("jp-shipping-side-panel")) {
+          if (!document.getElementById("jp-shipping-stack")) {
+            let legacyPanel = document.getElementById("jp-shipping-side-panel");
+            if (legacyPanel && !legacyPanel.closest("#jp-shipping-stack")) {
+              legacyPanel.remove();
+            }
+            let shippingStack = document.createElement("div");
+            shippingStack.id = "jp-shipping-stack";
+            shippingStack.className = "jp-shipping-stack";
+            if (settings3.enableFloatingButton) {
+              let floatBtn = document.createElement("button");
+              floatBtn.type = "button";
+              floatBtn.className = "mod-floating-btn";
+              floatBtn.title = t("mFloatingBtnTitle").replace("{text}", settings3.customFloatingText);
+              floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
+              floatBtn.onclick = async (e) => {
+                e.preventDefault();
+                let titleInput = document.querySelector('input[placeholder="Thread title"]');
+                if (titleInput && settings3.customFloatingText) {
+                  let currentVal = titleInput.value;
+                  if (!currentVal.includes(settings3.customFloatingText.trim())) {
+                    await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
+                  }
+                }
+                if (settings3.floatingButtonAutoFreeDelivery) {
+                  setVuetifyCheckbox("Free Delivery", true, true);
+                }
+                floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
+                setTimeout(() => {
+                  floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
+                }, 1500);
+              };
+              shippingStack.appendChild(floatBtn);
+            }
             let sidePanel = document.createElement("div");
             sidePanel.id = "jp-shipping-side-panel";
             sidePanel.className = "jp-shipping-side-panel";
-            mainFormPanel.appendChild(sidePanel);
+            shippingStack.appendChild(sidePanel);
+            mainFormPanel.appendChild(shippingStack);
+          } else if (settings3.enableFloatingButton && !document.querySelector("#jp-shipping-stack .mod-floating-btn")) {
+            let shippingStack = document.getElementById("jp-shipping-stack");
+            let floatBtn = document.createElement("button");
+            floatBtn.type = "button";
+            floatBtn.className = "mod-floating-btn";
+            floatBtn.title = t("mFloatingBtnTitle").replace("{text}", settings3.customFloatingText);
+            floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
+            floatBtn.onclick = async (e) => {
+              e.preventDefault();
+              let titleInput = document.querySelector('input[placeholder="Thread title"]');
+              if (titleInput && settings3.customFloatingText) {
+                let currentVal = titleInput.value;
+                if (!currentVal.includes(settings3.customFloatingText.trim())) {
+                  await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
+                }
+              }
+              if (settings3.floatingButtonAutoFreeDelivery) {
+                setVuetifyCheckbox("Free Delivery", true, true);
+              }
+              floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
+              setTimeout(() => {
+                floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
+              }, 1500);
+            };
+            shippingStack.insertBefore(floatBtn, shippingStack.firstChild);
           }
           if (settings3.enableCategoryAdvisor && !document.getElementById("jp-cat-side-panel")) {
             let catSidePanel = document.createElement("div");
@@ -5683,9 +6659,22 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         }
         let merchantNoteAlert = null;
         const getMerchantNameForNotes = () => {
+          const mainUrlNode = document.querySelector('textarea[name="mainUrl"]');
+          const canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
+          const mainUrl = mainUrlNode?.value || "";
+          const canonicalUrl = canonicalUrlNode?.value || "";
+          const resolveFromUrls = () => getStoreMerchantDomain(mainUrl, canonicalUrl);
           let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
           if (merchantInput && merchantInput.value.trim()) {
-            return merchantInput.value.trim();
+            const fromInput = merchantInput.value.trim();
+            if (fromInput !== "---") {
+              if (!isShortenerMerchantName(fromInput)) {
+                return fromInput;
+              }
+              const resolved = resolveFromUrls();
+              if (resolved) return resolved;
+              return fromInput;
+            }
           }
           let historyBox = document.querySelector(".pepper-history-box");
           if (historyBox) {
@@ -5694,26 +6683,15 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             if (match && match[1]) {
               let parsedMerchant = match[1].trim();
               if (parsedMerchant !== "---") {
-                return parsedMerchant;
+                if (!isShortenerMerchantName(parsedMerchant)) {
+                  return parsedMerchant;
+                }
+                const resolved = resolveFromUrls();
+                if (resolved) return resolved;
               }
             }
           }
-          let canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
-          let mainUrlNode = document.querySelector('textarea[name="mainUrl"]');
-          let fallbackUrl = "";
-          if (canonicalUrlNode && canonicalUrlNode.value.trim() !== "") {
-            fallbackUrl = canonicalUrlNode.value.trim();
-          } else if (mainUrlNode && mainUrlNode.value.trim() !== "") {
-            fallbackUrl = mainUrlNode.value.trim();
-          }
-          if (fallbackUrl) {
-            try {
-              let domain = new URL(fallbackUrl).hostname.replace(/^www\./, "");
-              if (domain) return domain;
-            } catch (e) {
-            }
-          }
-          return null;
+          return resolveFromUrls();
         };
         const editMerchantNote = (merchantName, callback) => {
           let editContainer = document.createElement("div");
@@ -6160,11 +7138,27 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         }
         if (settings3.enableShippingCosts) {
           updateShippingCostAlert();
-          let merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
-          if (merchantInput) {
-            merchantInput.addEventListener("change", updateShippingCostAlert);
-            merchantInput.addEventListener("input", debounce(updateShippingCostAlert, 300));
-          }
+          const attachDealFieldWatchers = () => {
+            const merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+            if (merchantInput && !merchantInput.dataset.jpShippingWatch) {
+              merchantInput.dataset.jpShippingWatch = "1";
+              merchantInput.addEventListener("change", updateShippingCostAlert);
+              merchantInput.addEventListener("input", debounce(updateShippingCostAlert, 300));
+            }
+            [
+              document.querySelector('textarea[name="mainUrl"]'),
+              document.querySelector('textarea[name="canonicalUrl"]')
+            ].forEach((field) => {
+              if (!field || field.dataset.jpShippingWatch) return;
+              field.dataset.jpShippingWatch = "1";
+              field.addEventListener("input", debounce(() => {
+                lastCountedShippingMerchant = null;
+                updateShippingCostAlert();
+                checkAutomations();
+              }, 400));
+            });
+          };
+          attachDealFieldWatchers();
         }
         updateLockButtons();
         let detectAndConvertCallback = null;
