@@ -6410,6 +6410,47 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           input.style.backgroundColor = "";
           if (DEBUG) console.log("✅ Shipping set:", input.value);
         };
+        const applyUserFreeDelivery = async () => {
+          window.jpUserEditedShipping = true;
+          window.jpAutoShippingSet = false;
+          let nativeInput = getShippingInput();
+          setVuetifyCheckbox("Free Delivery", true, true);
+          await afterVueUpdate(nativeInput || document.body);
+          if (nativeInput && nativeInput.value.trim() !== "") {
+            nativeInput.focus();
+            nativeInput.value = "";
+            nativeInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+            nativeInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+            nativeInput.blur();
+            await afterVueUpdate(nativeInput);
+            nativeInput.classList.remove("jp-shipping-alert");
+            nativeInput.style.color = "";
+            nativeInput.style.backgroundColor = "";
+          }
+        };
+        const handleFloatingBtnClick = async (floatBtn, e) => {
+          e.preventDefault();
+          if (settings3.floatingButtonAutoFreeDelivery) {
+            window.jpUserEditedShipping = true;
+          }
+          let titleInput = document.querySelector('input[placeholder="Thread title"]');
+          if (titleInput && settings3.customFloatingText) {
+            let currentVal = titleInput.value;
+            if (!currentVal.includes(settings3.customFloatingText.trim())) {
+              await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
+            }
+          }
+          if (settings3.floatingButtonAutoFreeDelivery) {
+            await applyUserFreeDelivery();
+            if (settings3.enableShippingCosts) {
+              setTimeout(() => updateShippingCostAlert(), 400);
+            }
+          }
+          floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
+          setTimeout(() => {
+            floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
+          }, 1500);
+        };
         let checkAutomations = () => {
           let urlTextarea2 = document.querySelector('textarea[name="mainUrl"]');
           if (!urlTextarea2) return;
@@ -6455,7 +6496,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 if (!window.jpUserEditedShipping && isChecked) {
                   isChecked = false;
                 }
-                if (isChecked && freeDelLabel) {
+                if (isChecked && freeDelLabel && !window.jpUserEditedShipping) {
                   freeDelLabel.style.backgroundColor = "#ff5252";
                   freeDelLabel.style.color = "#fff";
                   freeDelLabel.title = "BŁĄD: Amazon poniżej 65 zł ma płatną wysyłkę! Odznacz darmową dostawę.";
@@ -6583,23 +6624,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               floatBtn.className = "mod-floating-btn";
               floatBtn.title = t("mFloatingBtnTitle").replace("{text}", settings3.customFloatingText);
               floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
-              floatBtn.onclick = async (e) => {
-                e.preventDefault();
-                let titleInput = document.querySelector('input[placeholder="Thread title"]');
-                if (titleInput && settings3.customFloatingText) {
-                  let currentVal = titleInput.value;
-                  if (!currentVal.includes(settings3.customFloatingText.trim())) {
-                    await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
-                  }
-                }
-                if (settings3.floatingButtonAutoFreeDelivery) {
-                  setVuetifyCheckbox("Free Delivery", true, true);
-                }
-                floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
-                setTimeout(() => {
-                  floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
-                }, 1500);
-              };
+              floatBtn.onclick = (e) => handleFloatingBtnClick(floatBtn, e);
               shippingStack.appendChild(floatBtn);
             }
             let sidePanel = document.createElement("div");
@@ -6614,23 +6639,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             floatBtn.className = "mod-floating-btn";
             floatBtn.title = t("mFloatingBtnTitle").replace("{text}", settings3.customFloatingText);
             floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
-            floatBtn.onclick = async (e) => {
-              e.preventDefault();
-              let titleInput = document.querySelector('input[placeholder="Thread title"]');
-              if (titleInput && settings3.customFloatingText) {
-                let currentVal = titleInput.value;
-                if (!currentVal.includes(settings3.customFloatingText.trim())) {
-                  await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
-                }
-              }
-              if (settings3.floatingButtonAutoFreeDelivery) {
-                setVuetifyCheckbox("Free Delivery", true, true);
-              }
-              floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
-              setTimeout(() => {
-                floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
-              }, 1500);
-            };
+            floatBtn.onclick = (e) => handleFloatingBtnClick(floatBtn, e);
             shippingStack.insertBefore(floatBtn, shippingStack.firstChild);
           }
           if (settings3.enableCategoryAdvisor && !document.getElementById("jp-cat-side-panel")) {
@@ -6871,21 +6880,14 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           if (needsUpdate) {
             targetContainer.querySelector(".jp-shipping-apply-btn").addEventListener("click", async () => {
               if (shouldBeFree) {
-                setVuetifyCheckbox("Free Delivery", true, true);
-                if (nativeInput && nativeInput.value !== "") {
-                  nativeInput.focus();
-                  nativeInput.value = "";
-                  nativeInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-                  nativeInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-                  nativeInput.blur();
-                }
+                await applyUserFreeDelivery();
               } else {
                 const costStr = shippingCosts.cost.toString().replace(".", ",");
                 setVuetifyCheckbox("Free Delivery", false, true);
                 await afterVueUpdate(getShippingInput());
                 await setShippingCost(costStr);
+                window.jpUserEditedShipping = true;
               }
-              window.jpUserEditedShipping = true;
               setTimeout(() => updateShippingCostAlert(), 400);
             });
           }
