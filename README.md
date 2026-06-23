@@ -125,6 +125,43 @@ Automatically scans the page and visually emphasizes specific user statuses, mak
 
 <img width="1211" height="173" alt="Zrzut ekranu 2026-06-9 o 12 57 58" src="https://github.com/user-attachments/assets/cd5b9b43-a0b9-4928-805a-e3ad862cc3d0" />
 
+### 🏷️ 14. Category Advisor
+Suggests the best category for a deal based on Pepper history and internal rewards data.
+* **Auto-suggestions:** Percentage pills next to the category field when a confident match is found.
+* **Manual search:** Search by keyword with results from both Pepper threads and the rewards database.
+* **Ignored words:** Custom stop-word list (shared with history search) to improve matching.
+
+### 📴 15. Offline Deals Queue Panel
+Surfaces deals with broken or unreachable links across the entire moderation queue (`deals/new`).
+* **Full pagination scan:** Scans all list pages and detects the native `error` icon / „Offline” label (client-side link check — not the JSON `online` field).
+* **Dedicated panel:** A separate „offline” tab with a filterable list; click a deal to open it for review.
+* **Auto-refresh:** Count and list update in the background as Pepper finishes rendering link-check icons.
+
+### 🕐 16. Exact Timestamps on Queue Lists
+Replaces relative times („Submitted 4 hours ago”) with precise datetimes on **New**, **On Hold**, and **Reported** lists.
+* Format: `23.06.2026 18:31:51` (Submitted + Published when available).
+* Data sourced from the moderation list JSON API.
+
+### 🔍 17. User Inspector Links (Metabase + IPs)
+Quick-access toolbar on the thread edit page and in the legacy user inspector profile.
+
+**On thread edit** (below the user card):
+* **Track UUID** — Metabase UUID tracker
+* **Co dodaje** — top threads by author ([Metabase](https://data-metabase.pepper.com/question/8947-top-threads))
+* **Na kogo głosuje** — cold/hot vote patterns ([Metabase](https://data-metabase.pepper.com/question/8820-cold-votes-on-thread-submitters-from-a-specific-member))
+* **Wykres temperatury** — temperature evolution for the current deal ([Metabase](https://data-metabase.pepper.com/question/9106-evolution-of-temperature-for-a-specific-thread))
+* **All IPs** — expandable panel with recent IPs (clickable → inspector), plus „open all in tabs”
+
+**On inspector user profile** (`/admin/inspector/users/{id}`):
+* **Co dodaje**, **Na kogo głosuje**, **All IPs** — same as above (Track UUID is left to the native panel button).
+
+### 🔎 18. Product Inspector & Research Tools
+* **EAN / ASIN detection:** Finds product identifiers in the title or URL; generates a barcode preview for the description.
+* **Reverse image search:** One-click Google Lens from the main deal image.
+* **Link expander:** Unshortens redirect URLs before you review the deal.
+* **Lens AI description:** Fetches and inserts Google Lens AI overview text into the description field.
+* **Allegro images:** Pulls product images from Allegro listing pages into the Pepper form.
+
 ---
 
 ## ⚙️ Settings and Configuration
@@ -133,7 +170,7 @@ The script features a powerful, graphical configuration UI accessible by clickin
 
 * 🌗 **Full UI Themes (Dark Mode):** Choose between Light and Dark mode. The script completely overhauls both the legacy V1 (Angular) and modern V2 (Vuetify) moderation panels, providing a consistent, custom-tailored, eye-friendly Dark Mode across the entire admin dashboard.
 * 🌍 **Language:** Polish (PL) or English (EN).
-* 🔧 **Toggle modules:** Don't need the history tab? Turn it off. Prefer manual math? Disable the calculator.
+* 🔧 **Toggle modules:** Don't need the history tab? Turn it off. Prefer manual math? Disable the calculator. Queue tools (offline panel, exact timestamps) and user links (Metabase, IPs) can be toggled independently in **Lista kolejki** and **Panel edycji okazji**.
 * 🎛️ **Full history customization:** Choose exactly what data points (Author, Temperature, Store, Copy Button) should be displayed in the history list (includes a live preview in the settings menu!).
 * 🛑 **Stop Words:** Define custom words that the script should ignore when analyzing the title for search queries.
 * 📍 **Floating Approve Button:** An optional setting to move the "Approve & Send PM" button to a more accessible, floating position on the screen, saving you from unnecessary scrolling.
@@ -152,13 +189,15 @@ Jalapeño works quietly in the background to prevent human errors and streamline
 * ✋ **Manual Intervention Detection:** Jalapeño respects your manual inputs. If you manually type a shipping cost or click the free delivery checkbox, the script flags it and stops "fighting" you with its automations, giving you full control.
 * 🤝 **Active Editing Highlight:** Visually highlights deals (with an orange border and background) that are "currently edited by" another moderator, preventing accidental overlapping of work.
 * 💾 **Save Button Text Fix:** Automatically changes the confusing "Dodaj Okazję" (Add Deal) text on the main save button to a much more logical "Zapisz edycję" (Save edit) when you are modifying an existing deal.
-* 🖼️ **Image Editor UI Cleanup:** Removes unnecessary borders, standardizes backgrounds, and tones down overly bright warning banners in the built-in image editor for a much cleaner look.
+* ⏳ **Offline scan patience:** The offline-deals counter waits for Pepper's async link-check icons before reporting — retries automatically if the first pass returns zero.
 
 ---
 
 ## 🛠️ Technologies and API
 * **Fake Promo | Merchant Notes | Shipping costs Database:** Google Apps Script (Web App)
 * **Exchange Rates:** Open Exchange Rates API (`open.er-api.com`)
+* * **Metabase (user/deal analytics):** — UUID tracker, top threads, vote patterns, temperature charts
+* **User IPs:** Pepper admin API (`GET /admin/users/{id}`)
 * **Styling:** Injected CSS with CSS variables support (Light/Dark Mode).
 
 ---
