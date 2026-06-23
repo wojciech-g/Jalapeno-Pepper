@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.3
+// @version      4.9.5
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -461,6 +461,10 @@
                 .theme--light.v-card, .theme--light.v-sheet, .theme--light.v-list, .theme--light.v-navigation-drawer, .theme--light.v-menu__content,
                 .theme--light.v-tabs-items, .theme--light.v-tabs, .theme--light.v-expansion-panel, .theme--light.v-footer {
                     background-color: #2b2d31 !important; color: var(--jp-text) !important; border-color: #1e1f22 !important;
+                }
+                .jp-offline-view-active.theme--light.v-tabs-items,
+                .jp-offline-view-active .theme--light.v-tabs-items {
+                    background-color: #2b2d31 !important;
                 }
                 .theme--light.v-expansion-panel .v-expansion-panel__container { background-color: #2b2d31 !important; color: var(--jp-text) !important; }
                 .theme--light.v-expansion-panel .v-expansion-panel__header { color: var(--jp-text) !important; }
@@ -1301,11 +1305,33 @@
   var i18n = {
     pl: {
       titleSettings: "⚙️ Ustawienia Jalapeño",
-      secAppearance: "🎨 Wygląd i Interfejs",
-      secModules: "🚀 Aktywne Moduły",
-      secFloatingBtn: "✨ Szybki dopisek (latający przycisk)",
-      secConfig: "⚙️ Konfiguracja Szczegółowa",
-      secHistory: "📜 Personalizacja Historii",
+      secAppearance: "🎨 Wygląd i interfejs",
+      secAppearanceDesc: "Motyw, język i czytelność panelu Jalapeño w panelu moderacji.",
+      secModules: "🚀 Funkcje skryptu",
+      secModulesDesc: "Włącz lub wyłącz poszczególne moduły. Opisy wyjaśniają, gdzie dana funkcja się pojawia.",
+      secModDealPanel: "Panel edycji okazji",
+      secModDealPanelDesc: "Narzędzia obok formularza, gdy moderujesz pojedynczą okazję.",
+      secModShipping: "Dostawa i sklepy",
+      secModShippingDesc: "Automatyczne uzupełnianie wysyłki oraz baza kosztów dostawy.",
+      secModMessages: "Notatki i wiadomości",
+      secModMessagesDesc: "Automatyczne notatki w wątku oraz szablony wiadomości do użytkownika.",
+      secModQueue: "Lista kolejki (deals/new)",
+      secModQueueDesc: "Funkcje na liście deals/new — alerty cenowe i panel okazji offline.",
+      mOfflineDealsFilter: "Filtr „Tylko offline”",
+      mOfflineDealsFilterHint: "Skanuje wszystkie strony paginacji i pokazuje panel z okazjami offline (etykieta Offline lub ikona error).",
+      mOfflineFilterTab: "offline",
+      mOfflineFilterTabActive: "Tylko offline",
+      mOfflineFilterEmpty: "Brak okazji offline w całej kolejce.",
+      mOfflinePanelTitle: "Okazje offline — do weryfikacji",
+      mOfflinePanelRescan: "Odśwież skan",
+      mOfflinePanelScanning: "Skanuję wszystkie strony…",
+      mOfflinePanelPage: "str.",
+      secFloatingBtn: "✨ Szybki dopisek",
+      secFloatingBtnDesc: "Przycisk nad panelem dostawy — dopisuje tekst do tytułu jednym kliknięciem.",
+      secConfig: "⚙️ Ustawienia zaawansowane",
+      secConfigDesc: "Waluta kalkulatora, słowa ignorowane, ukryte skróty i pozycja panelu dostawy.",
+      secHistory: "📜 Historia podobnych okazji",
+      secHistoryDesc: "Co pokazywać przy liście poprzednich wstawek na Pepperze.",
       lblFontColor: "Kolor czcionki (Tryb nocny):",
       lblFontSize: "Globalny rozmiar czcionki:",
       fontColorDefault: "Domyślny (Szaro-biały)",
@@ -1322,35 +1348,58 @@
       livePreview: "Podgląd na żywo:",
       defCurrency: "Kalkulator - Domyślna waluta:",
       histCount: "Ilość wyników w historii (1-10):",
-      stopWords: "Własne 'Stop Words' (oddzielone przecinkiem):",
-      categoryIgnoreWords: "Asystent kategorii — ignorowane słowa (nagrody):",
-      categoryIgnoreWordsHint: "Dodatkowe słowa (poza wspólną bazą na GitHub). Oddziel przecinkami.",
-      hideBtns: "Ukryj przyciski:",
+      stopWords: "Własne słowa ignorowane w wyszukiwaniu (historia, kategorie)",
+      stopWordsHint: "Oddziel przecinkami. Te słowa nie będą brane pod uwagę przy dopasowywaniu tytułów.",
+      hideBtns: "Ukryj skróty w panelu (Ceneo, Keepa…)",
+      hideBtnsHint: "Zaznaczone przyciski znikną z siatki szybkich linków obok formularza.",
       btnCancel: "Anuluj",
       btnSave: "Zapisz ustawienia",
       optTheme: "Motyw interfejsu (Theme):",
       optLang: "Język (Language):",
-      mFakePromo: "Fake Promo",
-      mCalc: "Kalkulator",
-      mHist: "Historia",
-      mMeta: "Sklep i Temp",
-      mFall: "Fallback słów kluczowych",
-      mAutoAmz: "Podp. wysyłki (Amazon, Allegro, Zalando Lounge)",
-      mAutoLoc: "Auto markety",
-      mHoldNote: "Auto Notatka (Hold)",
-      mTemplates: "Szablony wiad. (Hold)",
-      mInfracNote: "Auto Notatka (Kary/Usunięcia)",
-      mFloatingBtn: "Latający przycisk (Szybki dopisek)",
-      mFloatingBtnEnable: "Pokaż przycisk ✨ nad panelem dostawy",
+      mFakePromo: "Ostrzeżenie Fake Promo",
+      mFakePromoHint: "Sprawdza bazę cyklicznych okazji i pokazuje alert przy dopasowaniu wzorca.",
+      mCalc: "Kalkulator walut",
+      mCalcHint: "Przelicznik EUR / USD / GBP → PLN obok pola kuponu.",
+      mHist: "Historia podobnych okazji",
+      mHistHint: "Pobiera ostatnie wstawki z Peppera pasujące do tytułu.",
+      mMeta: "Sklep i temperatura",
+      mMetaHint: "Dodaje merchant i temp. do każdej pozycji w historii.",
+      mFall: "Fallback kategorii",
+      mFallHint: "Gdy brak wyników historii — szuka kategorii po haśle z tytułu.",
+      mAutoAmz: "Auto koszty wysyłki",
+      mAutoAmzHint: "Amazon.pl: 8,99 zł poniżej 65 zł; Allegro 10,49 zł; Zalando Lounge 9,95 zł.",
+      mAutoLoc: "Auto markety stacjonarne",
+      mAutoLocHint: "Rozpoznaje Biedronkę, Lidl itd. w tytule — URL sklepu i checkbox „Local offer”.",
+      mHoldNote: "Auto notatka — Hold",
+      mHoldNoteHint: "Wstawia przygotowaną notatkę przy wstrzymaniu okazji (on hold).",
+      mTemplates: "Szablony wiadomości — Hold",
+      mTemplatesHint: "Przyciski z gotowymi treściami wiadomości przy holdzie.",
+      mInfracNote: "Auto notatka — kary",
+      mInfracNoteHint: "Automatyczna notatka przy karach i usunięciach wątku.",
+      mFloatingBtnEnable: "Pokaż przycisk „Szybki dopisek”",
+      mMoveApprove: "Przesuń „Approve & Send PM”",
+      mMoveApproveHint: "Przenosi natywny przycisk akceptacji wyżej w formularzu.",
+      lblFloatingText: "Tekst doklejany do tytułu:",
+      lblFloatingTextPlaceholder: "np.  | Smart! Okazja",
+      lblFloatingTextHint: "Ten tekst zostanie dopisany na końcu tytułu po kliknięciu ✨.",
+      lblFloatingFreeDel: "Zaznacz też „Free Delivery”",
+      lblFloatingFreeDelHint: "Po dopisaniu tytułu automatycznie włącza darmową dostawę w formularzu.",
+      mFloatingBtn: "Szybki dopisek",
       mFloatingBtnShort: "Szybki dopisek",
       mFloatingBtnDone: "Gotowe",
       mFloatingBtnTitle: "Dodaj do tytułu: {text}",
-      mMoveApprove: "Przesuń przycisk 'Approve & Send PM'",
-      lblFloatingText: "Tekst doklejany do tytułu:",
-      lblFloatingTextPlaceholder: "np.  | Smart! Okazja",
-      lblFloatingTextHint: "Kliknięcie przycisku ✨ dopisze ten tekst na końcu tytułu okazji.",
-      lblFloatingFreeDel: "Zaznacz też „Free Delivery”",
-      lblFloatingFreeDelHint: "Po dopisaniu tytułu automatycznie włączy darmową dostawę w formularzu.",
+      lblMerchantNotesHint: "Własne notatki per sklep — widoczne przy edycji okazji i synchronizowane w chmurze.",
+      lblShippingCostsHint: "Panel po prawej z zapisanymi kosztami dostawy i przyciskiem „Zastosuj”.",
+      mApproveReasonsHint: "Gotowe szablony treści wiadomości przy akceptacji okazji (Approve & Send PM).",
+      mLockButtonsHint: "Przyciski Edit Lock / Expire Lock obok formularza — szybkie blokowanie edycji.",
+      mBannedHighlightHint: "Działa w całym panelu moderacji — podświetla „banned” i „unauthenticated” w tekście strony.",
+      mPriceWarningHint: "Na liście deals/new pokazuje badge, gdy cena wzrosła o więcej niż 1% vs minimum z logów.",
+      mImageSearchHint: "Przycisk Lens przy miniaturze zdjęcia okazji w formularzu.",
+      mLensDescriptionHint: "Generuje opis produktu z Google Lens AI Overview i wkleja do edytora opisu.",
+      mProductInspectorHint: "Wykrywa EAN / ASIN z tytułu i URL; generuje barcode do opisu.",
+      mLinkExpanderHint: "Przycisk w edytorze opisu — rozwija skrócone linki (bit.ly itd.).",
+      mAllegroImagesHint: "Pobiera główne zdjęcie z oferty Allegro i wgrywa do okazji.",
+      mCategoryAdvisorHint: "Panel po lewej: kategorie z bazy nagród + podobne wstawki z Peppera.",
       hStatus: "Status (Aktywna/Wygasła/Skasowana)",
       hPrice: "Cena",
       hTemp: "Temperatura",
@@ -1390,14 +1439,14 @@
       lblStore: "🏪 Sklep:",
       lblTemp: "🌡️ Temp:",
       lblCom: "💬 Kom:",
-      lblMerchantNotes: "📝 Notatki - Merchant",
+      lblMerchantNotes: "Notatki o sklepach (merchant)",
       btnAddMerchantNote: "Dodaj notatkę",
       btnRemoveMerchantNote: "🗑️ Usuń notatkę",
       placeholderMerchantNote: "Dodaj notatkę dla tego merchanta...",
       msgMerchantNoteSaved: "✅ Notatka zapisana i zsynchronizowana",
       msgMerchantNoteDeleted: "✅ Notatka usunięta",
       msgMerchantNoteError: "❌ Błąd synchronizacji notatki",
-      lblShippingCosts: "🚚 Koszty Dostawy",
+      lblShippingCosts: "Baza kosztów dostawy",
       lblShippingCost: "Koszt dostawy (PLN)",
       lblFreeDeliveryFrom: "Darmowa dostawa od (PLN)",
       lblShippingNote: "Notatka (opcjonalna)",
@@ -1407,12 +1456,12 @@
       msgShippingCostSaved: "✅ Koszt dostawy zapisany i zsynchronizowany",
       msgShippingCostDeleted: "✅ Koszt dostawy usunięty",
       msgShippingCostError: "❌ Błąd synchronizacji kosztu dostawy",
-      mLockButtons: "Lock/Unlock przyciski (Edit Lock & Expire Lock)",
-      mBannedHighlight: "Podświetlenie 'banned' i 'unauthenticated'",
+      mLockButtons: "Przyciski Lock / Unlock",
+      mBannedHighlight: "Podświetlenie „banned”",
       lblShippingOffset: "Wysokość panelu dostawy (px):",
       lblShippingOffsetHint: "Odstęp od góry formularza — dotyczy przycisku ✨ i panelu dostawy po prawej.",
-      mPriceWarning: "Ostrzeżenie o wzroście ceny (>1%)",
-      mImageSearch: "Wyszukiwanie obrazem (Google Lens)",
+      mPriceWarning: "Alert wzrostu ceny na liście",
+      mImageSearch: "Wyszukiwanie obrazem (Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
       mInsertToDescription: "🖼 Wstaw do opisu",
       mNoIdentifiers: "Nie znaleziono identyfikatorów",
@@ -1432,7 +1481,7 @@
       mExpandLinksFailed: "Nie udało się rozwinąć linków: ",
       mLensBtn: "🔍 Wyszukaj z Google Lens",
       mLensTitle: "Otwórz bieżący obraz w Google Lens",
-      mCategoryAdvisor: "Asystent Kategorii (AI)",
+      mCategoryAdvisor: "Asystent kategorii",
       mCatAdvisorTitle: "🤖 Asystent Kategorii",
       mCatAdvisorLoading: "Ładowanie bazy kategorii…",
       mCatAdvisorLoadFailed: "Nie udało się załadować bazy kategorii",
@@ -1522,11 +1571,33 @@
     },
     en: {
       titleSettings: "⚙️ Jalapeño Settings",
-      secAppearance: "🎨 Appearance & UI",
-      secModules: "🚀 Active Modules",
-      secFloatingBtn: "✨ Quick append (floating button)",
-      secConfig: "⚙️ Advanced Configuration",
-      secHistory: "📜 History Personalization",
+      secAppearance: "🎨 Appearance & interface",
+      secAppearanceDesc: "Theme, language, and readability of the Jalapeño panel in moderation.",
+      secModules: "🚀 Script features",
+      secModulesDesc: "Enable or disable individual modules. Each description explains where it appears.",
+      secModDealPanel: "Deal edit panel",
+      secModDealPanelDesc: "Tools next to the form when moderating a single deal.",
+      secModShipping: "Shipping & stores",
+      secModShippingDesc: "Automatic shipping costs and delivery cost database.",
+      secModMessages: "Notes & messages",
+      secModMessagesDesc: "Automatic thread notes and message templates for users.",
+      secModQueue: "Queue list (deals/new)",
+      secModQueueDesc: "Features on deals/new list — price alerts and offline deals panel.",
+      mOfflineDealsFilter: "“Offline only” filter",
+      mOfflineDealsFilterHint: "Scans all pagination pages and shows a panel of offline deals (Offline label or error icon).",
+      mOfflineFilterTab: "offline",
+      mOfflineFilterTabActive: "Offline only",
+      mOfflineFilterEmpty: "No offline deals in the queue.",
+      mOfflinePanelTitle: "Offline deals — needs review",
+      mOfflinePanelRescan: "Rescan",
+      mOfflinePanelScanning: "Scanning all pages…",
+      mOfflinePanelPage: "p.",
+      secFloatingBtn: "✨ Quick append",
+      secFloatingBtnDesc: "Button above the shipping panel — appends text to the title in one click.",
+      secConfig: "⚙️ Advanced settings",
+      secConfigDesc: "Converter currency, ignored words, hidden shortcuts, shipping panel position.",
+      secHistory: "📜 Similar deals history",
+      secHistoryDesc: "What to show in the list of previous Pepper deals.",
       lblFontColor: "Font Color (Dark Mode):",
       lblFontSize: "Global Font Size:",
       fontColorDefault: "Default (Gray-white)",
@@ -1543,35 +1614,58 @@
       livePreview: "Live preview:",
       defCurrency: "Converter - Default currency:",
       histCount: "History results count (1-10):",
-      stopWords: "Custom 'Stop Words' (comma separated):",
-      categoryIgnoreWords: "Category advisor — ignored words (rewards DB):",
-      categoryIgnoreWordsHint: "Extra words (on top of shared GitHub list). Comma-separated.",
-      hideBtns: "Hide buttons:",
+      stopWords: "Custom ignored words (history, categories)",
+      stopWordsHint: "Comma-separated. These words are skipped when matching titles.",
+      hideBtns: "Hide quick-link buttons (Ceneo, Keepa…)",
+      hideBtnsHint: "Checked buttons disappear from the shortcut grid next to the form.",
       btnCancel: "Cancel",
       btnSave: "Save settings",
       optTheme: "Interface Theme:",
       optLang: "Language (Język):",
-      mFakePromo: "Fake Promo",
-      mCalc: "Calculator",
-      mHist: "History",
-      mMeta: "Store & Temp info",
-      mFall: "Keyword fallback",
-      mAutoAmz: "Shipping helper (Amazon, Allegro, Zalando Lounge)",
+      mFakePromo: "Fake Promo warning",
+      mFakePromoHint: "Checks the cyclic-deals database and shows an alert on pattern match.",
+      mCalc: "Currency converter",
+      mCalcHint: "EUR / USD / GBP → PLN next to the coupon field.",
+      mHist: "Similar deals history",
+      mHistHint: "Fetches recent Pepper deals matching the title.",
+      mMeta: "Store & temperature",
+      mMetaHint: "Adds merchant and temp. to each history entry.",
+      mFall: "Category fallback",
+      mFallHint: "When history has no results — searches categories by title keyword.",
+      mAutoAmz: "Auto shipping costs",
+      mAutoAmzHint: "Amazon.pl: 8.99 below 65 PLN; Allegro 10.49; Zalando Lounge 9.95.",
       mAutoLoc: "Auto local stores",
-      mHoldNote: "Auto Hold Note",
-      mTemplates: "Hold Msg Templates",
-      mInfracNote: "Auto Infraction Note",
-      mFloatingBtn: "Floating Button (Quick append)",
-      mFloatingBtnEnable: "Show ✨ button above shipping panel",
+      mAutoLocHint: "Detects Biedronka, Lidl etc. in title — store URL and “Local offer” checkbox.",
+      mHoldNote: "Auto note — Hold",
+      mHoldNoteHint: "Inserts a prepared note when putting a deal on hold.",
+      mTemplates: "Hold message templates",
+      mTemplatesHint: "Buttons with preset message text on hold.",
+      mInfracNote: "Auto note — infractions",
+      mInfracNoteHint: "Automatic note on infractions and thread removals.",
+      mFloatingBtnEnable: "Show “Quick append” button",
+      mMoveApprove: "Move “Approve & Send PM”",
+      mMoveApproveHint: "Moves the native approve button higher in the form.",
+      lblFloatingText: "Text appended to title:",
+      lblFloatingTextPlaceholder: "e.g.  | Smart! Deal",
+      lblFloatingTextHint: "This text is appended to the end of the title when you click ✨.",
+      lblFloatingFreeDel: "Also check “Free Delivery”",
+      lblFloatingFreeDelHint: "After appending the title, automatically enables free delivery in the form.",
+      mFloatingBtn: "Quick append",
       mFloatingBtnShort: "Quick append",
       mFloatingBtnDone: "Done",
       mFloatingBtnTitle: "Append to title: {text}",
-      mMoveApprove: "Move 'Approve & Send PM' button",
-      lblFloatingText: "Text appended to title:",
-      lblFloatingTextPlaceholder: "e.g.  | Smart! Deal",
-      lblFloatingTextHint: "Clicking ✨ appends this text to the end of the deal title.",
-      lblFloatingFreeDel: "Also check “Free Delivery”",
-      lblFloatingFreeDelHint: "After appending the title, automatically enables free delivery in the form.",
+      lblMerchantNotesHint: "Custom notes per store — visible when editing deals, synced to cloud.",
+      lblShippingCostsHint: "Right-side panel with saved shipping costs and an “Apply” button.",
+      mApproveReasonsHint: "Preset message templates when approving a deal (Approve & Send PM).",
+      mLockButtonsHint: "Edit Lock / Expire Lock buttons next to the form — quick edit blocking.",
+      mBannedHighlightHint: "Works across the whole moderation panel — highlights “banned” and “unauthenticated” in page text.",
+      mPriceWarningHint: "On deals/new list shows a badge when price rose more than 1% vs log minimum.",
+      mImageSearchHint: "Lens button on the deal thumbnail in the form.",
+      mLensDescriptionHint: "Generates product description from Google Lens AI Overview into the editor.",
+      mProductInspectorHint: "Detects EAN / ASIN from title and URL; generates barcode for description.",
+      mLinkExpanderHint: "Button in description editor — expands shortened links (bit.ly etc.).",
+      mAllegroImagesHint: "Pulls main image from Allegro offer and uploads to the deal.",
+      mCategoryAdvisorHint: "Left panel: categories from awards DB + similar deals from Pepper.",
       hStatus: "Status (Active/Expired/Deleted)",
       hPrice: "Price",
       hTemp: "Temperature",
@@ -1611,14 +1705,14 @@
       lblStore: "🏪 Store:",
       lblTemp: "🌡️ Temp:",
       lblCom: "💬 Com:",
-      lblMerchantNotes: "📝 Merchant Notes",
+      lblMerchantNotes: "Merchant notes",
       btnAddMerchantNote: "Add note",
       btnRemoveMerchantNote: "🗑️ Delete note",
       placeholderMerchantNote: "Add a note for this merchant...",
       msgMerchantNoteSaved: "✅ Note saved and synchronized",
       msgMerchantNoteDeleted: "✅ Note deleted",
       msgMerchantNoteError: "❌ Note synchronization error",
-      lblShippingCosts: "🚚 Shipping Costs",
+      lblShippingCosts: "Shipping cost database",
       lblShippingCost: "Shipping cost (PLN)",
       lblFreeDeliveryFrom: "Free delivery from (PLN)",
       lblShippingNote: "Note (optional)",
@@ -1628,11 +1722,11 @@
       msgShippingCostSaved: "✅ Shipping cost saved and synchronized",
       msgShippingCostDeleted: "✅ Shipping cost deleted",
       msgShippingCostError: "❌ Shipping cost synchronization error",
-      mLockButtons: "Lock/Unlock buttons (Edit Lock & Expire Lock)",
-      mBannedHighlight: "Highlight 'banned' and 'unauthenticated' words",
+      mLockButtons: "Lock / Unlock buttons",
+      mBannedHighlight: "Highlight “banned”",
       lblShippingOffset: "Shipping panel top offset (px):",
       lblShippingOffsetHint: "Distance from top of the form — applies to ✨ button and shipping panel on the right.",
-      mPriceWarning: "Price increase warning (>1%)",
+      mPriceWarning: "Price rise alert on queue list",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
       mInsertToDescription: "🖼 Insert to description",
@@ -1651,7 +1745,7 @@
       mExpandLinksExpandFailed: "Found {n} shortened link(s), but could not expand them",
       mExpandLinksSuccess: 'Expanded {n} link(s) — make any change, then click "Zapisz edycję"',
       mExpandLinksFailed: "Could not expand links: ",
-      mCategoryAdvisor: "Category Advisor (AI)",
+      mCategoryAdvisor: "Category advisor",
       mCatAdvisorTitle: "🤖 Category Advisor",
       mCatAdvisorLoading: "Loading category database…",
       mCatAdvisorLoadFailed: "Failed to load category database",
@@ -4398,9 +4492,534 @@
     });
   }
 
+  // src/features/offlineDealsFilter.js
+  var CACHE_KEY = "jpOfflineDealsCacheV3";
+  var CACHE_TTL_MS = 3 * 60 * 1e3;
+  var AUTO_REFRESH_MS = 90 * 1e3;
+  var MIN_REFRESH_GAP_MS = 8e3;
+  var INITIAL_SCAN_DELAY_MS = 2500;
+  var MAX_PAGES = 12;
+  var JSON_FETCH_DELAY_MS = 80;
+  var IFRAME_POLL_MS = 350;
+  var IFRAME_MAX_WAIT_MS = 7e3;
+  var _cache = null;
+  var _scanPromise = null;
+  var _scanGeneration = 0;
+  var _panelOpen = false;
+  var _iframe = null;
+  var _lastRefreshAttempt = 0;
+  var _initialScanScheduled = false;
+  function isDealsQueuePage() {
+    return /\/admin-v2\/moderation\/deals\/new/.test(window.location.pathname);
+  }
+  function getQueuePath() {
+    return window.location.pathname.replace(/\/$/, "") || "/admin-v2/moderation/deals/new";
+  }
+  function getCurrentPage() {
+    const p = parseInt(new URLSearchParams(window.location.search).get("page") || "1", 10);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  }
+  function getXsrfToken2() {
+    const m = document.cookie.match(/xsrf_t=([^;]+)/);
+    return m ? decodeURIComponent(m[1]).replace(/^"|"$/g, "") : "";
+  }
+  function loadCache() {
+    if (_cache) return _cache;
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Date.now() - parsed.scannedAt < CACHE_TTL_MS && parsed.queuePath === getQueuePath()) {
+        _cache = parsed;
+        return _cache;
+      }
+    } catch (_) {
+    }
+    return null;
+  }
+  function saveCache(items, queuePath) {
+    _cache = { items, queuePath, scannedAt: Date.now() };
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(_cache));
+    } catch (_) {
+    }
+  }
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  async function fetchListPageJson(page) {
+    const path = getQueuePath();
+    const url = `https://www.pepper.pl${path}?page=${page}&noCache=${Date.now()}`;
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": getXsrfToken2()
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  function parseListJson(data) {
+    const list = data?.state?.threadsList;
+    const items = list?.items || [];
+    const pag = list?.pagination || {};
+    const totalPages = pag.totalPages || pag.lastPage || pag.pageCount || Math.ceil((pag.total || items.length) / (pag.perPage || 24)) || 1;
+    return {
+      items,
+      totalPages: Math.min(Math.max(1, totalPages), MAX_PAGES)
+    };
+  }
+  function isOfflineDealRow(row) {
+    if (!row) return false;
+    for (const span of row.querySelectorAll("span")) {
+      const text = span.textContent.trim();
+      if (/^offline$/i.test(text) || /^not on site$/i.test(text)) {
+        return true;
+      }
+    }
+    for (const icon of row.querySelectorAll('i.material-icons.red--text, i.material-icons[class*="red--text"]')) {
+      if (icon.textContent.trim() === "error") {
+        return true;
+      }
+    }
+    return false;
+  }
+  function getDealRowsFromDoc(doc) {
+    const seen = /* @__PURE__ */ new Set();
+    const rows = [];
+    doc.querySelectorAll('a[href*="/admin-v2/moderation/thread/"]').forEach((link) => {
+      const row = link.closest('div[class*="overflow-hidden"]') || link.closest(".flex.xs12.py-0.pl-4") || link.closest(".flex.xs12");
+      if (row && !seen.has(row)) {
+        seen.add(row);
+        rows.push(row);
+      }
+    });
+    if (rows.length === 0) {
+      const column = doc.querySelector(".layout.column");
+      column?.querySelectorAll(':scope > div[class*="overflow-hidden"]').forEach((row) => {
+        if (!seen.has(row)) {
+          seen.add(row);
+          rows.push(row);
+        }
+      });
+    }
+    return rows;
+  }
+  function threadIdFromRow(row) {
+    const link = row.querySelector('a[href*="/admin-v2/moderation/thread/"]');
+    const m = link?.href?.match(/thread\/(\d+)/);
+    return m ? m[1] : null;
+  }
+  function offlineIdsFromDoc(doc) {
+    const ids = /* @__PURE__ */ new Set();
+    getDealRowsFromDoc(doc).forEach((row) => {
+      if (!isOfflineDealRow(row)) return;
+      const id = threadIdFromRow(row);
+      if (id) ids.add(id);
+    });
+    return ids;
+  }
+  function itemToDeal(item, page) {
+    return {
+      id: String(item.id),
+      title: item.title || `#${item.id}`,
+      merchant: item.merchant?.name || "—",
+      price: item.price != null ? item.price : null,
+      imagePath: item.imagePath || item.originalImageUrl || "",
+      link: item.link || "",
+      username: item.username || "",
+      page,
+      threadUrl: `/admin-v2/moderation/thread/${item.id}`
+    };
+  }
+  function removeIframe() {
+    if (_iframe) {
+      _iframe.remove();
+      _iframe = null;
+    }
+  }
+  function scanPageInIframe(page) {
+    return new Promise((resolve) => {
+      removeIframe();
+      const path = getQueuePath();
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.name = "jp-offline-scan";
+      iframe.dataset.jpOfflineScan = "1";
+      iframe.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:0;border:0";
+      _iframe = iframe;
+      let settled = false;
+      const finish = (ids) => {
+        if (settled) return;
+        settled = true;
+        removeIframe();
+        resolve(ids);
+      };
+      const started = Date.now();
+      let stablePasses = 0;
+      let lastSignature = "";
+      const poll = () => {
+        if (settled) return;
+        let doc;
+        try {
+          doc = iframe.contentDocument;
+        } catch (_) {
+          doc = null;
+        }
+        if (doc) {
+          const rows = getDealRowsFromDoc(doc);
+          const ids = offlineIdsFromDoc(doc);
+          const signature = `${rows.length}:${[...ids].sort().join(",")}`;
+          const loading = doc.querySelectorAll('.v-progress-circular, .v-skeleton-loader, [class*="skeleton"]').length;
+          if (rows.length > 0 && loading === 0 && signature === lastSignature) {
+            stablePasses++;
+          } else {
+            stablePasses = 0;
+            lastSignature = signature;
+          }
+          if (rows.length > 0 && stablePasses >= 2) {
+            finish(ids);
+            return;
+          }
+        }
+        if (Date.now() - started >= IFRAME_MAX_WAIT_MS) {
+          finish(doc ? offlineIdsFromDoc(doc) : /* @__PURE__ */ new Set());
+          return;
+        }
+        setTimeout(poll, IFRAME_POLL_MS);
+      };
+      iframe.onload = () => setTimeout(poll, IFRAME_POLL_MS);
+      iframe.onerror = () => finish(/* @__PURE__ */ new Set());
+      document.body.appendChild(iframe);
+      iframe.src = `https://www.pepper.pl${path}?page=${page}`;
+      setTimeout(poll, IFRAME_POLL_MS);
+    });
+  }
+  async function runFullScan(onProgress, onPartial) {
+    const gen = ++_scanGeneration;
+    const offlineDeals = [];
+    const seenIds = /* @__PURE__ */ new Set();
+    let totalPages = 1;
+    try {
+      const first = await fetchListPageJson(1);
+      if (gen !== _scanGeneration) return offlineDeals;
+      const parsed = parseListJson(first);
+      totalPages = parsed.totalPages;
+      for (let page = 1; page <= totalPages; page++) {
+        if (gen !== _scanGeneration) break;
+        onProgress?.(page, totalPages);
+        let jsonData = first;
+        if (page > 1) {
+          await delay(JSON_FETCH_DELAY_MS);
+          jsonData = await fetchListPageJson(page);
+        }
+        if (gen !== _scanGeneration) break;
+        const { items } = parseListJson(jsonData);
+        let offlineIds;
+        if (page === getCurrentPage() && isDealsQueuePage()) {
+          offlineIds = offlineIdsFromDoc(document);
+        } else {
+          offlineIds = await scanPageInIframe(page);
+        }
+        items.forEach((item) => {
+          const id = String(item.id);
+          if (!offlineIds.has(id) || seenIds.has(id)) return;
+          seenIds.add(id);
+          offlineDeals.push(itemToDeal(item, page));
+        });
+        if (gen === _scanGeneration) {
+          saveCache(offlineDeals, getQueuePath());
+          onPartial?.(offlineDeals.length, page, totalPages);
+        }
+      }
+    } catch (err) {
+      console.warn("[Jalapeño] offline scan error:", err);
+    }
+    if (gen === _scanGeneration) {
+      saveCache(offlineDeals, getQueuePath());
+    }
+    return offlineDeals;
+  }
+  function isCacheStale() {
+    const cached = loadCache();
+    return !cached || Date.now() - cached.scannedAt > AUTO_REFRESH_MS;
+  }
+  function maybeAutoRefresh() {
+    if (_scanPromise) return;
+    const now = Date.now();
+    if (now - _lastRefreshAttempt < MIN_REFRESH_GAP_MS) return;
+    if (!isCacheStale()) {
+      const cached = loadCache();
+      if (cached) updateTabBadge(cached.items.length);
+      return;
+    }
+    _lastRefreshAttempt = now;
+    startScan({ silent: true });
+  }
+  function updateTabBadge(count, scanning = false) {
+    const badge = document.querySelector(".jp-offline-filter-count");
+    const tab = document.querySelector(".jp-offline-filter-tab");
+    if (badge) {
+      badge.textContent = scanning ? "…" : String(count);
+    }
+    tab?.classList.toggle("jp-offline-filter-tab--scanning", scanning);
+  }
+  function getOfflineContentRoot() {
+    return document.querySelector(".v-tabs-items") || document.querySelector(".layout.column")?.parentElement || document.querySelector(".v-tabs")?.closest(".layout");
+  }
+  function setOfflineViewActive(active) {
+    getOfflineContentRoot()?.classList.toggle("jp-offline-view-active", active);
+  }
+  function setNativeListVisible(visible) {
+    const column = document.querySelector(".layout.column");
+    const pag = document.querySelector(".layout.row")?.closest(".layout")?.querySelector(".pagination, .v-pagination");
+    if (column) column.style.display = visible ? "" : "none";
+    if (pag) pag.style.display = visible ? "" : "none";
+  }
+  function showPanel() {
+    document.getElementById("jp-offline-deals-panel")?.classList.add("jp-offline-deals-panel--visible");
+  }
+  function hidePanel() {
+    document.getElementById("jp-offline-deals-panel")?.classList.remove("jp-offline-deals-panel--visible");
+  }
+  function navigateToThread(threadUrl) {
+    setPanelOpen(false);
+    const url = threadUrl.startsWith("http") ? threadUrl : `https://www.pepper.pl${threadUrl}`;
+    window.location.assign(url);
+  }
+  function bindDealCards(panel) {
+    panel.querySelectorAll(".jp-offline-deal-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        e.preventDefault();
+        const url = card.getAttribute("href");
+        if (url) navigateToThread(url);
+      });
+    });
+  }
+  function renderPanel(deals, statusText = "") {
+    const wasVisible = document.getElementById("jp-offline-deals-panel")?.classList.contains("jp-offline-deals-panel--visible");
+    let panel = document.getElementById("jp-offline-deals-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "jp-offline-deals-panel";
+      panel.className = "jp-offline-deals-panel";
+      const anchor = getOfflineContentRoot();
+      (anchor || document.body).appendChild(panel);
+    }
+    const rows = deals.length ? deals.map((d) => {
+      const price = d.price != null ? `${Number(d.price).toFixed(2).replace(".", ",")} zł` : "";
+      const img = d.imagePath ? `<img class="jp-offline-deal-thumb" src="${d.imagePath}" alt="" loading="lazy">` : '<div class="jp-offline-deal-thumb jp-offline-deal-thumb--empty"></div>';
+      return `
+                <a class="jp-offline-deal-card" href="${d.threadUrl}">
+                    ${img}
+                    <div class="jp-offline-deal-body">
+                        <div class="jp-offline-deal-title">${escapeHtml2(d.title)}</div>
+                        <div class="jp-offline-deal-meta">
+                            <span>${escapeHtml2(d.merchant)}</span>
+                            ${price ? `<span>${price}</span>` : ""}
+                            <span>${t("mOfflinePanelPage")} ${d.page}</span>
+                            ${d.username ? `<span>@${escapeHtml2(d.username)}</span>` : ""}
+                        </div>
+                    </div>
+                    <span class="jp-offline-deal-badge"><i class="material-icons">error</i> offline</span>
+                </a>
+            `;
+    }).join("") : `<div class="jp-offline-filter-empty">${t("mOfflineFilterEmpty")}</div>`;
+    panel.innerHTML = `
+        <div class="jp-offline-deals-toolbar">
+            <strong>${t("mOfflinePanelTitle")}</strong>
+            <span class="jp-offline-deals-status">${statusText || panelCountLabel(deals.length)}</span>
+            <button type="button" class="jp-offline-rescan-btn">${t("mOfflinePanelRescan")}</button>
+        </div>
+        <div class="jp-offline-deals-list">${rows}</div>
+    `;
+    panel.querySelector(".jp-offline-rescan-btn")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      startScan(true);
+    });
+    bindDealCards(panel);
+    if (wasVisible || _panelOpen) {
+      showPanel();
+    }
+  }
+  function panelCountLabel(n) {
+    const lang = document.documentElement.lang === "en" ? "en" : "pl";
+    if (lang === "en") return n === 1 ? "1 offline deal" : `${n} offline deals`;
+    if (n === 1) return "1 okazja offline";
+    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) return `${n} okazje offline`;
+    return `${n} okazji offline`;
+  }
+  function panelProgressLabel(page, total) {
+    const lang = document.documentElement.lang === "en" ? "en" : "pl";
+    return lang === "en" ? `Scanning page ${page}/${total}…` : `Skanuję stronę ${page}/${total}…`;
+  }
+  function escapeHtml2(str) {
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function setPanelOpen(open) {
+    _panelOpen = open;
+    const tab = document.querySelector(".jp-offline-filter-tab");
+    tab?.classList.toggle("v-tabs__item--active", open);
+    tab?.classList.toggle("jp-offline-filter-tab--active", open);
+    const label = tab?.querySelector(".jp-offline-filter-label");
+    if (label) {
+      label.textContent = open ? t("mOfflineFilterTabActive") : t("mOfflineFilterTab");
+    }
+    if (open) {
+      setNativeListVisible(false);
+      setOfflineViewActive(true);
+      const cached = loadCache();
+      renderPanel(cached?.items || [], cached ? "" : t("mOfflinePanelScanning"));
+      if (cached) updateTabBadge(cached.items.length);
+      showPanel();
+    } else {
+      setNativeListVisible(true);
+      setOfflineViewActive(false);
+      hidePanel();
+      document.querySelectorAll(".v-tabs__item--active").forEach((el) => {
+        if (!el.classList.contains("jp-offline-filter-tab")) return;
+        el.classList.remove("v-tabs__item--active");
+      });
+    }
+  }
+  function startScan(forceOrOptions = false) {
+    const opts = typeof forceOrOptions === "object" ? forceOrOptions : { force: !!forceOrOptions, silent: false };
+    const { force = false, silent = false } = opts;
+    if (_scanPromise && !force) return _scanPromise;
+    if (force) {
+      _scanGeneration++;
+      sessionStorage.removeItem(CACHE_KEY);
+      _cache = null;
+    }
+    const cachedCount = loadCache()?.items?.length ?? 0;
+    updateTabBadge(cachedCount, true);
+    if (_panelOpen) {
+      renderPanel(loadCache()?.items || [], t("mOfflinePanelScanning"));
+    }
+    _scanPromise = runFullScan(
+      (page, total) => {
+        if (_panelOpen) {
+          renderPanel(loadCache()?.items || [], panelProgressLabel(page, total));
+        }
+      },
+      (count, page, total) => {
+        updateTabBadge(count, page < total);
+      }
+    ).then((deals) => {
+      updateTabBadge(deals.length, false);
+      if (_panelOpen) renderPanel(deals);
+      if (!silent) increment("offlineDealsFilterUsed");
+      return deals;
+    }).finally(() => {
+      _scanPromise = null;
+    });
+    return _scanPromise;
+  }
+  function onTabClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const opening = !_panelOpen;
+    setPanelOpen(opening);
+    if (opening) {
+      document.querySelectorAll(".v-tabs__item--active").forEach((el) => {
+        if (!el.classList.contains("jp-offline-filter-tab")) {
+          el.classList.remove("v-tabs__item--active");
+        }
+      });
+      const cached = loadCache();
+      if (isCacheStale()) {
+        startScan({ silent: false });
+      }
+    }
+  }
+  function ensureOfflineTab() {
+    if (document.querySelector(".jp-offline-filter-tab")) return;
+    const archivedTab = document.querySelector('a[href*="moderation/archive/"]');
+    const archivedDiv = archivedTab?.closest(".v-tabs__div");
+    const tabsContainer = archivedDiv?.parentElement || document.querySelector(".v-tabs__container");
+    if (!tabsContainer) return;
+    const div = document.createElement("div");
+    div.className = "v-tabs__div";
+    div.setAttribute("flat", "");
+    div.innerHTML = `
+        <a href="#" class="v-tabs__item jp-offline-filter-tab">
+            <span class="d-inline-block jp-offline-filter-count">?</span>
+            <span class="text-capitalize jp-offline-filter-label">&nbsp;${t("mOfflineFilterTab")}</span>
+        </a>
+    `;
+    if (archivedDiv?.nextSibling) {
+      tabsContainer.insertBefore(div, archivedDiv.nextSibling);
+    } else {
+      tabsContainer.appendChild(div);
+    }
+    div.querySelector(".jp-offline-filter-tab")?.addEventListener("click", onTabClick);
+    document.querySelectorAll(".v-tabs__item:not(.jp-offline-filter-tab)").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        if (_panelOpen) setPanelOpen(false);
+      }, { once: false });
+    });
+    const cached = loadCache();
+    if (cached) updateTabBadge(cached.items.length);
+  }
+  function scheduleInitialScan() {
+    if (_initialScanScheduled) return;
+    _initialScanScheduled = true;
+    setTimeout(() => maybeAutoRefresh(), INITIAL_SCAN_DELAY_MS);
+  }
+  function notifyOfflineListPageChange() {
+    if (!isDealsQueuePage()) return;
+    highlightCurrentPageOffline();
+    const cached = loadCache();
+    if (cached) updateTabBadge(cached.items.length);
+    maybeAutoRefresh();
+  }
+  function highlightCurrentPageOffline() {
+    getDealRowsFromDoc(document).forEach((row) => {
+      row.classList.toggle("jp-offline-deal-row", isOfflineDealRow(row));
+    });
+  }
+  function cleanupOfflineFilter() {
+    _scanGeneration++;
+    _panelOpen = false;
+    _initialScanScheduled = false;
+    removeIframe();
+    _scanPromise = null;
+    document.getElementById("jp-offline-deals-panel")?.remove();
+    document.querySelector(".jp-offline-filter-tab")?.closest(".v-tabs__div")?.remove();
+    setOfflineViewActive(false);
+    setNativeListVisible(true);
+    getDealRowsFromDoc(document).forEach((row) => row.classList.remove("jp-offline-deal-row"));
+  }
+  function initOfflineDealsFilter(settings3) {
+    if (!settings3.enableOfflineDealsFilter) {
+      if (window.jpOfflineFilterReady) cleanupOfflineFilter();
+      window.jpOfflineFilterReady = false;
+      return;
+    }
+    if (!isDealsQueuePage()) return;
+    ensureOfflineTab();
+    highlightCurrentPageOffline();
+    const cached = loadCache();
+    if (cached) updateTabBadge(cached.items.length);
+    if (!window.jpOfflineFilterReady) {
+      window.jpOfflineFilterReady = true;
+      scheduleInitialScan();
+    }
+    maybeAutoRefresh();
+  }
+  function resetOfflineDealsFilter() {
+    cleanupOfflineFilter();
+    window.jpOfflineFilterReady = false;
+  }
+
   // src/main.js
   (function() {
     "use strict";
+    if (window !== window.top && /\/admin-v2\/moderation\//.test(window.location.pathname)) {
+      return;
+    }
     const isGoogleLensContext = /^www\.google\.(com|pl)$/.test(location.hostname) || location.hostname === "lens.google.com";
     const API_URL = "https://script.google.com/macros/s/AKfycbxPY1KVfIZ-MdhBG_QPYhE-H8QsDCqIp2OkD9nBKU8-tGh8mF5OReV0KRVFMecUX0xUcQ/exec";
     const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbyLBnmCCfJPnmc1owPB-pcxENNXkRuLEb0jkgmBOseU4bpFQVFsPMojJUcxD8vd-x3d/exec";
@@ -4451,7 +5070,8 @@
       enableLinkExpander: true,
       enableLensDescription: true,
       enableAllegroImages: true,
-      enableCategoryAdvisor: true
+      enableCategoryAdvisor: true,
+      enableOfflineDealsFilter: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -4473,6 +5093,67 @@
       location.reload();
     }
     injectThemeCSS(settings3);
+    function settingsSectionHead(titleKey, descKey) {
+      return `
+            <h4 class="jp-settings-h4">${t(titleKey)}</h4>
+            <p class="jp-settings-section-desc">${t(descKey)}</p>`;
+    }
+    function settingsModuleToggle(id, checked, labelKey, hintKey) {
+      return `
+            <label class="jp-module-toggle">
+                <input type="checkbox" id="${id}" ${checked ? "checked" : ""}>
+                <span class="jp-module-toggle-body">
+                    <span class="jp-module-toggle-title">${t(labelKey)}</span>
+                    <span class="jp-module-toggle-hint">${t(hintKey)}</span>
+                </span>
+            </label>`;
+    }
+    function settingsModuleGroup(titleKey, descKey, toggles) {
+      return `
+            <div class="jp-settings-group">
+                <div class="jp-settings-group-head">
+                    <div class="jp-settings-group-title">${t(titleKey)}</div>
+                    <div class="jp-settings-group-desc">${t(descKey)}</div>
+                </div>
+                <div class="jp-module-grid">${toggles.join("")}</div>
+            </div>`;
+    }
+    function buildSettingsModulesHtml() {
+      const s = settings3;
+      return [
+        settingsModuleGroup("secModDealPanel", "secModDealPanelDesc", [
+          settingsModuleToggle("set-calc", s.enableCalculator, "mCalc", "mCalcHint"),
+          settingsModuleToggle("set-hist", s.enableHistory, "mHist", "mHistHint"),
+          settingsModuleToggle("set-meta", s.enableMetaInfo, "mMeta", "mMetaHint"),
+          settingsModuleToggle("set-fallback", s.enableKeywordFallback, "mFall", "mFallHint"),
+          settingsModuleToggle("set-category-advisor", s.enableCategoryAdvisor, "mCategoryAdvisor", "mCategoryAdvisorHint"),
+          settingsModuleToggle("set-product-inspector", s.enableProductInspector, "mProductInspector", "mProductInspectorHint"),
+          settingsModuleToggle("set-image-search", s.enableReverseImageSearch, "mImageSearch", "mImageSearchHint"),
+          settingsModuleToggle("set-link-expander", s.enableLinkExpander, "mLinkExpander", "mLinkExpanderHint"),
+          settingsModuleToggle("set-lens-description", s.enableLensDescription, "mLensDescription", "mLensDescriptionHint"),
+          settingsModuleToggle("set-allegro-images", s.enableAllegroImages, "mAllegroImages", "mAllegroImagesHint"),
+          settingsModuleToggle("set-fakepromo", s.enableFakePromo, "mFakePromo", "mFakePromoHint"),
+          settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint")
+        ]),
+        settingsModuleGroup("secModShipping", "secModShippingDesc", [
+          settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
+          settingsModuleToggle("set-auto-local", s.enableAutoLocalStore, "mAutoLoc", "mAutoLocHint"),
+          settingsModuleToggle("set-shipping-costs", s.enableShippingCosts, "lblShippingCosts", "lblShippingCostsHint")
+        ]),
+        settingsModuleGroup("secModMessages", "secModMessagesDesc", [
+          settingsModuleToggle("set-hold-note", s.enableAutoHoldNote, "mHoldNote", "mHoldNoteHint"),
+          settingsModuleToggle("set-templates", s.enableMessageTemplates, "mTemplates", "mTemplatesHint"),
+          settingsModuleToggle("set-infraction-note", s.enableInfractionNote, "mInfracNote", "mInfracNoteHint"),
+          settingsModuleToggle("set-merchant-notes", s.enableMerchantNotes, "lblMerchantNotes", "lblMerchantNotesHint"),
+          settingsModuleToggle("set-approve-reasons", s.enableApproveReasons, "mApproveReasons", "mApproveReasonsHint"),
+          settingsModuleToggle("set-move-approve", s.enableMoveApproveBtn, "mMoveApprove", "mMoveApproveHint")
+        ]),
+        settingsModuleGroup("secModQueue", "secModQueueDesc", [
+          settingsModuleToggle("set-price-warning", s.enablePriceWarning, "mPriceWarning", "mPriceWarningHint"),
+          settingsModuleToggle("set-offline-filter", s.enableOfflineDealsFilter, "mOfflineDealsFilter", "mOfflineDealsFilterHint")
+        ])
+      ].join("");
+    }
     function openSettings() {
       increment("settingsOpened");
       const stats = getStats();
@@ -4481,10 +5162,8 @@
             <div id="jalapeno-settings-modal" style="max-height: 90vh; overflow-y: auto;">
                 <h2 style="margin-top:0; margin-bottom: 25px; text-align: center; color: var(--jp-link);">${t("titleSettings")}</h2>
 
-                <h4 style="margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secAppearance")}
-                </h4>
-                <div class="settings-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px 20px;">
+                ${settingsSectionHead("secAppearance", "secAppearanceDesc")}
+                <div class="settings-row jp-settings-grid-2">
                     <div>
                         <label>${t("optTheme")}</label>
                         <select id="set-theme" style="width:100%">
@@ -4519,100 +5198,80 @@
                         </select>
                     </div>
                 </div>
+                <label class="jp-module-toggle jp-module-toggle--solo" style="margin-top: 12px;">
+                    <input type="checkbox" id="set-banned-highlight" ${settings3.enableBannedHighlight ? "checked" : ""}>
+                    <span class="jp-module-toggle-body">
+                        <span class="jp-module-toggle-title">${t("mBannedHighlight")}</span>
+                        <span class="jp-module-toggle-hint">${t("mBannedHighlightHint")}</span>
+                    </span>
+                </label>
 
-                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secModules")}
-                </h4>
-                <div class="settings-row">
-                    <div style="font-size: 13px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-fakepromo" ${settings3.enableFakePromo ? "checked" : ""}> ${t("mFakePromo")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-calc" ${settings3.enableCalculator ? "checked" : ""}> ${t("mCalc")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hist" ${settings3.enableHistory ? "checked" : ""}> ${t("mHist")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-meta" ${settings3.enableMetaInfo ? "checked" : ""}> ${t("mMeta")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-fallback" ${settings3.enableKeywordFallback ? "checked" : ""}> ${t("mFall")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-amazon" ${settings3.enableAutoAmazonShipping ? "checked" : ""}> ${t("mAutoAmz")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-auto-local" ${settings3.enableAutoLocalStore ? "checked" : ""}> ${t("mAutoLoc")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-hold-note" ${settings3.enableAutoHoldNote ? "checked" : ""}> ${t("mHoldNote")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-infraction-note" ${settings3.enableInfractionNote ? "checked" : ""}> ${t("mInfracNote")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-templates" ${settings3.enableMessageTemplates ? "checked" : ""}> ${t("mTemplates")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-move-approve" ${settings3.enableMoveApproveBtn ? "checked" : ""}> ${t("mMoveApprove")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-merchant-notes" ${settings3.enableMerchantNotes ? "checked" : ""}> ${t("lblMerchantNotes")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-shipping-costs" ${settings3.enableShippingCosts ? "checked" : ""}> ${t("lblShippingCosts")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-approve-reasons" ${settings3.enableApproveReasons ? "checked" : ""}> ${t("mApproveReasons")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lock-buttons" ${settings3.enableLockButtons ? "checked" : ""}> ${t("mLockButtons")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-banned-highlight" ${settings3.enableBannedHighlight ? "checked" : ""}> ${t("mBannedHighlight")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-price-warning" ${settings3.enablePriceWarning ? "checked" : ""}> ${t("mPriceWarning")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-image-search" ${settings3.enableReverseImageSearch ? "checked" : ""}> ${t("mImageSearch")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-lens-description" ${settings3.enableLensDescription ? "checked" : ""}> ${t("mLensDescription")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-product-inspector" ${settings3.enableProductInspector ? "checked" : ""}> ${t("mProductInspector")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-link-expander" ${settings3.enableLinkExpander ? "checked" : ""}> ${t("mLinkExpander")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-allegro-images" ${settings3.enableAllegroImages ? "checked" : ""}> ${t("mAllegroImages")}</label>
-                        <label style="font-weight:normal; cursor:pointer;"><input type="checkbox" id="set-category-advisor" ${settings3.enableCategoryAdvisor ? "checked" : ""}> ${t("mCategoryAdvisor")}</label>
-                    </div>
-                </div>
+                ${settingsSectionHead("secModules", "secModulesDesc")}
+                <div class="jp-settings-groups">${buildSettingsModulesHtml()}</div>
 
-                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secFloatingBtn")}
-                </h4>
-                <div class="settings-row settings-row-special">
-                    <label style="font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom: 10px;">
+                ${settingsSectionHead("secFloatingBtn", "secFloatingBtnDesc")}
+                <div class="settings-row settings-row-special jp-floating-settings">
+                    <label class="jp-module-toggle jp-module-toggle--solo">
                         <input type="checkbox" id="set-floating-btn" ${settings3.enableFloatingButton ? "checked" : ""}>
-                        <span>${t("mFloatingBtnEnable")}</span>
+                        <span class="jp-module-toggle-body">
+                            <span class="jp-module-toggle-title">${t("mFloatingBtnEnable")}</span>
+                            <span class="jp-module-toggle-hint">${t("secFloatingBtnDesc")}</span>
+                        </span>
                     </label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="jp-settings-grid-2" style="margin-top: 14px;">
                         <div>
                             <label>${t("lblFloatingText")}</label>
                             <input type="text" id="set-floating-text" value="${settings3.customFloatingText}" placeholder="${t("lblFloatingTextPlaceholder")}" style="width:100%">
-                            <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px;">${t("lblFloatingTextHint")}</div>
+                            <div class="jp-settings-field-hint">${t("lblFloatingTextHint")}</div>
                         </div>
                         <div>
-                            <label style="font-weight:normal; display:flex; align-items:center; gap:8px; margin-top: 22px; cursor:pointer;">
+                            <label class="jp-module-toggle jp-module-toggle--inline">
                                 <input type="checkbox" id="set-floating-freedel" ${settings3.floatingButtonAutoFreeDelivery ? "checked" : ""}>
-                                <span>${t("lblFloatingFreeDel")}</span>
+                                <span class="jp-module-toggle-body">
+                                    <span class="jp-module-toggle-title">${t("lblFloatingFreeDel")}</span>
+                                    <span class="jp-module-toggle-hint">${t("lblFloatingFreeDelHint")}</span>
+                                </span>
                             </label>
-                            <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px; margin-left: 22px;">${t("lblFloatingFreeDelHint")}</div>
                         </div>
                     </div>
                 </div>
 
-                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secConfig")}
-                </h4>
-
-                <div class="settings-row" style="width: 50%;">
-                    <label>${t("defCurrency")}</label>
-                    <select id="set-currency" style="width:100%">
-                        <option value="EUR" ${settings3.defaultCurrency === "EUR" ? "selected" : ""}>EUR</option>
-                        <option value="USD" ${settings3.defaultCurrency === "USD" ? "selected" : ""}>USD</option>
-                        <option value="GBP" ${settings3.defaultCurrency === "GBP" ? "selected" : ""}>GBP</option>
-                    </select>
-                </div>
-
-                <div class="settings-row" style="width: 50%; margin-top: 15px;">
-                    <label>${t("lblShippingOffset")}</label>
-                    <input type="number" id="set-shipping-offset" value="${settings3.shippingPanelTopOffset}" style="width:100%">
-                    <div style="font-size: 11px; color: var(--jp-text-muted); margin-top: 4px;">${t("lblShippingOffsetHint")}</div>
+                ${settingsSectionHead("secConfig", "secConfigDesc")}
+                <div class="settings-row jp-settings-grid-2">
+                    <div>
+                        <label>${t("defCurrency")}</label>
+                        <select id="set-currency" style="width:100%">
+                            <option value="EUR" ${settings3.defaultCurrency === "EUR" ? "selected" : ""}>EUR</option>
+                            <option value="USD" ${settings3.defaultCurrency === "USD" ? "selected" : ""}>USD</option>
+                            <option value="GBP" ${settings3.defaultCurrency === "GBP" ? "selected" : ""}>GBP</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>${t("lblShippingOffset")}</label>
+                        <input type="number" id="set-shipping-offset" value="${settings3.shippingPanelTopOffset}" style="width:100%">
+                        <div class="jp-settings-field-hint">${t("lblShippingOffsetHint")}</div>
+                    </div>
                 </div>
 
                 <div class="settings-row" style="margin-top: 15px;">
                     <label>${t("stopWords")}</label>
                     <textarea id="set-stopwords" style="width: 100%; min-height: 50px;" placeholder="np. fryer, cheap, now">${settings3.customStopWords}</textarea>
+                    <div class="jp-settings-field-hint">${t("stopWordsHint")}</div>
                 </div>
 
                 <div class="settings-row" style="margin-top: 15px;">
                     <label>${t("hideBtns")}</label>
-                    <div style="font-size: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 5px;">
+                    <div class="jp-settings-field-hint" style="margin-bottom: 8px;">${t("hideBtnsHint")}</div>
+                    <div class="jp-hide-btns-grid">
                         ${["Ceneo", "Keepa", "GG.deals", "PerfumeHub", "LubimyCzytać", "UpolujEbooka", "Promoklocki", "DekuDeals"].map((btn) => `
-                            <label style="font-weight:normal; cursor:pointer;">
+                            <label class="jp-hide-btn-item">
                                 <input type="checkbox" class="hide-btn-check" value="${btn}" ${settings3.hiddenButtons.includes(btn) ? "checked" : ""}> ${btn}
                             </label>
                         `).join("")}
                     </div>
                 </div>
 
-                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secHistory")}
-                </h4>
+                ${settingsSectionHead("secHistory", "secHistoryDesc")}
 
                 <div class="settings-row" style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
                     <label style="margin: 0;">${t("histCount")}</label>
@@ -4639,9 +5298,7 @@
                     </div>
                 </div>
 
-                <h4 style="margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 1px solid var(--jp-border); color: var(--jp-text); font-size: 15px;">
-                    ${t("secAnalytics")}
-                </h4>
+                <h4 class="jp-settings-h4">${t("secAnalytics")}</h4>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
@@ -4772,7 +5429,8 @@
           enableProductInspector: document.getElementById("set-product-inspector").checked,
           enableLinkExpander: document.getElementById("set-link-expander").checked,
           enableAllegroImages: document.getElementById("set-allegro-images").checked,
-          enableCategoryAdvisor: document.getElementById("set-category-advisor").checked
+          enableCategoryAdvisor: document.getElementById("set-category-advisor").checked,
+          enableOfflineDealsFilter: document.getElementById("set-offline-filter").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -4858,6 +5516,267 @@
         .settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-save { background: #2e7d32; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight:bold;}
         .btn-cancel { background: #777; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; color: white; font-weight:bold;}
+
+        .jp-settings-h4 {
+            margin: 28px 0 6px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--jp-border);
+            color: var(--jp-text);
+            font-size: 15px;
+        }
+        .jp-settings-h4:first-of-type { margin-top: 0; }
+        .jp-settings-section-desc {
+            margin: 0 0 14px 0;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--jp-text-muted);
+        }
+        .jp-settings-field-hint {
+            font-size: 11px;
+            line-height: 1.45;
+            color: var(--jp-text-muted);
+            margin-top: 4px;
+        }
+        .jp-settings-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px 20px;
+        }
+        .jp-settings-groups {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .jp-settings-group {
+            background: var(--jp-row-bg);
+            border: 1px solid var(--jp-row-border);
+            border-radius: 6px;
+            padding: 12px 14px;
+        }
+        .jp-settings-group-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--jp-text);
+            margin-bottom: 2px;
+        }
+        .jp-settings-group-desc {
+            font-size: 11px;
+            line-height: 1.45;
+            color: var(--jp-text-muted);
+            margin-bottom: 10px;
+        }
+        .jp-module-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+        }
+        .jp-module-toggle {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            cursor: pointer;
+            padding: 8px 10px;
+            border-radius: 5px;
+            border: 1px solid transparent;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .jp-module-toggle:hover {
+            background: var(--jp-input-bg);
+            border-color: var(--jp-border);
+        }
+        .jp-module-toggle input[type="checkbox"] {
+            margin-top: 3px;
+            flex-shrink: 0;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+        .jp-module-toggle-body {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .jp-module-toggle-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--jp-text);
+            line-height: 1.35;
+        }
+        .jp-module-toggle-hint {
+            font-size: 11px;
+            line-height: 1.45;
+            color: var(--jp-text-muted);
+        }
+        .jp-module-toggle--solo,
+        .jp-module-toggle--inline {
+            padding: 0;
+            border: none;
+        }
+        .jp-module-toggle--solo:hover,
+        .jp-module-toggle--inline:hover {
+            background: transparent;
+            border-color: transparent;
+        }
+        .jp-hide-btns-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px 10px;
+        }
+        .jp-hide-btn-item {
+            font-size: 12px;
+            font-weight: normal;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--jp-text);
+        }
+
+        .jp-offline-filter-tab { cursor: pointer !important; }
+        .jp-offline-filter-tab--scanning .jp-offline-filter-count { opacity: 0.5; }
+        .jp-offline-filter-tab--active,
+        .jp-offline-filter-tab.v-tabs__item--active { color: var(--jp-stat-del-co) !important; }
+        .jp-offline-filter-count { font-weight: 700; }
+        .jp-offline-deal-row { box-shadow: inset 3px 0 0 var(--jp-stat-del-co); }
+
+        .jp-offline-view-active {
+            background: var(--jp-bg) !important;
+            color: var(--jp-text) !important;
+            min-height: 55vh;
+            padding-bottom: 24px;
+        }
+        .jp-offline-view-active .layout.column { background: transparent !important; }
+
+        .jp-offline-deals-panel {
+            display: none;
+            margin: 0;
+            padding: 12px 16px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            color: var(--jp-text);
+            font-family: inherit;
+        }
+        .jp-offline-deals-panel--visible { display: block; }
+        .jp-offline-deals-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            margin-bottom: 14px;
+            padding: 10px 14px;
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 4px solid var(--jp-stat-del-co);
+            border-radius: 6px;
+        }
+        .jp-offline-deals-toolbar strong {
+            font-size: 14px;
+            color: var(--jp-text);
+        }
+        .jp-offline-deals-status { color: var(--jp-text-muted); font-size: 12px; }
+        .jp-offline-rescan-btn {
+            margin-left: auto;
+            padding: 5px 12px;
+            font-size: 12px;
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 4px;
+            background: var(--jp-btn-bg);
+            color: var(--jp-text);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .jp-offline-rescan-btn:hover {
+            background: var(--jp-btn-hover);
+            border-color: var(--jp-stat-del-bo);
+            color: var(--jp-stat-del-co);
+        }
+        .jp-offline-deals-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+        }
+        .jp-offline-deal-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 14px;
+            border: 1px solid var(--jp-border);
+            border-radius: 4px;
+            background: var(--jp-btn-bg);
+            text-decoration: none !important;
+            color: var(--jp-text) !important;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+            cursor: pointer;
+        }
+        .jp-offline-deal-card:hover {
+            background: var(--jp-btn-hover);
+            border-color: var(--jp-stat-del-bo);
+            box-shadow: inset 3px 0 0 var(--jp-stat-del-co);
+        }
+        .jp-offline-deal-thumb {
+            width: 52px;
+            height: 52px;
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+            border: 1px solid var(--jp-border);
+        }
+        .jp-offline-deal-thumb--empty {
+            background: var(--jp-border);
+        }
+        .jp-offline-deal-body { flex: 1; min-width: 0; }
+        .jp-offline-deal-title {
+            font-weight: 600;
+            font-size: 13px;
+            line-height: 1.4;
+            color: var(--jp-text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .jp-offline-deal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 14px;
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--jp-text-muted);
+        }
+        .jp-offline-deal-badge {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--jp-stat-del-co);
+            background: var(--jp-stat-del-bg);
+            border: 1px solid var(--jp-stat-del-bo);
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+        .jp-offline-deal-badge .material-icons {
+            font-size: 14px;
+            line-height: 1;
+        }
+        .jp-offline-filter-empty {
+            padding: 20px 16px;
+            border: 1px dashed var(--jp-border);
+            border-left: 4px solid var(--jp-stat-del-co);
+            border-radius: 6px;
+            background: var(--jp-btn-bg);
+            color: var(--jp-text-muted);
+            font-size: 13px;
+            text-align: center;
+        }
 
         .jp-shipping-stack {
             width: 300px;
@@ -6235,13 +7154,13 @@
         toolsBox.appendChild(settingsBtn);
         let leftCol = document.createElement("div");
         leftCol.className = "mod-left-col";
-        const debounce = (func, delay) => {
+        const debounce = (func, delay2) => {
           let timeoutId;
           return (...args) => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
               func.apply(null, args);
-            }, delay);
+            }, delay2);
           };
         };
         if (settings3.enableFakePromo) {
@@ -7561,13 +8480,21 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
     setInterval(() => {
       let currentHref = window.location.href;
       if (currentHref !== lastKnownHref) {
+        const prevHref = lastKnownHref;
         lastKnownHref = currentHref;
+        const prevDealsNew = /\/admin-v2\/moderation\/deals\/new/.test(prevHref);
+        const nowDealsNew = /\/admin-v2\/moderation\/deals\/new/.test(currentHref);
         window.jpDealCheckersAttached = false;
         window.jpLastCheckedUrl = null;
         window.jpUserEditedShipping = false;
         window.jpUserForcedFreeDelivery = false;
         window.jpAutoShippingSet = false;
         window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
+        if (prevDealsNew && nowDealsNew) {
+          notifyOfflineListPageChange();
+        } else {
+          resetOfflineDealsFilter();
+        }
         let oldWarningBox = document.querySelector(".jp-price-warning-toast");
         if (oldWarningBox) oldWarningBox.remove();
       }
@@ -7586,6 +8513,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       displayMerchantNotesOnPage();
       checkApproveMessageModal();
       checkQueuePriceIncreases();
+      initOfflineDealsFilter(settings3);
       let now = Date.now();
       if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
         highlightEditedCards();
