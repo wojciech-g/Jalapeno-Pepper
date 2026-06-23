@@ -131,11 +131,17 @@ Suggests the best category for a deal based on Pepper history and internal rewar
 * **Manual search:** Search by keyword with results from both Pepper threads and the rewards database.
 * **Ignored words:** Custom stop-word list (shared with history search) to improve matching.
 
+<img width="272" height="592" alt="Zrzut ekranu 2026-06-22 o 23 41 22" src="https://github.com/user-attachments/assets/8fb6f8c6-819f-4bb8-84ce-82f332401632" />
+
 ### 📴 15. Offline Deals Queue Panel
 Surfaces deals with broken or unreachable links across the entire moderation queue (`deals/new`).
 * **Full pagination scan:** Scans all list pages and detects the native `error` icon / „Offline” label (client-side link check — not the JSON `online` field).
 * **Dedicated panel:** A separate „offline” tab with a filterable list; click a deal to open it for review.
 * **Auto-refresh:** Count and list update in the background as Pepper finishes rendering link-check icons.
+
+<img width="1070" height="119" alt="Zrzut ekranu 2026-06-23 o 18 31 51" src="https://github.com/user-attachments/assets/e77b8389-b05e-44f7-b2e7-722b5ea9285d" />
+
+<img width="1841" height="626" alt="Zrzut ekranu 2026-06-23 o 18 39 12" src="https://github.com/user-attachments/assets/616c0a0c-e8cf-46d1-af93-34d5a6edba92" />
 
 ### 🕐 16. Exact Timestamps on Queue Lists
 Replaces relative times („Submitted 4 hours ago”) with precise datetimes on **New**, **On Hold**, and **Reported** lists.
@@ -147,13 +153,15 @@ Quick-access toolbar on the thread edit page and in the legacy user inspector pr
 
 **On thread edit** (below the user card):
 * **Track UUID** — Metabase UUID tracker
-* **Co dodaje** — top threads by author ([Metabase](https://data-metabase.pepper.com/question/8947-top-threads))
-* **Na kogo głosuje** — cold/hot vote patterns ([Metabase](https://data-metabase.pepper.com/question/8820-cold-votes-on-thread-submitters-from-a-specific-member))
-* **Wykres temperatury** — temperature evolution for the current deal ([Metabase](https://data-metabase.pepper.com/question/9106-evolution-of-temperature-for-a-specific-thread))
+* **Co dodaje** — top threads by author
+* **Na kogo głosuje** — cold/hot vote patterns
+* **Wykres temperatury** — temperature evolution for the current deal
 * **All IPs** — expandable panel with recent IPs (clickable → inspector), plus „open all in tabs”
 
 **On inspector user profile** (`/admin/inspector/users/{id}`):
 * **Co dodaje**, **Na kogo głosuje**, **All IPs** — same as above (Track UUID is left to the native panel button).
+
+<img width="1211" height="417" alt="Zrzut ekranu 2026-06-23 o 21 28 52" src="https://github.com/user-attachments/assets/6ae0583d-e396-48ef-9808-2ac3ca5014ec" />
 
 ### 🔎 18. Product Inspector & Research Tools
 * **EAN / ASIN detection:** Finds product identifiers in the title or URL; generates a barcode preview for the description.
@@ -161,6 +169,8 @@ Quick-access toolbar on the thread edit page and in the legacy user inspector pr
 * **Link expander:** Unshortens redirect URLs before you review the deal.
 * **Lens AI description:** Fetches and inserts Google Lens AI overview text into the description field.
 * **Allegro images:** Pulls product images from Allegro listing pages into the Pepper form.
+
+<img width="1217" height="831" alt="Zrzut ekranu 2026-06-15 o 10 47 28" src="https://github.com/user-attachments/assets/9e1fd3c1-4f7a-4f6d-b91a-4595ed8ebeab" />
 
 ---
 
