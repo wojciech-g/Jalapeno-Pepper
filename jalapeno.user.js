@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.5
+// @version      4.9.6
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1322,6 +1322,24 @@
       mOfflineFilterTab: "offline",
       mOfflineFilterTabActive: "Tylko offline",
       mOfflineFilterEmpty: "Brak okazji offline w całej kolejce.",
+      mExactTimestamps: "Dokładne timestampy na liście",
+      mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published jako 23.06.2026 18:31:51 na new / on-hold / reported.",
+      mUserAdminLinks: "Metabase + All IPs użytkownika",
+      mUserAdminLinksHint: "Przy edycji wątku i w inspektorze usera — Metabase (Track UUID, co dodaje, głosy) oraz panel IP.",
+      mMetabaseUuid: "Track UUID",
+      mMetabaseWhatAdds: "Co dodaje",
+      mMetabaseColdVotes: "Na kogo głosuje",
+      mMetabaseTempChart: "Wykres temperatury okazji",
+      mAllIps: "All IPs",
+      mIpsLoading: "Ładowanie IP…",
+      mIpsNone: "Brak danych IP.",
+      mIpsLoadFailed: "Nie udało się pobrać IP użytkownika.",
+      mIpsLastIp: "Ostatnie",
+      mIpsSignupIp: "Rejestracja",
+      mIpsRecent: "Historia",
+      mIpsLocation: "Lokalizacja",
+      mIpsWhen: "Data",
+      mIpsOpenAll: "Otwórz wszystkie IP",
       mOfflinePanelTitle: "Okazje offline — do weryfikacji",
       mOfflinePanelRescan: "Odśwież skan",
       mOfflinePanelScanning: "Skanuję wszystkie strony…",
@@ -1588,6 +1606,24 @@
       mOfflineFilterTab: "offline",
       mOfflineFilterTabActive: "Offline only",
       mOfflineFilterEmpty: "No offline deals in the queue.",
+      mExactTimestamps: "Exact timestamps on queue list",
+      mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published as 23.06.2026 18:31:51 on new / on-hold / reported.",
+      mUserAdminLinks: "Metabase + user All IPs",
+      mUserAdminLinksHint: "On thread edit and inspector profile — Metabase (Track UUID, posts, votes) and IP panel.",
+      mMetabaseUuid: "Track UUID",
+      mMetabaseWhatAdds: "What they post",
+      mMetabaseColdVotes: "Who they vote on",
+      mMetabaseTempChart: "Temperature chart (this deal)",
+      mAllIps: "All IPs",
+      mIpsLoading: "Loading IPs…",
+      mIpsNone: "No IP data.",
+      mIpsLoadFailed: "Could not load user IPs.",
+      mIpsLastIp: "Last",
+      mIpsSignupIp: "Signup",
+      mIpsRecent: "History",
+      mIpsLocation: "Location",
+      mIpsWhen: "Date",
+      mIpsOpenAll: "Open all IPs",
       mOfflinePanelTitle: "Offline deals — needs review",
       mOfflinePanelRescan: "Rescan",
       mOfflinePanelScanning: "Scanning all pages…",
@@ -4497,7 +4533,10 @@
   var CACHE_TTL_MS = 3 * 60 * 1e3;
   var AUTO_REFRESH_MS = 90 * 1e3;
   var MIN_REFRESH_GAP_MS = 8e3;
-  var INITIAL_SCAN_DELAY_MS = 2500;
+  var INITIAL_SCAN_DELAY_MS = 4e3;
+  var LIVE_PAGE_WAIT_MS = 15e3;
+  var LIVE_PAGE_POLL_MS = 500;
+  var FOLLOWUP_SCAN_DELAYS_MS = [5e3, 12e3, 25e3];
   var MAX_PAGES = 12;
   var JSON_FETCH_DELAY_MS = 80;
   var IFRAME_POLL_MS = 350;
@@ -4509,6 +4548,9 @@
   var _iframe = null;
   var _lastRefreshAttempt = 0;
   var _initialScanScheduled = false;
+  var _iconWatchObserver = null;
+  var _followupTimers = [];
+  var _iconWatchDebounce = null;
   function isDealsQueuePage() {
     return /\/admin-v2\/moderation\/deals\/new/.test(window.location.pathname);
   }
@@ -4621,6 +4663,48 @@
     });
     return ids;
   }
+  async function waitForOfflineIdsOnLivePage() {
+    const start = Date.now();
+    let stablePasses = 0;
+    let lastSignature = "";
+    while (Date.now() - start < LIVE_PAGE_WAIT_MS) {
+      const rows = getDealRowsFromDoc(document);
+      const ids = offlineIdsFromDoc(document);
+      const signature = `${rows.length}:${[...ids].sort().join(",")}`;
+      const loading = document.querySelectorAll(
+        '.v-progress-circular, .v-skeleton-loader, [class*="skeleton"]'
+      ).length;
+      if (rows.length > 0 && loading === 0 && signature === lastSignature) {
+        stablePasses++;
+        if (stablePasses >= 3) return ids;
+      } else {
+        stablePasses = 0;
+        lastSignature = signature;
+      }
+      await delay(LIVE_PAGE_POLL_MS);
+    }
+    return offlineIdsFromDoc(document);
+  }
+  function countDomOfflineOnPage() {
+    return offlineIdsFromDoc(document).size;
+  }
+  function shouldRunOfflineScan() {
+    const domOnPage = countDomOfflineOnPage();
+    const cached = loadCache();
+    const cachedCount = cached?.items?.length ?? 0;
+    if (isCacheStale()) return true;
+    if (domOnPage > 0 && cachedCount === 0) return true;
+    if (domOnPage > cachedCount) return true;
+    return false;
+  }
+  function updateBadgeFromDomHint() {
+    if (_scanPromise) return;
+    const domOnPage = countDomOfflineOnPage();
+    const cachedCount = loadCache()?.items?.length ?? 0;
+    if (domOnPage > cachedCount) {
+      updateTabBadge(domOnPage);
+    }
+  }
   function itemToDeal(item, page) {
     return {
       id: String(item.id),
@@ -4719,7 +4803,7 @@
         const { items } = parseListJson(jsonData);
         let offlineIds;
         if (page === getCurrentPage() && isDealsQueuePage()) {
-          offlineIds = offlineIdsFromDoc(document);
+          offlineIds = await waitForOfflineIdsOnLivePage();
         } else {
           offlineIds = await scanPageInIframe(page);
         }
@@ -4749,14 +4833,68 @@
   function maybeAutoRefresh() {
     if (_scanPromise) return;
     const now = Date.now();
-    if (now - _lastRefreshAttempt < MIN_REFRESH_GAP_MS) return;
-    if (!isCacheStale()) {
+    if (now - _lastRefreshAttempt < MIN_REFRESH_GAP_MS) {
+      updateBadgeFromDomHint();
+      return;
+    }
+    if (!shouldRunOfflineScan()) {
       const cached = loadCache();
-      if (cached) updateTabBadge(cached.items.length);
+      if (cached) {
+        updateTabBadge(cached.items.length);
+      } else {
+        updateBadgeFromDomHint();
+      }
       return;
     }
     _lastRefreshAttempt = now;
     startScan({ silent: true });
+  }
+  function watchForOfflineIcons() {
+    if (_iconWatchObserver) return;
+    const target = document.querySelector(".layout.column") || document.querySelector(".v-tabs-items");
+    if (!target) return;
+    _iconWatchObserver = new MutationObserver(() => {
+      clearTimeout(_iconWatchDebounce);
+      _iconWatchDebounce = setTimeout(() => {
+        highlightCurrentPageOffline();
+        updateBadgeFromDomHint();
+        if (shouldRunOfflineScan()) {
+          _lastRefreshAttempt = 0;
+          maybeAutoRefresh();
+        }
+      }, 900);
+    });
+    _iconWatchObserver.observe(target, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+  }
+  function scheduleOfflineScanRetries() {
+    _followupTimers.forEach((id) => clearTimeout(id));
+    _followupTimers = [];
+    for (const waitMs of FOLLOWUP_SCAN_DELAYS_MS) {
+      _followupTimers.push(setTimeout(() => {
+        if (!isDealsQueuePage()) return;
+        highlightCurrentPageOffline();
+        updateBadgeFromDomHint();
+        if (shouldRunOfflineScan()) {
+          _lastRefreshAttempt = 0;
+          maybeAutoRefresh();
+        }
+      }, waitMs));
+    }
+  }
+  function stopOfflineIconWatch() {
+    if (_iconWatchObserver) {
+      _iconWatchObserver.disconnect();
+      _iconWatchObserver = null;
+    }
+    clearTimeout(_iconWatchDebounce);
+    _iconWatchDebounce = null;
+    _followupTimers.forEach((id) => clearTimeout(id));
+    _followupTimers = [];
   }
   function updateTabBadge(count, scanning = false) {
     const badge = document.querySelector(".jp-offline-filter-count");
@@ -4971,8 +5109,9 @@
   function notifyOfflineListPageChange() {
     if (!isDealsQueuePage()) return;
     highlightCurrentPageOffline();
-    const cached = loadCache();
-    if (cached) updateTabBadge(cached.items.length);
+    updateBadgeFromDomHint();
+    _lastRefreshAttempt = 0;
+    scheduleOfflineScanRetries();
     maybeAutoRefresh();
   }
   function highlightCurrentPageOffline() {
@@ -4984,6 +5123,7 @@
     _scanGeneration++;
     _panelOpen = false;
     _initialScanScheduled = false;
+    stopOfflineIconWatch();
     removeIframe();
     _scanPromise = null;
     document.getElementById("jp-offline-deals-panel")?.remove();
@@ -5001,17 +5141,447 @@
     if (!isDealsQueuePage()) return;
     ensureOfflineTab();
     highlightCurrentPageOffline();
+    updateBadgeFromDomHint();
     const cached = loadCache();
     if (cached) updateTabBadge(cached.items.length);
     if (!window.jpOfflineFilterReady) {
       window.jpOfflineFilterReady = true;
       scheduleInitialScan();
+      scheduleOfflineScanRetries();
+      watchForOfflineIcons();
     }
     maybeAutoRefresh();
   }
   function resetOfflineDealsFilter() {
     cleanupOfflineFilter();
     window.jpOfflineFilterReady = false;
+  }
+
+  // src/utils/pepperAdmin.js
+  function getXsrfToken3() {
+    const m = document.cookie.match(/xsrf_t=([^;]+)/);
+    return m ? decodeURIComponent(m[1]).replace(/^"|"$/g, "") : "";
+  }
+  function formatPlTimestamp(unixSeconds) {
+    if (unixSeconds == null || !Number.isFinite(Number(unixSeconds))) return null;
+    const d = new Date(Number(unixSeconds) * 1e3);
+    if (Number.isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function formatPlTimestampIso(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  async function fetchModerationListPage(path, page) {
+    const url = `https://www.pepper.pl${path}?page=${page}&noCache=${Date.now()}`;
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": getXsrfToken3()
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  async function fetchAdminUser(userId) {
+    const res = await fetch(`https://www.pepper.pl/admin/users/${userId}`, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": getXsrfToken3()
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+  var METABASE_UUID_URL = "https://data-metabase.pepper.com/question/10221-beta-v0-1-number-of-user-ids-per-uuid";
+  function buildInspectorIpUrl(entry) {
+    const hash = entry?.ip_address;
+    if (!hash) return null;
+    return `https://www.pepper.pl/admin/inspector/ips?ip_filter=${encodeURIComponent(hash)}`;
+  }
+  function buildMetabaseUserUrl(userId) {
+    const params = new URLSearchParams({
+      country_code: "pl",
+      event_date: "past480days",
+      uuid: "",
+      minimum_user_ids: "2",
+      maximum_uuids: "",
+      user_id: String(userId),
+      max_diff_registration_datetime: ""
+    });
+    return `${METABASE_UUID_URL}?${params.toString()}`;
+  }
+  var METABASE_TOP_THREADS_URL = "https://data-metabase.pepper.com/question/8947-top-threads";
+  var METABASE_COLD_VOTES_URL = "https://data-metabase.pepper.com/question/8820-cold-votes-on-thread-submitters-from-a-specific-member";
+  var METABASE_TEMP_CHART_URL = "https://data-metabase.pepper.com/question/9106-evolution-of-temperature-for-a-specific-thread";
+  function buildMetabaseTopThreadsUrl(userId) {
+    const params = new URLSearchParams({
+      thread_source_name: "",
+      empty_thread_source_name: "",
+      empty_voucher: "",
+      event_date: "",
+      user_author_name: "",
+      voucher_code: "",
+      exclude_user_author_id: "",
+      date_import_thread_ids: "",
+      amazon_seller_name: "",
+      maximum_temperature: "",
+      thread_status: "",
+      creation_date: "past60days",
+      country_code: "pl",
+      exclusive: "",
+      creator: "",
+      user_role: "",
+      thread_id: "",
+      link_count: "0",
+      is_pinned: "",
+      order_by_temperature: "No",
+      default_group_name: "",
+      is_expired: "",
+      empty_cpc_link: "",
+      local: "",
+      minimum_temperature: "",
+      only_freebies: "No",
+      merchant_name: "",
+      price: "",
+      user_author_id: String(userId),
+      search_pattern: "",
+      merchant_id: "",
+      import_thread_ids: "No"
+    });
+    params.append("thread_type", "deal");
+    params.append("thread_type", "voucher");
+    return `${METABASE_TOP_THREADS_URL}?${params.toString()}`;
+  }
+  function buildMetabaseColdVotesUrl(userId) {
+    const params = new URLSearchParams({
+      country_code: "pl",
+      user_id: String(userId),
+      months: "6",
+      orderbycoldvotes: "No",
+      minimum_cold_votes: "0",
+      minimum_hot_votes: "0"
+    });
+    return `${METABASE_COLD_VOTES_URL}?${params.toString()}`;
+  }
+  function buildMetabaseTempChartUrl(threadId) {
+    const params = new URLSearchParams({
+      thread_id: String(threadId),
+      country_code: "pl"
+    });
+    return `${METABASE_TEMP_CHART_URL}?${params.toString()}`;
+  }
+
+  // src/features/exactTimestamps.js
+  var LIST_PATH_RE = /\/admin-v2\/moderation\/deals\/(new|on-hold|reported)/;
+  var _listCache = null;
+  var _lastHref = "";
+  var _applyPromise = null;
+  function isDealsListPage() {
+    return LIST_PATH_RE.test(window.location.pathname);
+  }
+  function getListPath() {
+    return window.location.pathname.replace(/\/$/, "");
+  }
+  function getCurrentPage2() {
+    const p = parseInt(new URLSearchParams(window.location.search).get("page") || "1", 10);
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  }
+  function clearRowMarkers() {
+    document.querySelectorAll("[data-jp-timestamps-done]").forEach((el) => {
+      delete el.dataset.jpTimestampsDone;
+    });
+  }
+  async function getListItems() {
+    const path = getListPath();
+    const page = getCurrentPage2();
+    const key = `${path}?page=${page}`;
+    if (_listCache && _listCache.key === key && Date.now() - _listCache.at < 3e4) {
+      return _listCache.items;
+    }
+    const data = await fetchModerationListPage(path, page);
+    const items = data?.state?.threadsList?.items || [];
+    _listCache = { key, items, at: Date.now() };
+    return items;
+  }
+  function findTimeRow(row) {
+    for (const icon of row.querySelectorAll("i.material-icons")) {
+      if (icon.textContent.trim() === "access_time") {
+        return icon.closest(".flex") || icon.parentElement;
+      }
+    }
+    return row.querySelector(".flex.grey--text.text--darken-1") || row.querySelector(".flex.grey--text");
+  }
+  function applyTimestampToRow(row, item) {
+    if (row.dataset.jpTimestampsDone) return;
+    const timeRow = findTimeRow(row);
+    if (!timeRow) return;
+    const submitted = formatPlTimestamp(item.createdAt);
+    if (!submitted) return;
+    const published = formatPlTimestamp(item.approvedAt);
+    let html = `<i aria-hidden="true" class="v-icon material-icons theme--light grey--text text--lighten-1" style="font-size: 16px;">access_time</i> Submitted ${submitted}`;
+    if (published) {
+      html += ` <span> · Published ${published} </span>`;
+    }
+    timeRow.innerHTML = html;
+    timeRow.classList.add("jp-exact-timestamp");
+    row.dataset.jpTimestampsDone = "1";
+  }
+  function getDealRows() {
+    const seen = /* @__PURE__ */ new Set();
+    const rows = [];
+    document.querySelectorAll('a[href*="/admin-v2/moderation/thread/"]').forEach((link) => {
+      const row = link.closest('div[class*="overflow-hidden"]') || link.closest(".flex.xs12.py-0.pl-4") || link.closest(".flex.xs12");
+      if (row && !seen.has(row)) {
+        seen.add(row);
+        rows.push({ row, link });
+      }
+    });
+    return rows;
+  }
+  async function applyExactTimestamps() {
+    const items = await getListItems();
+    const byId = new Map(items.map((item) => [String(item.id), item]));
+    getDealRows().forEach(({ row, link }) => {
+      const m = link.href.match(/thread\/(\d+)/);
+      if (!m) return;
+      const item = byId.get(m[1]);
+      if (item) applyTimestampToRow(row, item);
+    });
+  }
+  function initExactTimestamps(settings3) {
+    if (!settings3.enableExactTimestamps) return;
+    if (!isDealsListPage()) return;
+    if (window.location.href !== _lastHref) {
+      _lastHref = window.location.href;
+      clearRowMarkers();
+      _listCache = null;
+    }
+    if (_applyPromise) return;
+    _applyPromise = applyExactTimestamps().catch((err) => console.warn("[Jalapeño] exact timestamps:", err)).finally(() => {
+      _applyPromise = null;
+    });
+  }
+  function resetExactTimestamps() {
+    _lastHref = "";
+    _listCache = null;
+    _applyPromise = null;
+    clearRowMarkers();
+  }
+
+  // src/features/userAdminLinks.js
+  var _userCache = /* @__PURE__ */ new Map();
+  function parseUserPayload(json) {
+    return json?.data?.user || json?.user || json?.data || null;
+  }
+  async function getUserData(userId) {
+    const key = String(userId);
+    if (_userCache.has(key)) return _userCache.get(key);
+    const json = await fetchAdminUser(userId);
+    const user = parseUserPayload(json);
+    if (user) _userCache.set(key, user);
+    return user;
+  }
+  function userIdFromInspectorUrl() {
+    const m = window.location.pathname.match(/\/admin\/inspector\/users\/(\d+)/);
+    return m ? m[1] : null;
+  }
+  function userIdFromThreadPage() {
+    for (const link of document.querySelectorAll('a[href*="/admin/inspector/users/"], a[href*="/admin/users/"]')) {
+      const m = link.href.match(/(?:users|inspector\/users)\/(\d+)/);
+      if (m) return m[1];
+    }
+    return null;
+  }
+  function threadIdFromPage() {
+    const m = window.location.pathname.match(/\/admin-v2\/moderation\/thread\/(\d+)/);
+    return m ? m[1] : null;
+  }
+  function appendInspectorLink(container, href, label, markerClass) {
+    const a = document.createElement("a");
+    a.className = `btn btn-mini btn-light jp-user-metabase-link ${markerClass}`;
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = label;
+    container.appendChild(a);
+  }
+  function buildLinksBar(userId, threadId = null, opts = {}) {
+    const { showUuid = false, showTempChart = false } = opts;
+    const bar = document.createElement("div");
+    bar.id = "jp-user-admin-links";
+    bar.className = "jp-user-admin-links jp-user-admin-links--v2";
+    const parts = [];
+    if (showUuid) {
+      parts.push(`
+            <a class="jp-user-admin-btn jp-user-admin-btn--metabase jp-user-metabase-uuid" href="${buildMetabaseUserUrl(userId)}" target="_blank" rel="noopener">
+                ${t("mMetabaseUuid")}
+            </a>
+        `);
+    }
+    parts.push(`
+        <a class="jp-user-admin-btn jp-user-admin-btn--metabase jp-user-metabase-top" href="${buildMetabaseTopThreadsUrl(userId)}" target="_blank" rel="noopener">
+            ${t("mMetabaseWhatAdds")}
+        </a>
+        <a class="jp-user-admin-btn jp-user-admin-btn--metabase jp-user-metabase-votes" href="${buildMetabaseColdVotesUrl(userId)}" target="_blank" rel="noopener">
+            ${t("mMetabaseColdVotes")}
+        </a>
+    `);
+    if (showTempChart && threadId) {
+      parts.push(`
+            <a class="jp-user-admin-btn jp-user-admin-btn--metabase jp-user-metabase-temp" href="${buildMetabaseTempChartUrl(threadId)}" target="_blank" rel="noopener">
+                ${t("mMetabaseTempChart")}
+            </a>
+        `);
+    }
+    parts.push(`
+        <button type="button" class="jp-user-admin-btn jp-user-admin-btn--ips jp-user-admin-ips-jalapeno">
+            ${t("mAllIps")}
+        </button>
+    `);
+    bar.innerHTML = parts.join("");
+    bar.querySelector(".jp-user-admin-btn--ips")?.addEventListener("click", () => {
+      toggleIpsPanel(userId, bar);
+    });
+    return bar;
+  }
+  function renderIpsHtml(user) {
+    const rows = [];
+    const seen = /* @__PURE__ */ new Set();
+    const urls = [];
+    const pushIp = (label, entry) => {
+      if (!entry?.ip_address) return;
+      const key = `${label}:${entry.ip_address}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const url = buildInspectorIpUrl(entry);
+      if (url && !urls.includes(url)) urls.push(url);
+      const when = formatPlTimestampIso(entry.created_at) || "—";
+      const loc = [entry.city, entry.country_code].filter(Boolean).join(", ");
+      const ipCell = url ? `<a href="${url}" target="_blank" rel="noopener" class="jp-user-ip-link"><code>${entry.ip_address}</code></a>` : `<code>${entry.ip_address}</code>`;
+      rows.push(`
+            <tr>
+                <td>${label}</td>
+                <td>${ipCell}</td>
+                <td>${loc || "—"}</td>
+                <td>${when}</td>
+            </tr>
+        `);
+    };
+    pushIp(t("mIpsLastIp"), user.last_ip);
+    pushIp(t("mIpsSignupIp"), user.signup_ip);
+    (user.recent_ips_list || []).forEach((entry, i) => {
+      pushIp(`${t("mIpsRecent")} ${i + 1}`, entry);
+    });
+    if (rows.length === 0) {
+      return { html: `<div class="jp-user-ips-empty">${t("mIpsNone")}</div>`, urls: [] };
+    }
+    const toolbar = urls.length ? `<div class="jp-user-ips-toolbar">
+            <button type="button" class="jp-user-ips-open-all">${t("mIpsOpenAll")} (${urls.length})</button>
+           </div>` : "";
+    return {
+      html: `${toolbar}
+        <table class="jp-user-ips-table">
+            <thead><tr><th></th><th>IP</th><th>${t("mIpsLocation")}</th><th>${t("mIpsWhen")}</th></tr></thead>
+            <tbody>${rows.join("")}</tbody>
+        </table>`,
+      urls
+    };
+  }
+  function openAllIpTabs(urls) {
+    urls.forEach((url, i) => {
+      setTimeout(() => window.open(url, "_blank", "noopener"), i * 120);
+    });
+  }
+  function bindIpsPanel(panel, urls) {
+    panel.querySelector(".jp-user-ips-open-all")?.addEventListener("click", () => {
+      openAllIpTabs(urls);
+    });
+  }
+  async function toggleIpsPanel(userId, bar) {
+    let panel = bar.nextElementSibling?.classList?.contains("jp-user-ips-panel") ? bar.nextElementSibling : null;
+    if (panel?.dataset.open === "1") {
+      panel.remove();
+      return;
+    }
+    document.querySelectorAll(".jp-user-ips-panel").forEach((p) => p.remove());
+    panel = document.createElement("div");
+    panel.className = "jp-user-ips-panel";
+    panel.dataset.open = "1";
+    panel.innerHTML = `<div class="jp-user-ips-loading">${t("mIpsLoading")}</div>`;
+    bar.insertAdjacentElement("afterend", panel);
+    try {
+      const user = await getUserData(userId);
+      if (!user) throw new Error("no user");
+      const { html, urls } = renderIpsHtml(user);
+      panel.innerHTML = html;
+      bindIpsPanel(panel, urls);
+    } catch (err) {
+      console.warn("[Jalapeño] user IPs:", err);
+      panel.innerHTML = `<div class="jp-user-ips-empty">${t("mIpsLoadFailed")}</div>`;
+    }
+  }
+  function cleanupInspectorInjections() {
+    document.querySelector(".jp-user-admin-links--v2")?.remove();
+    document.querySelector(".jp-user-admin-links:not(.peps-admin-profile-links)")?.remove();
+  }
+  function injectInspectorLinks(userId) {
+    cleanupInspectorInjections();
+    if (document.querySelector(".jp-user-metabase-top")) return;
+    const anchor = document.querySelector(".peps-admin-profile-links");
+    if (anchor) {
+      appendInspectorLink(anchor, buildMetabaseTopThreadsUrl(userId), t("mMetabaseWhatAdds"), "jp-user-metabase-top");
+      appendInspectorLink(anchor, buildMetabaseColdVotesUrl(userId), t("mMetabaseColdVotes"), "jp-user-metabase-votes");
+      if (!document.querySelector(".jp-user-admin-ips-jalapeno")) {
+        const ipsBtn = document.createElement("button");
+        ipsBtn.type = "button";
+        ipsBtn.className = "id-copy-button btn btn-mini btn-info jp-user-admin-ips jp-user-admin-ips-jalapeno";
+        ipsBtn.innerHTML = `<i class="icon-globe"></i> ${t("mAllIps")}`;
+        ipsBtn.addEventListener("click", () => toggleIpsPanel(userId, anchor));
+        anchor.appendChild(ipsBtn);
+      }
+      return;
+    }
+    const cardBody = document.querySelector(".card-body");
+    if (!cardBody) return;
+    const bar = buildLinksBar(userId, null, { showUuid: false, showTempChart: false });
+    cardBody.insertBefore(bar, cardBody.firstChild);
+  }
+  function injectThreadLinks(userId) {
+    if (document.getElementById("jp-user-admin-links")) return;
+    const card = document.querySelector(".v-card.v-sheet.elevation-0.rounded-medium.mb-4.break-word") || document.querySelector(".v-card.elevation-0.rounded-medium.mb-4.break-word") || document.querySelector(".v-card.elevation-0.rounded-medium.mb-4");
+    if (!card) return;
+    const threadId = threadIdFromPage();
+    const bar = buildLinksBar(userId, threadId, { showUuid: true, showTempChart: !!threadId });
+    card.insertAdjacentElement("afterend", bar);
+  }
+  function initUserAdminLinks(settings3) {
+    if (!settings3.enableUserAdminLinks) return;
+    const inspectorId = userIdFromInspectorUrl();
+    if (inspectorId) {
+      injectInspectorLinks(inspectorId);
+      return;
+    }
+    if (/\/admin-v2\/moderation\/thread\//.test(window.location.pathname)) {
+      const threadUserId = userIdFromThreadPage();
+      if (threadUserId) injectThreadLinks(threadUserId);
+    }
+  }
+  function resetUserAdminLinks() {
+    document.querySelectorAll(
+      ".jp-user-admin-ips-jalapeno, .jp-user-metabase-link, .jp-user-metabase-top, .jp-user-metabase-votes, .jp-user-metabase-temp, .jp-user-metabase-uuid"
+    ).forEach((el) => el.remove());
+    document.querySelector(".jp-user-admin-links--v2")?.remove();
+    document.querySelectorAll(".jp-user-ips-panel").forEach((p) => p.remove());
+    _userCache.clear();
   }
 
   // src/main.js
@@ -5071,7 +5641,9 @@
       enableLensDescription: true,
       enableAllegroImages: true,
       enableCategoryAdvisor: true,
-      enableOfflineDealsFilter: true
+      enableOfflineDealsFilter: true,
+      enableExactTimestamps: true,
+      enableUserAdminLinks: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -5133,7 +5705,8 @@
           settingsModuleToggle("set-lens-description", s.enableLensDescription, "mLensDescription", "mLensDescriptionHint"),
           settingsModuleToggle("set-allegro-images", s.enableAllegroImages, "mAllegroImages", "mAllegroImagesHint"),
           settingsModuleToggle("set-fakepromo", s.enableFakePromo, "mFakePromo", "mFakePromoHint"),
-          settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint")
+          settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint"),
+          settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
@@ -5150,7 +5723,8 @@
         ]),
         settingsModuleGroup("secModQueue", "secModQueueDesc", [
           settingsModuleToggle("set-price-warning", s.enablePriceWarning, "mPriceWarning", "mPriceWarningHint"),
-          settingsModuleToggle("set-offline-filter", s.enableOfflineDealsFilter, "mOfflineDealsFilter", "mOfflineDealsFilterHint")
+          settingsModuleToggle("set-offline-filter", s.enableOfflineDealsFilter, "mOfflineDealsFilter", "mOfflineDealsFilterHint"),
+          settingsModuleToggle("set-exact-timestamps", s.enableExactTimestamps, "mExactTimestamps", "mExactTimestampsHint")
         ])
       ].join("");
     }
@@ -5430,7 +6004,9 @@
           enableLinkExpander: document.getElementById("set-link-expander").checked,
           enableAllegroImages: document.getElementById("set-allegro-images").checked,
           enableCategoryAdvisor: document.getElementById("set-category-advisor").checked,
-          enableOfflineDealsFilter: document.getElementById("set-offline-filter").checked
+          enableOfflineDealsFilter: document.getElementById("set-offline-filter").checked,
+          enableExactTimestamps: document.getElementById("set-exact-timestamps").checked,
+          enableUserAdminLinks: document.getElementById("set-user-admin-links").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -5776,6 +6352,130 @@
             color: var(--jp-text-muted);
             font-size: 13px;
             text-align: center;
+        }
+
+        .jp-exact-timestamp { font-size: 12px !important; white-space: nowrap; }
+
+        .jp-user-admin-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .jp-user-admin-links--v2 {
+            margin: 0 0 16px 0;
+            padding: 10px 12px;
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-border);
+            border-radius: 6px;
+        }
+        .jp-user-admin-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 4px;
+            border: 1px solid var(--jp-btn-border);
+            background: var(--jp-btn-bg);
+            color: var(--jp-text);
+            cursor: pointer;
+            text-decoration: none !important;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .jp-user-admin-btn .material-icons { font-size: 16px; line-height: 1; }
+        .jp-user-admin-btn:hover {
+            background: var(--jp-btn-hover);
+            border-color: var(--jp-link);
+            color: var(--jp-link);
+        }
+        .jp-user-admin-btn--metabase { border-color: #e65100; color: #e65100; }
+        .jp-user-admin-btn--metabase:hover { background: rgba(230, 81, 0, 0.08); }
+        .jp-user-ips-panel {
+            margin: 0 0 16px 0;
+            padding: 10px 12px;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #d84315;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .jp-user-ips-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            color: var(--jp-text);
+        }
+        .jp-user-ips-table th,
+        .jp-user-ips-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--jp-border);
+            text-align: left;
+            vertical-align: middle;
+        }
+        .jp-user-ips-table tbody tr:hover {
+            background: var(--jp-btn-hover);
+        }
+        .jp-user-ips-table th {
+            color: var(--jp-text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.03em;
+        }
+        .jp-user-ips-table td:first-child {
+            color: var(--jp-text-muted);
+            white-space: nowrap;
+        }
+        .jp-user-ips-table code {
+            font-size: 10px;
+            word-break: break-all;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        .jp-user-ips-loading,
+        .jp-user-ips-empty {
+            font-size: 12px;
+            color: var(--jp-text-muted);
+            padding: 6px 0;
+        }
+        .jp-user-ips-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+        }
+        .jp-user-ips-open-all {
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 4px;
+            background: var(--jp-btn-bg);
+            color: #d84315;
+            cursor: pointer;
+        }
+        .jp-user-ips-open-all:hover {
+            background: rgba(216, 67, 21, 0.1);
+            border-color: #d84315;
+        }
+        .jp-user-ip-link {
+            text-decoration: none !important;
+            display: inline-block;
+        }
+        .jp-user-ip-link code {
+            display: inline-block;
+            padding: 3px 7px;
+            border-radius: 4px;
+            background: var(--jp-input-bg);
+            border: 1px solid var(--jp-border);
+            color: #d84315 !important;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .jp-user-ip-link:hover code {
+            background: rgba(216, 67, 21, 0.12);
+            border-color: #d84315;
+            text-decoration: none;
         }
 
         .jp-shipping-stack {
@@ -8492,8 +9192,11 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
         if (prevDealsNew && nowDealsNew) {
           notifyOfflineListPageChange();
+          resetExactTimestamps();
         } else {
           resetOfflineDealsFilter();
+          resetExactTimestamps();
+          resetUserAdminLinks();
         }
         let oldWarningBox = document.querySelector(".jp-price-warning-toast");
         if (oldWarningBox) oldWarningBox.remove();
@@ -8514,6 +9217,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       checkApproveMessageModal();
       checkQueuePriceIncreases();
       initOfflineDealsFilter(settings3);
+      initExactTimestamps(settings3);
+      initUserAdminLinks(settings3);
       let now = Date.now();
       if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
         highlightEditedCards();
