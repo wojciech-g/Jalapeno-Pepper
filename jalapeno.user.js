@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.8
+// @version      4.9.9
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -110,6 +110,101 @@
             /* =========================================
                2. WSPÓLNE STYLE KOMPONENTÓW JALAPENO
                ========================================= */
+
+            .jp-update-banner {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                max-width: min(420px, calc(100vw - 40px));
+                padding: 12px 14px;
+                border: 1px solid var(--jp-stat-del-bo);
+                border-left: 4px solid #e65100;
+                border-radius: 8px;
+                background: var(--jp-modal-bg);
+                color: var(--jp-text);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+                opacity: 0;
+                transform: translateY(-12px);
+                transition: opacity 0.25s ease, transform 0.25s ease;
+                pointer-events: auto;
+            }
+            .jp-update-banner--visible {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            .jp-update-banner-body {
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                flex: 1;
+                min-width: 0;
+            }
+            .jp-update-banner-icon {
+                font-size: 20px;
+                line-height: 1;
+                flex-shrink: 0;
+            }
+            .jp-update-banner-text {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+                min-width: 0;
+            }
+            .jp-update-banner-title {
+                font-size: 13px;
+                line-height: 1.35;
+                color: var(--jp-text);
+            }
+            .jp-update-banner-hint {
+                font-size: 11px;
+                line-height: 1.4;
+                color: var(--jp-text-muted);
+            }
+            .jp-update-banner-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+            .jp-update-banner-download {
+                display: inline-flex;
+                align-items: center;
+                padding: 6px 12px;
+                border-radius: 4px;
+                background: #e65100;
+                color: #fff !important;
+                font-size: 12px;
+                font-weight: 700;
+                text-decoration: none !important;
+                white-space: nowrap;
+                transition: background 0.15s ease;
+            }
+            .jp-update-banner-download:hover {
+                background: #bf360c;
+                color: #fff !important;
+            }
+            .jp-update-banner-dismiss {
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                border: 1px solid var(--jp-btn-border);
+                border-radius: 4px;
+                background: var(--jp-btn-bg);
+                color: var(--jp-text-muted);
+                font-size: 18px;
+                line-height: 1;
+                cursor: pointer;
+                transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+            }
+            .jp-update-banner-dismiss:hover {
+                background: var(--jp-btn-hover);
+                color: var(--jp-text);
+                border-color: var(--jp-link);
+            }
 
             .jp-shipping-alert { border: 2px dashed #ff5252 !important; box-shadow: 0 0 5px rgba(255, 82, 82, 0.3) !important; transition: all 0.3s ease; }
             .jp-shipping-alert::placeholder { color: #ff5252 !important; opacity: 0.8 !important; font-weight: 500 !important; }
@@ -1548,6 +1643,10 @@
       mLensAiOpenLens: "🔍 Lens otwarty — poczekaj na AI Overview i wróć tutaj",
       mLensAiNoImage: "Brak zdjęcia okazji — dodaj obrazek przed użyciem opisu AI",
       mToolbarLensAiTitle: "Otwórz Lens i wygeneruj opis produktu (AI Overview)",
+      mUpdateBannerTitle: "Dostępna wersja Jalapeño {v}",
+      mUpdateBannerHint: "Kliknij „Pobierz”, aby zaktualizować skrypt w Tampermonkey.",
+      mUpdateDownload: "Pobierz aktualizację",
+      mUpdateDismiss: "Zamknij",
       mUpdateAvailable: "Dostępna nowa wersja Jalapeño {v} — kliknij ikonę Tampermonkey → Jalapeño → Sprawdź aktualizacje",
       mClipboardUnavailable: "❌ Schowek nie obsługuje obrazów w tej przeglądarce",
       mCopiedBarcode: "📋 Barcode skopiowany jako PNG",
@@ -1835,6 +1934,10 @@
       mLensAiOpenLens: "🔍 Lens opened — wait for AI Overview and return here",
       mLensAiNoImage: "No deal image found — add an image before using AI description",
       mToolbarLensAiTitle: "Open Lens and generate product description (AI Overview)",
+      mUpdateBannerTitle: "Jalapeño {v} is available",
+      mUpdateBannerHint: "Click Download to update the script in Tampermonkey.",
+      mUpdateDownload: "Download update",
+      mUpdateDismiss: "Dismiss",
       mUpdateAvailable: "New Jalapeño version {v} available — open Tampermonkey → Jalapeño → Check for updates",
       mClipboardUnavailable: "❌ Clipboard image API not available in this browser",
       mCopiedBarcode: "📋 Barcode copied as PNG image",
@@ -3332,6 +3435,56 @@
     _lastProcessedOverview = "";
   }
 
+  // src/ui/updateBanner.js
+  var DISMISS_KEY = "jpUpdateDismissedVersion";
+  var BANNER_ID = "jp-update-banner";
+  var AUTO_DISMISS_MS = 15e3;
+  var _autoDismissTimer = null;
+  function isUpdateDismissed(version) {
+    return GM_getValue(DISMISS_KEY) === version;
+  }
+  function dismissUpdateNotice(version) {
+    GM_setValue(DISMISS_KEY, version);
+    removeUpdateBanner();
+  }
+  function removeUpdateBanner() {
+    if (_autoDismissTimer) {
+      clearTimeout(_autoDismissTimer);
+      _autoDismissTimer = null;
+    }
+    document.getElementById(BANNER_ID)?.remove();
+  }
+  function showUpdateBanner(version, downloadUrl) {
+    if (isUpdateDismissed(version)) return;
+    removeUpdateBanner();
+    const banner = document.createElement("div");
+    banner.id = BANNER_ID;
+    banner.className = "jp-update-banner";
+    banner.innerHTML = `
+        <div class="jp-update-banner-body">
+            <div class="jp-update-banner-icon" aria-hidden="true">🌶️</div>
+            <div class="jp-update-banner-text">
+                <strong class="jp-update-banner-title">${t("mUpdateBannerTitle").replace("{v}", version)}</strong>
+                <span class="jp-update-banner-hint">${t("mUpdateBannerHint")}</span>
+            </div>
+        </div>
+        <div class="jp-update-banner-actions">
+            <a class="jp-update-banner-download" href="${downloadUrl}" target="_blank" rel="noopener">
+                ${t("mUpdateDownload")}
+            </a>
+            <button type="button" class="jp-update-banner-dismiss" title="${t("mUpdateDismiss")}" aria-label="${t("mUpdateDismiss")}">×</button>
+        </div>
+    `;
+    banner.querySelector(".jp-update-banner-dismiss")?.addEventListener("click", () => {
+      dismissUpdateNotice(version);
+    });
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add("jp-update-banner--visible"));
+    _autoDismissTimer = setTimeout(() => {
+      removeUpdateBanner();
+    }, AUTO_DISMISS_MS);
+  }
+
   // src/features/updateCheck.js
   var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js";
   var LAST_CHECK_KEY = "jpLastUpdateCheck";
@@ -3345,21 +3498,29 @@
     return false;
   }
   function checkForScriptUpdate() {
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    if (GM_getValue(LAST_CHECK_KEY) === today) return;
-    GM_setValue(LAST_CHECK_KEY, today);
     const localVersion = typeof GM_info !== "undefined" && GM_info.script ? GM_info.script.version : null;
     if (!localVersion) return;
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const alreadyCheckedToday = GM_getValue(LAST_CHECK_KEY) === today;
+    if (alreadyCheckedToday) {
+      return;
+    }
     GM_xmlhttpRequest({
       method: "GET",
       url: UPDATE_CHECK_URL,
       timeout: 12e3,
       onload(res) {
+        GM_setValue(LAST_CHECK_KEY, today);
         const match = res.responseText.match(/@version\s+([\d.]+)/);
         if (!match) return;
         const remoteVersion = match[1];
         if (!isNewerVersion(remoteVersion, localVersion)) return;
-        showToast(t("mUpdateAvailable").replace("{v}", remoteVersion), true);
+        if (isUpdateDismissed(remoteVersion)) return;
+        showUpdateBanner(remoteVersion, UPDATE_CHECK_URL);
+      },
+      onerror() {
+      },
+      ontimeout() {
       }
     });
   }
