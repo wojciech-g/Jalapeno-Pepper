@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.9
+// @version      4.9.10
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -3529,7 +3529,7 @@
   var FETCH_TIMEOUT_MS = 12e3;
   var PEPPER_UPLOAD_URL = "https://www.pepper.pl/image/upload-from-image-uri-or-image-file/thread_medium";
   var UI_ASSET_PATTERN = /action-common|arrowhead/i;
-  var PRODUCT_IMAGE_PATTERN = /a\.allegroimg\.com\/s\d+\/[a-f0-9]+\/[a-f0-9]+/i;
+  var PRODUCT_IMAGE_PATTERN = /a\.allegroimg\.com\/(?:s\d+|original)\/[a-f0-9]+\/[a-f0-9]+/i;
   function isProductImageUrl(src) {
     return Boolean(src && !UI_ASSET_PATTERN.test(src) && PRODUCT_IMAGE_PATTERN.test(src));
   }
@@ -3537,7 +3537,7 @@
     return src.replace(/\/s\d+\//, "/original/");
   }
   function imageDedupeKey(src) {
-    const match = src.match(/a\.allegroimg\.com\/s\d+\/([^/]+\/[^/]+)/i);
+    const match = src.match(/a\.allegroimg\.com\/(?:s\d+|original)\/([^/]+\/[^/]+)/i);
     return match ? match[1] : null;
   }
   function extractAllegroGalleryImages(gallery) {
@@ -3558,19 +3558,85 @@
     }
     return images;
   }
+  function collectAllegroImageUrl(src, byKey) {
+    if (!src || !isProductImageUrl(src)) return;
+    const key = imageDedupeKey(src);
+    if (!key || byKey.has(key)) return;
+    byKey.set(key, toAllegroOriginalUrl(src));
+  }
+  function parseAllegroOfferUrl(url) {
+    try {
+      const parsed = new URL(String(url).trim());
+      if (!/(^|\.)allegro\.pl$/i.test(parsed.hostname)) return null;
+      if (/\/oferta\//i.test(parsed.pathname)) {
+        return parsed;
+      }
+      if (/\/produkt\//i.test(parsed.pathname)) {
+        const offerId = parsed.searchParams.get("offerId") || parsed.searchParams.get("offerid");
+        const clean = new URL(`${parsed.origin}${parsed.pathname}`);
+        if (offerId) clean.searchParams.set("offerId", offerId);
+        return clean;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function isAllegroOfferUrl(url) {
+    return parseAllegroOfferUrl(url) !== null;
+  }
+  function getAllegroFetchCandidates(url) {
+    const parsed = parseAllegroOfferUrl(url);
+    if (!parsed) return [];
+    const candidates = [parsed.toString()];
+    const offerId = parsed.searchParams.get("offerId") || parsed.searchParams.get("offerid");
+    if (offerId) {
+      candidates.push(`https://allegro.pl/oferta/${offerId}`);
+    }
+    return [...new Set(candidates)];
+  }
   function extractAllegroGalleryFromHtml(html) {
+    const byKey = /* @__PURE__ */ new Map();
     const doc = new DOMParser().parseFromString(html, "text/html");
     const gallery = doc.querySelector('[data-box-name="showoffer.gallery"]');
-    if (gallery) return extractAllegroGalleryImages(gallery);
-    const fallback = /* @__PURE__ */ new Map();
+    if (gallery) {
+      extractAllegroGalleryImages(gallery).forEach((url) => {
+        const key = imageDedupeKey(url) || url;
+        byKey.set(key, url);
+      });
+    }
     doc.querySelectorAll('img[src*="a.allegroimg.com"]').forEach((img) => {
-      const src = img.getAttribute("src");
-      if (!isProductImageUrl(src)) return;
-      const key = imageDedupeKey(src);
-      if (!key || fallback.has(key)) return;
-      fallback.set(key, toAllegroOriginalUrl(src));
+      collectAllegroImageUrl(img.getAttribute("src"), byKey);
     });
-    return [...fallback.values()];
+    doc.querySelectorAll('meta[property="og:image"], meta[name="og:image"]').forEach((meta) => {
+      collectAllegroImageUrl(meta.getAttribute("content"), byKey);
+    });
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach((script) => {
+      try {
+        const walk = (obj) => {
+          if (!obj) return;
+          if (typeof obj === "string") {
+            if (obj.includes("a.allegroimg.com")) collectAllegroImageUrl(obj, byKey);
+            return;
+          }
+          if (Array.isArray(obj)) {
+            obj.forEach(walk);
+            return;
+          }
+          if (typeof obj === "object") {
+            if (typeof obj.url === "string") collectAllegroImageUrl(obj.url, byKey);
+            Object.values(obj).forEach(walk);
+          }
+        };
+        walk(JSON.parse(script.textContent));
+      } catch (_) {
+      }
+    });
+    const regex = /https:\/\/a\.allegroimg\.com\/(?:s\d+|original)\/[a-f0-9]+\/[a-f0-9]+[^"'\\s<>]*/gi;
+    for (const match of html.matchAll(regex)) {
+      collectAllegroImageUrl(match[0], byKey);
+    }
+    return [...byKey.values()];
   }
   function getXsrfToken() {
     const match = document.cookie.match(/xsrf_t=([^;]+)/);
@@ -3618,14 +3684,6 @@
     if (canonical) return canonical;
     const main = document.querySelector('textarea[name="mainUrl"]')?.value?.trim();
     return main || null;
-  }
-  function isAllegroOfferUrl(url) {
-    try {
-      const parsed = new URL(url);
-      return /(^|\.)allegro\.pl$/i.test(parsed.hostname) && /\/oferta\//i.test(parsed.pathname);
-    } catch (_) {
-      return /allegro\.pl\/oferta\//i.test(url);
-    }
   }
   function extractUploadedImageUrl(data) {
     if (!data) return null;
@@ -3717,19 +3775,26 @@
       showToast(t("mAllegroImgNoUrl"), "error");
       return;
     }
-    try {
-      const html = await gmFetchHtml(offerUrl);
-      const images = extractAllegroGalleryFromHtml(html);
-      if (!images.length) {
-        showToast(t("mAllegroImgNone"), "error");
+    const candidates = getAllegroFetchCandidates(offerUrl);
+    let lastError = null;
+    for (const fetchUrl of candidates) {
+      try {
+        const html = await gmFetchHtml(fetchUrl);
+        const images = extractAllegroGalleryFromHtml(html);
+        if (!images.length) continue;
+        await uploadImageFromUri(images[0]);
+        increment("allegroImagePulls");
+        showToast(t("mAllegroImgUploaded"));
         return;
+      } catch (err) {
+        lastError = err;
+        console.warn("[JP AllegroImages] Pull failed for", fetchUrl, err);
       }
-      await uploadImageFromUri(images[0]);
-      increment("allegroImagePulls");
-      showToast(t("mAllegroImgUploaded"));
-    } catch (err) {
-      console.warn("[JP AllegroImages] Pull failed:", err);
-      showToast(t("mAllegroImgUploadFailed") + (err.message || ""), "error");
+    }
+    if (lastError) {
+      showToast(t("mAllegroImgUploadFailed") + (lastError.message || ""), "error");
+    } else {
+      showToast(t("mAllegroImgNone"), "error");
     }
   }
   function initPepperAllegroButton() {
