@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.6
+// @version      4.9.8
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1326,6 +1326,7 @@
       mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published jako 23.06.2026 18:31:51 na new / on-hold / reported.",
       mUserAdminLinks: "Metabase + All IPs użytkownika",
       mUserAdminLinksHint: "Przy edycji wątku i w inspektorze usera — Metabase (Track UUID, co dodaje, głosy) oraz panel IP.",
+      mJalapenoTools: "Jalapeño",
       mMetabaseUuid: "Track UUID",
       mMetabaseWhatAdds: "Co dodaje",
       mMetabaseColdVotes: "Na kogo głosuje",
@@ -1341,6 +1342,8 @@
       mIpsWhen: "Data",
       mIpsOpenAll: "Otwórz wszystkie IP",
       mOfflinePanelTitle: "Okazje offline — do weryfikacji",
+      mOfflinePanelHome: "Kolejka okazji",
+      mOfflinePanelDesc: "Okazje z niedziałającym linkiem — skan wszystkich stron paginacji.",
       mOfflinePanelRescan: "Odśwież skan",
       mOfflinePanelScanning: "Skanuję wszystkie strony…",
       mOfflinePanelPage: "str.",
@@ -1610,6 +1613,7 @@
       mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published as 23.06.2026 18:31:51 on new / on-hold / reported.",
       mUserAdminLinks: "Metabase + user All IPs",
       mUserAdminLinksHint: "On thread edit and inspector profile — Metabase (Track UUID, posts, votes) and IP panel.",
+      mJalapenoTools: "Jalapeño",
       mMetabaseUuid: "Track UUID",
       mMetabaseWhatAdds: "What they post",
       mMetabaseColdVotes: "Who they vote on",
@@ -1625,6 +1629,8 @@
       mIpsWhen: "Date",
       mIpsOpenAll: "Open all IPs",
       mOfflinePanelTitle: "Offline deals — needs review",
+      mOfflinePanelHome: "Deal queue",
+      mOfflinePanelDesc: "Deals with broken links — scan across all pagination pages.",
       mOfflinePanelRescan: "Rescan",
       mOfflinePanelScanning: "Scanning all pages…",
       mOfflinePanelPage: "p.",
@@ -4529,6 +4535,8 @@
   }
 
   // src/features/offlineDealsFilter.js
+  var OFFLINE_QP = "jp-offline";
+  var OFFLINE_HISTORY_STATE = { jpOfflinePanel: true };
   var CACHE_KEY = "jpOfflineDealsCacheV3";
   var CACHE_TTL_MS = 3 * 60 * 1e3;
   var AUTO_REFRESH_MS = 90 * 1e3;
@@ -4551,6 +4559,33 @@
   var _iconWatchObserver = null;
   var _followupTimers = [];
   var _iconWatchDebounce = null;
+  var _historyHooked = false;
+  function isOfflineUrl() {
+    return new URLSearchParams(window.location.search).get(OFFLINE_QP) === "1";
+  }
+  function queueUrlWithOffline() {
+    const params = new URLSearchParams(window.location.search);
+    params.set(OFFLINE_QP, "1");
+    return `${getQueuePath()}?${params.toString()}`;
+  }
+  function queueUrlWithoutOffline() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete(OFFLINE_QP);
+    const q = params.toString();
+    return `${getQueuePath()}${q ? `?${q}` : ""}`;
+  }
+  function ensureOfflineHistoryHook() {
+    if (_historyHooked) return;
+    _historyHooked = true;
+    window.addEventListener("popstate", () => {
+      if (!isDealsQueuePage()) return;
+      if (isOfflineUrl() && !_panelOpen) {
+        setPanelOpen(true, { skipHistory: true });
+      } else if (!isOfflineUrl() && _panelOpen) {
+        setPanelOpen(false, { skipHistory: true });
+      }
+    });
+  }
   function isDealsQueuePage() {
     return /\/admin-v2\/moderation\/deals\/new/.test(window.location.pathname);
   }
@@ -4923,7 +4958,6 @@
     document.getElementById("jp-offline-deals-panel")?.classList.remove("jp-offline-deals-panel--visible");
   }
   function navigateToThread(threadUrl) {
-    setPanelOpen(false);
     const url = threadUrl.startsWith("http") ? threadUrl : `https://www.pepper.pl${threadUrl}`;
     window.location.assign(url);
   }
@@ -4966,13 +5000,26 @@
             `;
     }).join("") : `<div class="jp-offline-filter-empty">${t("mOfflineFilterEmpty")}</div>`;
     panel.innerHTML = `
-        <div class="jp-offline-deals-toolbar">
-            <strong>${t("mOfflinePanelTitle")}</strong>
-            <span class="jp-offline-deals-status">${statusText || panelCountLabel(deals.length)}</span>
-            <button type="button" class="jp-offline-rescan-btn">${t("mOfflinePanelRescan")}</button>
-        </div>
+        <header class="jp-offline-deals-header">
+            <a href="${queueUrlWithoutOffline()}" class="jp-offline-deals-home">
+                <i class="material-icons">arrow_back</i>
+                <span>${t("mOfflinePanelHome")}</span>
+            </a>
+            <div class="jp-offline-deals-heading">
+                <h2 class="jp-offline-deals-title">${t("mOfflinePanelTitle")}</h2>
+                <p class="jp-offline-deals-desc">${t("mOfflinePanelDesc")}</p>
+            </div>
+            <div class="jp-offline-deals-actions">
+                <span class="jp-offline-deals-status">${statusText || panelCountLabel(deals.length)}</span>
+                <button type="button" class="jp-offline-rescan-btn">${t("mOfflinePanelRescan")}</button>
+            </div>
+        </header>
         <div class="jp-offline-deals-list">${rows}</div>
     `;
+    panel.querySelector(".jp-offline-deals-home")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      setPanelOpen(false);
+    });
     panel.querySelector(".jp-offline-rescan-btn")?.addEventListener("click", (e) => {
       e.preventDefault();
       startScan(true);
@@ -4996,7 +5043,8 @@
   function escapeHtml2(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
-  function setPanelOpen(open) {
+  function setPanelOpen(open, opts = {}) {
+    const { skipHistory = false } = opts;
     _panelOpen = open;
     const tab = document.querySelector(".jp-offline-filter-tab");
     tab?.classList.toggle("v-tabs__item--active", open);
@@ -5012,6 +5060,9 @@
       renderPanel(cached?.items || [], cached ? "" : t("mOfflinePanelScanning"));
       if (cached) updateTabBadge(cached.items.length);
       showPanel();
+      if (!skipHistory && !isOfflineUrl()) {
+        history.pushState(OFFLINE_HISTORY_STATE, "", queueUrlWithOffline());
+      }
     } else {
       setNativeListVisible(true);
       setOfflineViewActive(false);
@@ -5020,6 +5071,13 @@
         if (!el.classList.contains("jp-offline-filter-tab")) return;
         el.classList.remove("v-tabs__item--active");
       });
+      if (!skipHistory) {
+        if (history.state?.jpOfflinePanel) {
+          history.back();
+        } else if (isOfflineUrl()) {
+          history.replaceState(null, "", queueUrlWithoutOffline());
+        }
+      }
     }
   }
   function startScan(forceOrOptions = false) {
@@ -5121,13 +5179,13 @@
   }
   function cleanupOfflineFilter() {
     _scanGeneration++;
-    _panelOpen = false;
     _initialScanScheduled = false;
     stopOfflineIconWatch();
     removeIframe();
     _scanPromise = null;
     document.getElementById("jp-offline-deals-panel")?.remove();
     document.querySelector(".jp-offline-filter-tab")?.closest(".v-tabs__div")?.remove();
+    _panelOpen = false;
     setOfflineViewActive(false);
     setNativeListVisible(true);
     getDealRowsFromDoc(document).forEach((row) => row.classList.remove("jp-offline-deal-row"));
@@ -5139,6 +5197,7 @@
       return;
     }
     if (!isDealsQueuePage()) return;
+    ensureOfflineHistoryHook();
     ensureOfflineTab();
     highlightCurrentPageOffline();
     updateBadgeFromDomHint();
@@ -5149,6 +5208,9 @@
       scheduleInitialScan();
       scheduleOfflineScanRetries();
       watchForOfflineIcons();
+    }
+    if (isOfflineUrl() && !_panelOpen) {
+      setPanelOpen(true, { skipHistory: true });
     }
     maybeAutoRefresh();
   }
@@ -5405,20 +5467,11 @@
     const m = window.location.pathname.match(/\/admin-v2\/moderation\/thread\/(\d+)/);
     return m ? m[1] : null;
   }
-  function appendInspectorLink(container, href, label, markerClass) {
-    const a = document.createElement("a");
-    a.className = `btn btn-mini btn-light jp-user-metabase-link ${markerClass}`;
-    a.href = href;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = label;
-    container.appendChild(a);
-  }
   function buildLinksBar(userId, threadId = null, opts = {}) {
-    const { showUuid = false, showTempChart = false } = opts;
+    const { showUuid = false, showTempChart = false, variant = "thread" } = opts;
     const bar = document.createElement("div");
-    bar.id = "jp-user-admin-links";
-    bar.className = "jp-user-admin-links jp-user-admin-links--v2";
+    bar.id = variant === "inspector" ? "jp-user-admin-inspector-links" : "jp-user-admin-links";
+    bar.className = variant === "inspector" ? "jp-user-admin-links jp-user-admin-links--inspector" : "jp-user-admin-links jp-user-admin-links--v2";
     const parts = [];
     if (showUuid) {
       parts.push(`
@@ -5529,31 +5582,30 @@
       panel.innerHTML = `<div class="jp-user-ips-empty">${t("mIpsLoadFailed")}</div>`;
     }
   }
-  function cleanupInspectorInjections() {
-    document.querySelector(".jp-user-admin-links--v2")?.remove();
-    document.querySelector(".jp-user-admin-links:not(.peps-admin-profile-links)")?.remove();
+  function buildInspectorPanel(userId) {
+    const panel = document.createElement("div");
+    panel.id = "jp-user-admin-inspector-panel";
+    panel.className = "jp-user-admin-inspector-panel";
+    const head = document.createElement("div");
+    head.className = "jp-user-admin-inspector-head";
+    head.textContent = t("mJalapenoTools");
+    const bar = buildLinksBar(userId, null, { showUuid: false, showTempChart: false, variant: "inspector" });
+    panel.appendChild(head);
+    panel.appendChild(bar);
+    return panel;
   }
   function injectInspectorLinks(userId) {
-    cleanupInspectorInjections();
-    if (document.querySelector(".jp-user-metabase-top")) return;
-    const anchor = document.querySelector(".peps-admin-profile-links");
-    if (anchor) {
-      appendInspectorLink(anchor, buildMetabaseTopThreadsUrl(userId), t("mMetabaseWhatAdds"), "jp-user-metabase-top");
-      appendInspectorLink(anchor, buildMetabaseColdVotesUrl(userId), t("mMetabaseColdVotes"), "jp-user-metabase-votes");
-      if (!document.querySelector(".jp-user-admin-ips-jalapeno")) {
-        const ipsBtn = document.createElement("button");
-        ipsBtn.type = "button";
-        ipsBtn.className = "id-copy-button btn btn-mini btn-info jp-user-admin-ips jp-user-admin-ips-jalapeno";
-        ipsBtn.innerHTML = `<i class="icon-globe"></i> ${t("mAllIps")}`;
-        ipsBtn.addEventListener("click", () => toggleIpsPanel(userId, anchor));
-        anchor.appendChild(ipsBtn);
-      }
+    if (document.getElementById("jp-user-admin-inspector-panel")) return;
+    const nativeLinks = document.querySelector(".peps-admin-profile-links");
+    const cardBody = document.querySelector(".card-body");
+    const panel = buildInspectorPanel(userId);
+    if (nativeLinks) {
+      nativeLinks.insertAdjacentElement("afterend", panel);
       return;
     }
-    const cardBody = document.querySelector(".card-body");
-    if (!cardBody) return;
-    const bar = buildLinksBar(userId, null, { showUuid: false, showTempChart: false });
-    cardBody.insertBefore(bar, cardBody.firstChild);
+    if (cardBody) {
+      cardBody.appendChild(panel);
+    }
   }
   function injectThreadLinks(userId) {
     if (document.getElementById("jp-user-admin-links")) return;
@@ -5576,10 +5628,8 @@
     }
   }
   function resetUserAdminLinks() {
-    document.querySelectorAll(
-      ".jp-user-admin-ips-jalapeno, .jp-user-metabase-link, .jp-user-metabase-top, .jp-user-metabase-votes, .jp-user-metabase-temp, .jp-user-metabase-uuid"
-    ).forEach((el) => el.remove());
-    document.querySelector(".jp-user-admin-links--v2")?.remove();
+    document.getElementById("jp-user-admin-inspector-panel")?.remove();
+    document.getElementById("jp-user-admin-links")?.remove();
     document.querySelectorAll(".jp-user-ips-panel").forEach((p) => p.remove());
     _userCache.clear();
   }
@@ -6227,7 +6277,7 @@
         .jp-offline-deals-panel {
             display: none;
             margin: 0;
-            padding: 12px 16px 20px;
+            padding: 0 16px 24px;
             background: transparent;
             border: none;
             border-radius: 0;
@@ -6235,27 +6285,72 @@
             font-family: inherit;
         }
         .jp-offline-deals-panel--visible { display: block; }
-        .jp-offline-deals-toolbar {
+        .jp-offline-deals-header {
             display: flex;
             flex-wrap: wrap;
-            align-items: center;
-            gap: 8px 14px;
-            margin-bottom: 14px;
-            padding: 10px 14px;
+            align-items: flex-start;
+            gap: 12px 20px;
+            margin-bottom: 16px;
+            padding: 14px 16px;
             background: var(--jp-btn-bg);
             border: 1px solid var(--jp-border);
             border-left: 4px solid var(--jp-stat-del-co);
-            border-radius: 6px;
+            border-radius: 8px;
         }
-        .jp-offline-deals-toolbar strong {
-            font-size: 14px;
+        .jp-offline-deals-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--jp-link);
+            text-decoration: none !important;
+            border: 1px solid var(--jp-border);
+            border-radius: 20px;
+            background: var(--jp-bg);
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .jp-offline-deals-home .material-icons {
+            font-size: 16px;
+            line-height: 1;
+        }
+        .jp-offline-deals-home:hover {
+            background: var(--jp-btn-hover);
+            border-color: var(--jp-link);
+            color: var(--jp-link);
+        }
+        .jp-offline-deals-heading {
+            flex: 1;
+            min-width: 180px;
+        }
+        .jp-offline-deals-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.3;
             color: var(--jp-text);
         }
-        .jp-offline-deals-status { color: var(--jp-text-muted); font-size: 12px; }
-        .jp-offline-rescan-btn {
-            margin-left: auto;
-            padding: 5px 12px;
+        .jp-offline-deals-desc {
+            margin: 4px 0 0;
             font-size: 12px;
+            line-height: 1.45;
+            color: var(--jp-text-muted);
+        }
+        .jp-offline-deals-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            margin-left: auto;
+        }
+        .jp-offline-deals-status { color: var(--jp-text-muted); font-size: 12px; white-space: nowrap; }
+        .jp-offline-rescan-btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
             border: 1px solid var(--jp-btn-border);
             border-radius: 4px;
             background: var(--jp-btn-bg);
@@ -6368,6 +6463,30 @@
             background: var(--jp-btn-bg);
             border: 1px solid var(--jp-border);
             border-radius: 6px;
+        }
+        .jp-user-admin-inspector-panel {
+            margin: 12px 0 0;
+            padding: 10px 12px;
+            border: 1px solid var(--jp-border, rgba(0, 0, 0, 0.12));
+            border-left: 3px solid #e65100;
+            border-radius: 4px;
+            background: var(--jp-btn-bg, rgba(0, 0, 0, 0.03));
+            clear: both;
+        }
+        .jp-user-admin-inspector-head {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--jp-text-muted, #888);
+            margin-bottom: 8px;
+            letter-spacing: 0.04em;
+        }
+        .jp-user-admin-links--inspector {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            border: none;
+            border-radius: 0;
         }
         .jp-user-admin-btn {
             display: inline-flex;
