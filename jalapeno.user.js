@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.12
+// @version      4.9.13
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1585,7 +1585,7 @@
       mCopyBarcode: "📋 Kopiuj barcode",
       mInspectorTitle: "🔎 Inspektor (EAN / ASIN)",
       mInsertOpenFirst: 'Najpierw otwórz "Edytuj opis", a następnie kliknij 🖼 Wstaw do opisu',
-      mInsertSuccess: '✅ Barcode wstawiony — dokonaj dowolnej zmiany i kliknij "Zapisz edycję"',
+      mInsertSuccess: '✅ Barcode wstawiony — dokonaj dowolnej zmiany i kliknij "Zapisz opis"',
       mInsertFailed: "❌ Wstawianie nieudane: ",
       mToolbarBarcodeTitle: "Wstaw barcode EAN do opisu",
       mLinkExpander: "Rozwijanie skróconych linków w opisie",
@@ -1593,7 +1593,7 @@
       mExpandLinksOpenFirst: 'Najpierw otwórz "Edytuj opis", a następnie kliknij przycisk URL',
       mExpandLinksNone: "Nie znaleziono skróconych linków w opisie",
       mExpandLinksExpandFailed: "Znaleziono {n} skróconych linków, ale nie udało się ich rozwinąć",
-      mExpandLinksSuccess: 'Rozwinięto {n} link(ów) — dokonaj dowolnej zmiany i kliknij "Zapisz edycję"',
+      mExpandLinksSuccess: 'Rozwinięto {n} link(ów) — dokonaj dowolnej zmiany i kliknij "Zapisz opis"',
       mExpandLinksFailed: "Nie udało się rozwinąć linków: ",
       mLensBtn: "🔍 Wyszukaj z Google Lens",
       mLensTitle: "Otwórz bieżący obraz w Google Lens",
@@ -1876,7 +1876,7 @@
       mCopyBarcode: "📋 Copy Barcode",
       mInspectorTitle: "🔎 Inspector (EAN / ASIN)",
       mInsertOpenFirst: 'Open "Edit description" first, then click 🖼 Insert to description',
-      mInsertSuccess: '✅ Barcode inserted — make any change, then click "Zapisz edycję"',
+      mInsertSuccess: '✅ Barcode inserted — make any change, then click "Zapisz opis"',
       mInsertFailed: "❌ Insert failed: ",
       mToolbarBarcodeTitle: "Insert EAN barcode into description",
       mLinkExpander: "Expand shortened links in description",
@@ -1884,7 +1884,7 @@
       mExpandLinksOpenFirst: 'Open "Edit description" first, then click the URL button',
       mExpandLinksNone: "No shortened links found in the description",
       mExpandLinksExpandFailed: "Found {n} shortened link(s), but could not expand them",
-      mExpandLinksSuccess: 'Expanded {n} link(s) — make any change, then click "Zapisz edycję"',
+      mExpandLinksSuccess: 'Expanded {n} link(s) — make any change, then click "Zapisz opis"',
       mExpandLinksFailed: "Could not expand links: ",
       mCategoryAdvisor: "Category advisor",
       mCatAdvisorTitle: "🤖 Category Advisor",
@@ -2030,29 +2030,76 @@
       }
     });
   }
-  var SAVE_EDIT_LABEL = "Zapisz edycję";
-  var ADD_DEAL_RE = /^dodaj\s+okazj/i;
+  var SAVE_DESCRIPTION_LABEL = "Zapisz opis";
+  var _observedRoots = /* @__PURE__ */ new WeakSet();
+  var _saveBtnWatchStarted = false;
+  function normalizeLabel(text) {
+    return String(text || "").trim().normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  }
   function isThreadEditPage() {
     return /\/admin-v2\/moderation\/thread\/\d+/.test(window.location.pathname);
   }
   function shouldReplaceSaveLabel(text) {
-    const trimmed = text.trim();
-    return ADD_DEAL_RE.test(trimmed) || trimmed === "Add deal";
+    const normalized = normalizeLabel(text);
+    return normalized === "dodaj okazje" || normalized.startsWith("dodaj okazj") || normalized === "add deal";
   }
   function replaceSaveLabel(el) {
     const text = (el.innerText || el.textContent || "").trim();
     if (!shouldReplaceSaveLabel(text)) return;
+    if (text === SAVE_DESCRIPTION_LABEL) return;
     if (el.childNodes.length === 1 && el.firstChild?.nodeType === Node.TEXT_NODE) {
-      el.firstChild.textContent = SAVE_EDIT_LABEL;
+      el.firstChild.textContent = SAVE_DESCRIPTION_LABEL;
     } else {
-      el.innerText = SAVE_EDIT_LABEL;
+      el.textContent = SAVE_DESCRIPTION_LABEL;
     }
+    el.dataset.jpSaveLabelFixed = "1";
+  }
+  function updateSaveButtonTextInRoot(root) {
+    if (!root) return;
+    root.querySelectorAll("span.flex--inline.boxAlign-ai--all-c").forEach(replaceSaveLabel);
+    root.querySelectorAll(".v-btn__content, button.button--type-primary").forEach((el) => {
+      if (el.matches("span.flex--inline.boxAlign-ai--all-c")) return;
+      replaceSaveLabel(el);
+    });
+  }
+  function getDescriptionIframeDoc() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return null;
+    try {
+      return iframe.contentDocument;
+    } catch (_) {
+      return null;
+    }
+  }
+  function ensureSaveButtonWatch() {
+    if (_saveBtnWatchStarted) return;
+    _saveBtnWatchStarted = true;
+    const rerun = () => {
+      if (!isThreadEditPage()) return;
+      updateSaveButtonTextInRoot(document);
+      updateSaveButtonTextInRoot(getDescriptionIframeDoc());
+    };
+    const observeRoot = (root) => {
+      if (!root?.body || _observedRoots.has(root)) return;
+      _observedRoots.add(root);
+      new MutationObserver(rerun).observe(root.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    };
+    observeRoot(document);
+    rerun();
+    new MutationObserver(() => {
+      observeRoot(getDescriptionIframeDoc());
+      rerun();
+    }).observe(document.body, { childList: true, subtree: true });
   }
   function updateSaveButtonText() {
     if (!isThreadEditPage()) return;
-    document.querySelectorAll(
-      "span.flex--inline.boxAlign-ai--all-c, .v-btn__content, button.button--type-primary span"
-    ).forEach(replaceSaveLabel);
+    ensureSaveButtonWatch();
+    updateSaveButtonTextInRoot(document);
+    updateSaveButtonTextInRoot(getDescriptionIframeDoc());
   }
 
   // src/features/analytics.js
