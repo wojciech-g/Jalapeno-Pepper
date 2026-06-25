@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.10
+// @version      4.9.12
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1418,7 +1418,7 @@
       mOfflineFilterTabActive: "Tylko offline",
       mOfflineFilterEmpty: "Brak okazji offline w całej kolejce.",
       mExactTimestamps: "Dokładne timestampy na liście",
-      mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published jako 23.06.2026 18:31:51 na new / on-hold / reported.",
+      mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published/Expires/Expired jako 23.06.2026 18:31:51 na new / on-hold / reported / expired.",
       mUserAdminLinks: "Metabase + All IPs użytkownika",
       mUserAdminLinksHint: "Przy edycji wątku i w inspektorze usera — Metabase (Track UUID, co dodaje, głosy) oraz panel IP.",
       mJalapenoTools: "Jalapeño",
@@ -1709,7 +1709,7 @@
       mOfflineFilterTabActive: "Offline only",
       mOfflineFilterEmpty: "No offline deals in the queue.",
       mExactTimestamps: "Exact timestamps on queue list",
-      mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published as 23.06.2026 18:31:51 on new / on-hold / reported.",
+      mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published/Expires/Expired as 23.06.2026 18:31:51 on new / on-hold / reported / expired.",
       mUserAdminLinks: "Metabase + user All IPs",
       mUserAdminLinksHint: "On thread edit and inspector profile — Metabase (Track UUID, posts, votes) and IP panel.",
       mJalapenoTools: "Jalapeño",
@@ -2030,12 +2030,29 @@
       }
     });
   }
+  var SAVE_EDIT_LABEL = "Zapisz edycję";
+  var ADD_DEAL_RE = /^dodaj\s+okazj/i;
+  function isThreadEditPage() {
+    return /\/admin-v2\/moderation\/thread\/\d+/.test(window.location.pathname);
+  }
+  function shouldReplaceSaveLabel(text) {
+    const trimmed = text.trim();
+    return ADD_DEAL_RE.test(trimmed) || trimmed === "Add deal";
+  }
+  function replaceSaveLabel(el) {
+    const text = (el.innerText || el.textContent || "").trim();
+    if (!shouldReplaceSaveLabel(text)) return;
+    if (el.childNodes.length === 1 && el.firstChild?.nodeType === Node.TEXT_NODE) {
+      el.firstChild.textContent = SAVE_EDIT_LABEL;
+    } else {
+      el.innerText = SAVE_EDIT_LABEL;
+    }
+  }
   function updateSaveButtonText() {
-    document.querySelectorAll("span.flex--inline.boxAlign-ai--all-c").forEach((span) => {
-      if (span.innerText.trim() === "Dodaj Okazję") {
-        span.innerText = "Zapisz edycję";
-      }
-    });
+    if (!isThreadEditPage()) return;
+    document.querySelectorAll(
+      "span.flex--inline.boxAlign-ai--all-c, .v-btn__content, button.button--type-primary span"
+    ).forEach(replaceSaveLabel);
   }
 
   // src/features/analytics.js
@@ -2278,8 +2295,51 @@
     ];
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" style="background:#fff;border-radius:2px;display:block;">` + rects + texts.join("") + `</svg>`;
   }
+  function getDescriptionEditorContext() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return null;
+    try {
+      const iframeDoc = iframe.contentDocument;
+      const editor = iframeDoc?.querySelector(".redactor-editor, .tiptap, .ProseMirror");
+      if (!iframeDoc || !editor) return null;
+      return { iframeDoc, iframeWin: iframe.contentWindow, editor };
+    } catch (_) {
+      return null;
+    }
+  }
+  function getRedactorHtml(iframeWin, editor) {
+    let html = editor.innerHTML;
+    let textareaValue = "";
+    const $ = iframeWin.$;
+    if ($) {
+      const $textarea = $('textarea[name="description"], textarea').first();
+      if ($textarea.length) {
+        textareaValue = $textarea[0]?.value || "";
+        const r = $textarea.data("redactor");
+        if (r) {
+          html = r.$editor ? r.$editor.html() : r.get ? r.get() : editor.innerHTML;
+        }
+      }
+    }
+    const editorPlain = (html || "").replace(/<[^>]+>/g, "").trim();
+    if (!editorPlain && textareaValue.trim()) return textareaValue;
+    if (!html.trim() && textareaValue.trim()) return textareaValue;
+    return html;
+  }
   function getDescriptionText() {
     const parts = [];
+    const ctx = getDescriptionEditorContext();
+    if (ctx) {
+      const html = getRedactorHtml(ctx.iframeWin, ctx.editor);
+      let textareaValue = "";
+      const $ = ctx.iframeWin.$;
+      if ($) {
+        const $textarea = $('textarea[name="description"], textarea').first();
+        textareaValue = $textarea[0]?.value || "";
+      }
+      parts.push(html, textareaValue, ctx.editor.textContent || "");
+      if (html) parts.push(html.replace(/<[^>]+>/g, " "));
+    }
     const textareaSelectors = [
       'textarea[placeholder="Description"]',
       'textarea[aria-label="Description"]',
@@ -2289,7 +2349,7 @@
       const el = document.querySelector(sel);
       if (el && el.value) parts.push(el.value);
     }
-    const richEditor = document.querySelector('.tiptap, .ProseMirror, .redactor-editor, [contenteditable="true"]');
+    const richEditor = document.querySelector(".tiptap, .ProseMirror, .redactor-editor");
     if (richEditor) parts.push(richEditor.textContent);
     const rendered = document.querySelector(
       '.cept-thread-description-container, [class*="thread-description"], [class*="description-container"]'
@@ -2304,7 +2364,7 @@
     const desc = getDescriptionText();
     const corpus = [title, mainUrl, canonUrl, desc].join(" ");
     const result = { ean: null, asin: null };
-    const ean13Candidates = corpus.match(/\b\d{13}\b/g);
+    const ean13Candidates = corpus.match(/(?<!\d)\d{13}(?!\d)/g);
     if (ean13Candidates) {
       result.ean = ean13Candidates.find(validateEAN13) || null;
     }
@@ -2662,7 +2722,26 @@
       const el = document.querySelector(sel);
       if (el) el.addEventListener("input", debouncedRefresh);
     });
+    watchDescriptionChanges(debouncedRefresh);
     watchForDescriptionToolbar();
+  }
+  function watchDescriptionChanges(debouncedRefresh) {
+    const attached = /* @__PURE__ */ new WeakSet();
+    function attach(ctx) {
+      if (!ctx || attached.has(ctx.editor)) return;
+      attached.add(ctx.editor);
+      ctx.editor.addEventListener("input", debouncedRefresh);
+      new MutationObserver(debouncedRefresh).observe(ctx.editor, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    }
+    function tryAttach() {
+      attach(getDescriptionEditorContext());
+    }
+    tryAttach();
+    new MutationObserver(tryAttach).observe(document.body, { childList: true, subtree: true });
   }
 
   // src/features/linkExpander.js
@@ -2854,7 +2933,7 @@
       return null;
     }
   }
-  function getRedactorHtml(iframeWin, editor) {
+  function getRedactorHtml2(iframeWin, editor) {
     let html = editor.innerHTML;
     let textareaValue = "";
     const $ = iframeWin.$;
@@ -2874,7 +2953,7 @@
     return html;
   }
   function getEditorContent(iframeWin, editor) {
-    const html = getRedactorHtml(iframeWin, editor);
+    const html = getRedactorHtml2(iframeWin, editor);
     let textareaValue = "";
     const $ = iframeWin.$;
     if ($) {
@@ -3272,7 +3351,7 @@
       return null;
     }
   }
-  function getRedactorHtml2(iframeWin, editor) {
+  function getRedactorHtml3(iframeWin, editor) {
     const $ = iframeWin.$;
     if ($) {
       const $textarea = $('textarea[name="description"], textarea').first();
@@ -3321,7 +3400,7 @@
     const ctx = getDescriptionEditor2();
     if (!ctx) return false;
     const htmlBlock = text.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
-    const current = getRedactorHtml2(ctx.iframeWin, ctx.editor);
+    const current = getRedactorHtml3(ctx.iframeWin, ctx.editor);
     const separator = current.trim() ? "<p><br></p>" : "";
     setRedactorHtml2(ctx.iframeWin, ctx.editor, current + separator + htmlBlock);
     return true;
@@ -5569,7 +5648,7 @@
   }
 
   // src/features/exactTimestamps.js
-  var LIST_PATH_RE = /\/admin-v2\/moderation\/deals\/(new|on-hold|reported)/;
+  var LIST_PATH_RE = /\/admin-v2\/moderation\/deals\/(new|on-hold|reported|expired)/;
   var _listCache = null;
   var _lastHref = "";
   var _applyPromise = null;
@@ -5600,7 +5679,30 @@
     _listCache = { key, items, at: Date.now() };
     return items;
   }
-  function findTimeRow(row) {
+  function getExpirationParts(item) {
+    const now = Math.floor(Date.now() / 1e3);
+    if (item.expiredAt != null && Number.isFinite(Number(item.expiredAt))) {
+      const value = formatPlTimestamp(item.expiredAt);
+      if (value) return { label: "Expired", value, icon: "timer_off" };
+    }
+    const expiresRaw = item.expiresAt ?? item.scheduledExpiredAt;
+    if (expiresRaw != null && Number.isFinite(Number(expiresRaw))) {
+      const value = formatPlTimestamp(expiresRaw);
+      if (!value) return null;
+      const isFuture = Number(expiresRaw) > now;
+      return {
+        label: isFuture ? "Expires" : "Expired",
+        value,
+        icon: isFuture ? "schedule" : "timer_off"
+      };
+    }
+    if (item.deactivatedAt != null && Number.isFinite(Number(item.deactivatedAt))) {
+      const value = formatPlTimestamp(item.deactivatedAt);
+      if (value) return { label: "Expired", value, icon: "timer_off" };
+    }
+    return null;
+  }
+  function findSubmittedTimeRow(row) {
     for (const icon of row.querySelectorAll("i.material-icons")) {
       if (icon.textContent.trim() === "access_time") {
         return icon.closest(".flex") || icon.parentElement;
@@ -5608,20 +5710,50 @@
     }
     return row.querySelector(".flex.grey--text.text--darken-1") || row.querySelector(".flex.grey--text");
   }
+  function findExpirationTimeRow(row) {
+    for (const icon of row.querySelectorAll("i.material-icons")) {
+      const name = icon.textContent.trim();
+      if (name === "timer_off" || name === "event_busy" || name === "schedule" || name === "hourglass_empty") {
+        return icon.closest(".flex") || icon.parentElement;
+      }
+    }
+    return null;
+  }
+  function renderTimeRow(rowEl, iconName, text) {
+    rowEl.innerHTML = `<i aria-hidden="true" class="v-icon material-icons theme--light grey--text text--lighten-1" style="font-size: 16px;">${iconName}</i> ${text}`;
+    rowEl.classList.add("jp-exact-timestamp");
+  }
   function applyTimestampToRow(row, item) {
     if (row.dataset.jpTimestampsDone) return;
-    const timeRow = findTimeRow(row);
-    if (!timeRow) return;
     const submitted = formatPlTimestamp(item.createdAt);
-    if (!submitted) return;
     const published = formatPlTimestamp(item.approvedAt);
-    let html = `<i aria-hidden="true" class="v-icon material-icons theme--light grey--text text--lighten-1" style="font-size: 16px;">access_time</i> Submitted ${submitted}`;
-    if (published) {
-      html += ` <span> · Published ${published} </span>`;
+    const expiration = getExpirationParts(item);
+    const submittedRow = findSubmittedTimeRow(row);
+    const expirationRow = findExpirationTimeRow(row);
+    const hasSeparateExpirationRow = expirationRow && expirationRow !== submittedRow;
+    let applied = false;
+    if (submittedRow) {
+      const parts = [];
+      if (submitted) parts.push(`Submitted ${submitted}`);
+      if (published) parts.push(`Published ${published}`);
+      if (expiration && !hasSeparateExpirationRow) {
+        parts.push(`${expiration.label} ${expiration.value}`);
+      }
+      if (parts.length) {
+        renderTimeRow(submittedRow, "access_time", parts.join(" · "));
+        applied = true;
+      }
     }
-    timeRow.innerHTML = html;
-    timeRow.classList.add("jp-exact-timestamp");
-    row.dataset.jpTimestampsDone = "1";
+    if (hasSeparateExpirationRow && expiration) {
+      renderTimeRow(expirationRow, expiration.icon, `${expiration.label} ${expiration.value}`);
+      applied = true;
+    } else if (!submittedRow && expirationRow && expiration) {
+      renderTimeRow(expirationRow, expiration.icon, `${expiration.label} ${expiration.value}`);
+      applied = true;
+    }
+    if (applied) {
+      row.dataset.jpTimestampsDone = "1";
+    }
   }
   function getDealRows() {
     const seen = /* @__PURE__ */ new Set();
