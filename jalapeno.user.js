@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.13
+// @version      4.9.14
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -603,6 +603,7 @@
                 .theme--light.v-input input, .theme--light.v-input textarea { color: var(--jp-text) !important; }
                 .theme--light.v-input input::placeholder, .theme--light.v-input textarea::placeholder, ::-webkit-input-placeholder { color: #949ba4 !important; opacity: 1 !important; }
                 .theme--light.v-label { color: #949ba4 !important; }
+                .v-application input.input, .theme--light input.input { color: var(--jp-text) !important; background-color: var(--jp-input-bg) !important; }
 
                 .theme--light.v-text-field .v-text-field__details .v-messages { color: var(--jp-text-muted) !important; }
 
@@ -1412,6 +1413,14 @@
       secModMessagesDesc: "Automatyczne notatki w wątku oraz szablony wiadomości do użytkownika.",
       secModQueue: "Lista kolejki (deals/new)",
       secModQueueDesc: "Funkcje na liście deals/new — alerty cenowe i panel okazji offline.",
+      secModSidePanels: "Panele boczne",
+      secModSidePanelsDesc: "Zwijane panele przyklejone do lewej krawędzi ekranu — widoczne na każdej stronie moderacji.",
+      mSessionHistory: "Historia sesji",
+      mSessionHistoryHint: "Lista deali otwartych w ciągu ostatniej doby. Kliknięcie wraca do danego deala.",
+      mSnippets: "Schowek fragmentów",
+      mSnippetsHint: "Własna biblioteka fragmentów tekstu do kopiowania jednym kliknięciem.",
+      mCheatsheet: "FAQ / Moduły",
+      mCheatsheetHint: "Przegląd wszystkich modułów Jalapeño z opisami i informacją które są aktywne.",
       mOfflineDealsFilter: "Filtr „Tylko offline”",
       mOfflineDealsFilterHint: "Skanuje wszystkie strony paginacji i pokazuje panel z okazjami offline (etykieta Offline lub ikona error).",
       mOfflineFilterTab: "offline",
@@ -1419,6 +1428,8 @@
       mOfflineFilterEmpty: "Brak okazji offline w całej kolejce.",
       mExactTimestamps: "Dokładne timestampy na liście",
       mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published/Expires/Expired jako 23.06.2026 18:31:51 na new / on-hold / reported / expired.",
+      mReportedReason: "Powód zgłoszenia przy edycji wątku",
+      mReportedReasonHint: "Na stronie edycji wątku ze zgłoszeń (Reported) pokazuje baner z powodem zgłoszenia nad panelem narzędzi.",
       mUserAdminLinks: "Metabase + All IPs użytkownika",
       mUserAdminLinksHint: "Przy edycji wątku i w inspektorze usera — Metabase (Track UUID, co dodaje, głosy) oraz panel IP.",
       mJalapenoTools: "Jalapeño",
@@ -1703,6 +1714,14 @@
       secModMessagesDesc: "Automatic thread notes and message templates for users.",
       secModQueue: "Queue list (deals/new)",
       secModQueueDesc: "Features on deals/new list — price alerts and offline deals panel.",
+      secModSidePanels: "Side panels",
+      secModSidePanelsDesc: "Collapsible panels pinned to the left edge of the screen — visible on all moderation pages.",
+      mSessionHistory: "Session history",
+      mSessionHistoryHint: "List of deals opened in the last 24 hours. Click to return to a deal.",
+      mSnippets: "Snippet clipboard",
+      mSnippetsHint: "Personal text snippet library — copy any entry with a single click.",
+      mCheatsheet: "FAQ / Modules",
+      mCheatsheetHint: "Overview of all Jalapeño modules with descriptions and which are currently active.",
       mOfflineDealsFilter: "“Offline only” filter",
       mOfflineDealsFilterHint: "Scans all pagination pages and shows a panel of offline deals (Offline label or error icon).",
       mOfflineFilterTab: "offline",
@@ -1710,6 +1729,8 @@
       mOfflineFilterEmpty: "No offline deals in the queue.",
       mExactTimestamps: "Exact timestamps on queue list",
       mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published/Expires/Expired as 23.06.2026 18:31:51 on new / on-hold / reported / expired.",
+      mReportedReason: "Report reason on thread edit page",
+      mReportedReasonHint: "On a thread edit page coming from the Reported queue, shows a banner with the report reason above the tools panel.",
       mUserAdminLinks: "Metabase + user All IPs",
       mUserAdminLinksHint: "On thread edit and inspector profile — Metabase (Track UUID, posts, votes) and IP panel.",
       mJalapenoTools: "Jalapeño",
@@ -3842,18 +3863,33 @@
     if (vImg) {
       vImg.style.backgroundImage = `url("${imageUrl}")`;
     }
+    const imageData = responseData?.image ?? responseData;
+    if (!imageData) return;
     let node = editor;
     while (node) {
       const vm = node.__vue__;
-      if (vm) {
-        if (responseData?.image && vm.$data?.image !== void 0) {
-          vm.$data.image = responseData.image;
-          vm.$forceUpdate?.();
-          return;
+      if (vm && vm.$data) {
+        let updated = false;
+        if ("image" in vm.$data) {
+          vm.$data.image = imageData;
+          updated = true;
+        } else if ("value" in vm.$data) {
+          vm.$data.value = imageData;
+          updated = true;
         }
-        if (vm.$data?.value !== void 0 && responseData?.image) {
-          vm.$data.value = responseData.image;
-          vm.$forceUpdate?.();
+        if (updated) {
+          try {
+            vm.$forceUpdate?.();
+          } catch (_) {
+          }
+          try {
+            vm.$emit("input", imageData);
+          } catch (_) {
+          }
+          try {
+            vm.$emit("change", imageData);
+          } catch (_) {
+          }
           return;
         }
       }
@@ -5694,6 +5730,141 @@
     return `${METABASE_TEMP_CHART_URL}?${params.toString()}`;
   }
 
+  // src/features/reportedReason.js
+  var THREAD_PATH_RE = /\/admin-v2\/moderation\/thread\/(\d+)/;
+  var _cache2 = /* @__PURE__ */ new Map();
+  var _fetchPromise = null;
+  var _stylesInjected = false;
+  function escapeHtml3(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function injectStyles() {
+    GM_addStyle(`
+        #jp-reported-reason-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 0 0 12px 0;
+            padding: 11px 14px;
+            background: var(--jp-row-bg, #fff8f1);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: 4px solid #e65100;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--jp-text, #333);
+        }
+        #jp-reported-reason-banner .jp-rr-icon {
+            color: #e65100;
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        #jp-reported-reason-banner .jp-rr-body {
+            flex: 1;
+            min-width: 0;
+        }
+        #jp-reported-reason-banner .jp-rr-label {
+            font-weight: 700;
+            color: #e65100;
+        }
+        #jp-reported-reason-banner .jp-rr-text {
+            font-size: 13px;
+            color: var(--jp-text, #333);
+            word-break: break-word;
+        }
+        #jp-reported-reason-banner .jp-rr-reporter {
+            font-size: 11px;
+            color: var(--jp-text-muted, #777);
+            margin-top: 3px;
+        }
+        #jp-reported-reason-dismiss {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--jp-text-muted, #999);
+            padding: 0;
+            flex-shrink: 0;
+            line-height: 1;
+            font-family: inherit;
+            opacity: 0.7;
+        }
+        #jp-reported-reason-dismiss:hover {
+            opacity: 1;
+            color: #e65100;
+        }
+    `);
+  }
+  function renderBanner(entry) {
+    if (document.getElementById("jp-reported-reason-banner")) return;
+    const anchor = document.querySelector(".mod-tools-container") || document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.querySelector(".v-card.rounded-medium");
+    if (!anchor) return;
+    if (!_stylesInjected) {
+      injectStyles();
+      _stylesInjected = true;
+    }
+    const banner = document.createElement("div");
+    banner.id = "jp-reported-reason-banner";
+    banner.innerHTML = `
+        <i class="material-icons jp-rr-icon">flag</i>
+        <div class="jp-rr-body">
+            <div class="jp-rr-text"><span class="jp-rr-label">Powód:</span> ${entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${escapeHtml3(entry.reason)}”` : escapeHtml3(entry.label || entry.reason || "")}</div>
+            ${entry.userId ? `<div class="jp-rr-reporter">ID zgłaszającego: ${entry.userId}</div>` : ""}
+        </div>
+        <button id="jp-reported-reason-dismiss" title="Zamknij">✕</button>
+    `;
+    anchor.parentNode.insertBefore(banner, anchor);
+    document.getElementById("jp-reported-reason-dismiss").onclick = () => banner.remove();
+  }
+  async function fetchAndCacheReported() {
+    const data = await fetchModerationListPage("/admin-v2/moderation/deals/reported", 1);
+    const items = data?.state?.threadsList?.items || [];
+    cacheReportedIssues(items);
+    return items;
+  }
+  function cacheReportedIssues(items) {
+    for (const item of items) {
+      if (item?.issue) {
+        _cache2.set(String(item.id), {
+          reason: item.issue.reason || "",
+          label: item.issue.reportTypeLabel || null,
+          typeName: item.issue.reportTypeName || null,
+          userId: item.issue.userId ?? null,
+          issueId: item.issue.id ?? null
+        });
+      }
+    }
+  }
+  function initReportedReason(settings3) {
+    if (!settings3.enableReportedReason) return;
+    const m = window.location.pathname.match(THREAD_PATH_RE);
+    if (!m) return;
+    if (document.getElementById("jp-reported-reason-banner")) return;
+    const dealId = m[1];
+    if (_cache2.has(dealId)) {
+      renderBanner(_cache2.get(dealId));
+      return;
+    }
+    if (_fetchPromise) {
+      _fetchPromise.then(() => {
+        const entry = _cache2.get(dealId);
+        if (entry && window.location.pathname.includes(`/thread/${dealId}`)) {
+          renderBanner(entry);
+        }
+      });
+      return;
+    }
+    _fetchPromise = fetchAndCacheReported().then(() => {
+      const entry = _cache2.get(dealId);
+      if (entry && window.location.pathname.includes(`/thread/${dealId}`)) {
+        renderBanner(entry);
+      }
+    }).catch((err) => {
+      console.warn("[Jalapeño] reported reason:", err);
+    });
+  }
+
   // src/features/exactTimestamps.js
   var LIST_PATH_RE = /\/admin-v2\/moderation\/deals\/(new|on-hold|reported|expired)/;
   var _listCache = null;
@@ -5724,6 +5895,9 @@
     const data = await fetchModerationListPage(path, page);
     const items = data?.state?.threadsList?.items || [];
     _listCache = { key, items, at: Date.now() };
+    if (/\/admin-v2\/moderation\/deals\/reported/.test(path)) {
+      cacheReportedIssues(items);
+    }
     return items;
   }
   function getExpirationParts(item) {
@@ -5816,6 +5990,7 @@
   }
   async function applyExactTimestamps() {
     const items = await getListItems();
+    if (!isDealsListPage()) return;
     const byId = new Map(items.map((item) => [String(item.id), item]));
     getDealRows().forEach(({ row, link }) => {
       const m = link.href.match(/thread\/(\d+)/);
@@ -6039,6 +6214,1167 @@
     _userCache.clear();
   }
 
+  // src/features/sessionHistory.js
+  var MAX_ENTRIES = 30;
+  var STORAGE_KEY = "jalapenoSessionHistory";
+  var TTL_MS = 24 * 60 * 60 * 1e3;
+  var sessionLog = [];
+  var _injected = false;
+  function loadPersistedLog() {
+    const saved = GM_getValue(STORAGE_KEY, []);
+    const cutoff = Date.now() - TTL_MS;
+    return saved.filter((e) => e.time > cutoff);
+  }
+  function persistLog() {
+    GM_setValue(STORAGE_KEY, sessionLog);
+  }
+  function extractThreadId(url) {
+    const m = url.match(/\/moderation\/thread\/(\d+)/);
+    return m ? m[1] : null;
+  }
+  function formatTimeAgo(ts) {
+    const diff = Math.floor((Date.now() - ts) / 1e3);
+    if (diff < 60) return `${diff}s`;
+    if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+    return `${Math.floor(diff / 3600)} h`;
+  }
+  function refreshSessionHistoryHighlight() {
+    renderHistory();
+  }
+  function highlightMatch(text, query) {
+    if (!query) return document.createTextNode(text);
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return document.createTextNode(text);
+    const frag = document.createDocumentFragment();
+    if (idx > 0) frag.appendChild(document.createTextNode(text.slice(0, idx)));
+    const mark = document.createElement("span");
+    mark.className = "jp-hist-match";
+    mark.textContent = text.slice(idx, idx + query.length);
+    frag.appendChild(mark);
+    if (idx + query.length < text.length) frag.appendChild(document.createTextNode(text.slice(idx + query.length)));
+    return frag;
+  }
+  function renderHistory() {
+    const list = document.getElementById("jp-hist-list");
+    const countEl = document.getElementById("jp-hist-count");
+    if (!list) return;
+    const query = (document.getElementById("jp-hist-search")?.value || "").trim();
+    const filtered = query ? sessionLog.filter((e) => (e.title || "").toLowerCase().includes(query.toLowerCase()) || (e.threadId || "").includes(query)) : sessionLog;
+    if (countEl) {
+      const shown = filtered.length;
+      const total = sessionLog.length;
+      countEl.textContent = total ? query && shown !== total ? `${shown}/${total}` : `${total} deal${total === 1 ? "" : "i"}` : "";
+    }
+    if (!sessionLog.length) {
+      list.innerHTML = '<span class="jp-hist-empty">Brak historii w tej sesji</span>';
+      return;
+    }
+    if (query && !filtered.length) {
+      list.innerHTML = '<span class="jp-hist-empty">Brak wyników</span>';
+      return;
+    }
+    list.replaceChildren();
+    const currentThreadId = extractThreadId(location.href);
+    filtered.forEach((entry) => {
+      const item = document.createElement("a");
+      item.className = "jp-hist-item" + (entry.threadId === currentThreadId ? " jp-hist-item-current" : "");
+      item.href = entry.url;
+      const title = document.createElement("span");
+      title.className = "jp-hist-title";
+      title.appendChild(highlightMatch(entry.title || `Deal #${entry.threadId}`, query));
+      const meta = document.createElement("span");
+      meta.className = "jp-hist-meta";
+      meta.textContent = `#${entry.threadId} · ${formatTimeAgo(entry.time)}`;
+      item.append(title, meta);
+      list.appendChild(item);
+    });
+  }
+  function recordDeal(title, url) {
+    const threadId = extractThreadId(url);
+    if (!threadId) return;
+    const existingIdx = sessionLog.findIndex((e) => e.threadId === threadId);
+    if (existingIdx !== -1) {
+      sessionLog[existingIdx].title = title || sessionLog[existingIdx].title;
+      sessionLog[existingIdx].time = Date.now();
+      const [entry] = sessionLog.splice(existingIdx, 1);
+      sessionLog.unshift(entry);
+    } else {
+      sessionLog.unshift({ title, url, threadId, time: Date.now() });
+      if (sessionLog.length > MAX_ENTRIES) sessionLog.pop();
+    }
+    persistLog();
+    renderHistory();
+  }
+  function initSessionHistory(settings3) {
+    if (_injected) return;
+    _injected = true;
+    sessionLog = loadPersistedLog();
+    GM_addStyle(`
+        #jp-session-hist {
+            position: fixed;
+            left: 0;
+            top: 380px;
+            z-index: 99998;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        #jp-hist-tab {
+            flex-shrink: 0;
+            width: 28px;
+            min-height: 100px;
+            background: #ff5200;
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 4px;
+            font-size: 10px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            user-select: none;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            font-family: inherit;
+        }
+
+        #jp-hist-tab:hover { background: #e64a00; }
+
+        #jp-session-hist.jp-hist-collapsed #jp-hist-inner { display: none; }
+
+        #jp-hist-inner {
+            width: 250px;
+            background: var(--jp-bg, #f9f9f9);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 3px 3px 14px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        #jp-hist-header {
+            background: #ff5200;
+            color: #fff;
+            padding: 7px 10px;
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #jp-hist-header-title { flex: 1; }
+
+        #jp-hist-count {
+            font-size: 10px;
+            opacity: 0.85;
+            font-weight: normal;
+        }
+
+        #jp-hist-collapse-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+
+        #jp-hist-collapse-btn:hover { background: rgba(255,255,255,0.35); }
+
+        #jp-hist-list {
+            max-height: calc(100vh - 480px);
+            overflow-y: auto;
+            padding: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .jp-hist-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: var(--jp-btn-bg, #fff);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            text-decoration: none;
+            color: var(--jp-text, #333);
+            cursor: pointer;
+        }
+
+        .jp-hist-item:hover {
+            background: var(--jp-btn-hover, #e6e6e6);
+            border-color: #ff5200;
+        }
+
+        .jp-hist-item-current {
+            border-color: #ff5200;
+            background: var(--jp-row-bg, #f0f8ff);
+        }
+
+        .jp-hist-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--jp-text, #333);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .jp-hist-meta {
+            font-size: 9px;
+            color: var(--jp-text-muted, #777);
+        }
+
+        #jp-hist-search-wrap {
+            padding: 5px 6px 4px;
+            border-bottom: 1px solid var(--jp-border, #e0e0e0);
+        }
+
+        #jp-hist-search {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 4px 7px;
+            border: 1px solid var(--jp-border, #ccc);
+            border-radius: 4px;
+            background: var(--jp-btn-bg, #fff);
+            color: var(--jp-text, #333);
+            font-size: 11px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        #jp-hist-search:focus {
+            border-color: #ff5200;
+        }
+
+        .jp-hist-empty {
+            font-size: 11px;
+            color: var(--jp-text-muted, #777);
+            font-style: italic;
+            padding: 4px 2px;
+        }
+
+        .jp-hist-match {
+            background: rgba(255, 82, 0, 0.3);
+            border-radius: 2px;
+        }
+    `);
+    const wrapper = document.createElement("div");
+    wrapper.id = "jp-session-hist";
+    wrapper.classList.add("jp-hist-collapsed");
+    wrapper.innerHTML = `
+        <button id="jp-hist-tab" title="Rozwiń historię sesji">Historia</button>
+        <div id="jp-hist-inner">
+            <div id="jp-hist-header">
+                <span id="jp-hist-header-title">Historia sesji</span>
+                <span id="jp-hist-count"></span>
+                <button id="jp-hist-collapse-btn" title="Zwiń">◀</button>
+            </div>
+            <div id="jp-hist-search-wrap">
+                <input id="jp-hist-search" type="search" placeholder="Szukaj..." autocomplete="off">
+            </div>
+            <div id="jp-hist-list">
+                <span class="jp-hist-empty">Brak historii w tej sesji</span>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(wrapper);
+    const tab = wrapper.querySelector("#jp-hist-tab");
+    const collapseBtn = wrapper.querySelector("#jp-hist-collapse-btn");
+    const setCollapsed = (collapsed) => {
+      wrapper.classList.toggle("jp-hist-collapsed", collapsed);
+      collapseBtn.textContent = collapsed ? "▶" : "◀";
+      collapseBtn.title = collapsed ? "Rozwiń" : "Zwiń";
+      tab.title = collapsed ? "Rozwiń historię sesji" : "Zwiń historię sesji";
+    };
+    tab.addEventListener("click", () => setCollapsed(!wrapper.classList.contains("jp-hist-collapsed")));
+    collapseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setCollapsed(!wrapper.classList.contains("jp-hist-collapsed"));
+    });
+    const searchInput = wrapper.querySelector("#jp-hist-search");
+    searchInput.addEventListener("input", () => renderHistory());
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        searchInput.value = "";
+        renderHistory();
+      }
+    });
+  }
+
+  // src/features/snippets.js
+  var STORAGE_KEY2 = "jalapenoSnippets";
+  var _injected2 = false;
+  function loadSnippets() {
+    return GM_getValue(STORAGE_KEY2, []);
+  }
+  function saveSnippets(snippets) {
+    GM_setValue(STORAGE_KEY2, snippets);
+  }
+  function makeId() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+  function renderSnippets(listEl) {
+    const snippets = loadSnippets();
+    listEl.replaceChildren();
+    if (!snippets.length) {
+      const empty = document.createElement("span");
+      empty.className = "jp-snip-empty";
+      empty.textContent = "Brak fragmentów. Kliknij + aby dodać.";
+      listEl.appendChild(empty);
+      return;
+    }
+    snippets.forEach((snip) => {
+      const item = document.createElement("div");
+      item.className = "jp-snip-item";
+      item.dataset.id = snip.id;
+      const body = document.createElement("div");
+      body.className = "jp-snip-body";
+      const name = document.createElement("span");
+      name.className = "jp-snip-name";
+      name.textContent = snip.name;
+      const preview = document.createElement("span");
+      preview.className = "jp-snip-preview";
+      preview.textContent = snip.text;
+      body.append(name, preview);
+      const actions = document.createElement("div");
+      actions.className = "jp-snip-actions";
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "jp-snip-btn jp-snip-btn-copy";
+      copyBtn.title = "Kopiuj";
+      copyBtn.textContent = "⎘";
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(snip.text).then(() => {
+          showToast(`Skopiowano: ${snip.name}`);
+        });
+      });
+      const editBtn = document.createElement("button");
+      editBtn.className = "jp-snip-btn";
+      editBtn.title = "Edytuj";
+      editBtn.textContent = "✎";
+      editBtn.addEventListener("click", () => {
+        showEditForm(listEl, item, snip);
+      });
+      const delBtn = document.createElement("button");
+      delBtn.className = "jp-snip-btn jp-snip-btn-del";
+      delBtn.title = "Usuń";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", () => {
+        const updated = loadSnippets().filter((s) => s.id !== snip.id);
+        saveSnippets(updated);
+        renderSnippets(listEl);
+      });
+      actions.append(copyBtn, editBtn, delBtn);
+      item.append(body, actions);
+      item.addEventListener("click", (e) => {
+        if (e.target.closest(".jp-snip-btn")) return;
+        navigator.clipboard.writeText(snip.text).then(() => {
+          showToast(`Skopiowano: ${snip.name}`);
+        });
+      });
+      listEl.appendChild(item);
+    });
+  }
+  function buildForm(onSave, onCancel, initial = { name: "", text: "" }) {
+    const form = document.createElement("div");
+    form.className = "jp-snip-form";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "jp-snip-input";
+    nameInput.placeholder = "Nazwa (np. Fake promo PL)";
+    nameInput.value = initial.name;
+    nameInput.maxLength = 60;
+    const textArea = document.createElement("textarea");
+    textArea.className = "jp-snip-textarea";
+    textArea.placeholder = "Treść fragmentu…";
+    textArea.value = initial.text;
+    textArea.rows = 3;
+    const btnRow = document.createElement("div");
+    btnRow.className = "jp-snip-form-btns";
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "jp-snip-save-btn";
+    saveBtn.textContent = "Zapisz";
+    saveBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      const text = textArea.value.trim();
+      if (!name || !text) return;
+      onSave(name, text);
+    });
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "jp-snip-cancel-btn";
+    cancelBtn.textContent = "Anuluj";
+    cancelBtn.addEventListener("click", onCancel);
+    btnRow.append(saveBtn, cancelBtn);
+    form.append(nameInput, textArea, btnRow);
+    return form;
+  }
+  function showAddForm(listEl, addBtn) {
+    if (listEl.querySelector(".jp-snip-form")) return;
+    addBtn.disabled = true;
+    const form = buildForm(
+      (name, text) => {
+        const snippets = loadSnippets();
+        snippets.unshift({ id: makeId(), name, text });
+        saveSnippets(snippets);
+        addBtn.disabled = false;
+        renderSnippets(listEl);
+      },
+      () => {
+        addBtn.disabled = false;
+        renderSnippets(listEl);
+      }
+    );
+    listEl.prepend(form);
+    form.querySelector("input").focus();
+  }
+  function showEditForm(listEl, itemEl, snip) {
+    const form = buildForm(
+      (name, text) => {
+        const snippets = loadSnippets().map(
+          (s) => s.id === snip.id ? { ...s, name, text } : s
+        );
+        saveSnippets(snippets);
+        renderSnippets(listEl);
+      },
+      () => renderSnippets(listEl),
+      { name: snip.name, text: snip.text }
+    );
+    itemEl.replaceWith(form);
+    form.querySelector("input").focus();
+  }
+  function initSnippets() {
+    if (_injected2) return;
+    _injected2 = true;
+    GM_addStyle(`
+        #jp-snippets {
+            position: fixed;
+            left: 0;
+            top: 540px;
+            z-index: 99998;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        #jp-snip-tab {
+            flex-shrink: 0;
+            width: 28px;
+            min-height: 100px;
+            background: #ff5200;
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 4px;
+            font-size: 10px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            user-select: none;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            font-family: inherit;
+        }
+
+        #jp-snip-tab:hover { background: #e64a00; }
+
+        #jp-snippets.jp-snip-collapsed #jp-snip-inner { display: none; }
+
+        #jp-snip-inner {
+            width: 260px;
+            background: var(--jp-bg, #f9f9f9);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 3px 3px 14px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        #jp-snip-header {
+            background: #ff5200;
+            color: #fff;
+            padding: 7px 10px;
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #jp-snip-header-title { flex: 1; }
+
+        #jp-snip-add-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+
+        #jp-snip-add-btn:hover { background: rgba(255,255,255,0.35); }
+        #jp-snip-add-btn:disabled { opacity: 0.4; cursor: default; }
+
+        #jp-snip-collapse-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+
+        #jp-snip-collapse-btn:hover { background: rgba(255,255,255,0.35); }
+
+        #jp-snip-list {
+            max-height: calc(100vh - 600px);
+            overflow-y: auto;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .jp-snip-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 7px;
+            border-radius: 4px;
+            background: var(--jp-btn-bg, #fff);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            cursor: pointer;
+        }
+
+        .jp-snip-item:hover {
+            background: var(--jp-btn-hover, #e6e6e6);
+            border-color: #ff5200;
+        }
+
+        .jp-snip-body {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .jp-snip-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--jp-text, #333);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .jp-snip-preview {
+            font-size: 9px;
+            color: var(--jp-text-muted, #777);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .jp-snip-actions {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        .jp-snip-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: var(--jp-text-muted, #777);
+            line-height: 1;
+            font-family: inherit;
+        }
+
+        .jp-snip-btn:hover { background: var(--jp-btn-hover, #e6e6e6); color: var(--jp-text, #333); }
+        .jp-snip-btn-copy:hover { color: #4caf50; }
+        .jp-snip-btn-del:hover { color: #f44336; }
+
+        .jp-snip-form {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 6px;
+            background: var(--jp-row-bg, #f0f8ff);
+            border-radius: 4px;
+            border: 1px solid var(--jp-border, #e0e0e0);
+        }
+
+        .jp-snip-input,
+        .jp-snip-textarea {
+            width: 100%;
+            padding: 4px 6px;
+            font-size: 11px;
+            border: 1px solid var(--jp-btn-border, #ccc);
+            border-radius: 3px;
+            box-sizing: border-box;
+            font-family: inherit;
+            background: var(--jp-input-bg, #fff);
+            color: var(--jp-input-text, #000);
+            outline: none;
+            resize: vertical;
+        }
+
+        .jp-snip-input:focus,
+        .jp-snip-textarea:focus { border-color: #ff5200; }
+
+        .jp-snip-form-btns {
+            display: flex;
+            gap: 5px;
+        }
+
+        .jp-snip-save-btn,
+        .jp-snip-cancel-btn {
+            flex: 1;
+            padding: 3px 0;
+            font-size: 11px;
+            border-radius: 3px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+        }
+
+        .jp-snip-save-btn {
+            background: #ff5200;
+            color: #fff;
+        }
+
+        .jp-snip-save-btn:hover { background: #e64a00; }
+
+        .jp-snip-cancel-btn {
+            background: var(--jp-btn-bg, #fff);
+            border: 1px solid var(--jp-btn-border, #ccc);
+            color: var(--jp-text, #333);
+        }
+
+        .jp-snip-cancel-btn:hover { background: var(--jp-btn-hover, #e6e6e6); }
+
+        .jp-snip-empty {
+            font-size: 11px;
+            color: var(--jp-text-muted, #777);
+            font-style: italic;
+            padding: 4px 2px;
+        }
+    `);
+    const wrapper = document.createElement("div");
+    wrapper.id = "jp-snippets";
+    wrapper.classList.add("jp-snip-collapsed");
+    wrapper.innerHTML = `
+        <button id="jp-snip-tab" title="Rozwiń schowek fragmentów">Schowek</button>
+        <div id="jp-snip-inner">
+            <div id="jp-snip-header">
+                <span id="jp-snip-header-title">Schowek</span>
+                <button id="jp-snip-add-btn" title="Dodaj fragment">+</button>
+                <button id="jp-snip-collapse-btn" title="Zwiń">▶</button>
+            </div>
+            <div id="jp-snip-list"></div>
+        </div>
+    `;
+    document.body.appendChild(wrapper);
+    const listEl = wrapper.querySelector("#jp-snip-list");
+    const tab = wrapper.querySelector("#jp-snip-tab");
+    const addBtn = wrapper.querySelector("#jp-snip-add-btn");
+    const collapseBtn = wrapper.querySelector("#jp-snip-collapse-btn");
+    renderSnippets(listEl);
+    const setCollapsed = (collapsed) => {
+      wrapper.classList.toggle("jp-snip-collapsed", collapsed);
+      collapseBtn.textContent = collapsed ? "▶" : "◀";
+      collapseBtn.title = collapsed ? "Rozwiń" : "Zwiń";
+    };
+    tab.addEventListener("click", () => setCollapsed(!wrapper.classList.contains("jp-snip-collapsed")));
+    collapseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setCollapsed(!wrapper.classList.contains("jp-snip-collapsed"));
+    });
+    addBtn.addEventListener("click", () => showAddForm(listEl, addBtn));
+  }
+
+  // src/features/cheatsheet.js
+  var _injected3 = false;
+  var SECTIONS = [
+    {
+      id: "deal",
+      label: "Panel deala",
+      items: [
+        {
+          key: "enableFakePromo",
+          label: "Fake Promo",
+          desc: 'Porównuje URL i cenę z bazą podejrzanych wzorców. Czerwony baner = trafienie. Przycisk "Oznacz" dodaje nowy wzorzec do bazy Google Sheets.'
+        },
+        {
+          key: "enableCalculator",
+          label: "Kalkulator walut",
+          desc: "Przelicza EUR/USD/GBP na PLN po kursie z open.er-api.com. Kurs odświeżany raz na sesję."
+        },
+        {
+          key: "enableHistory",
+          label: "Historia podobnych deali",
+          desc: 'Szuka na Pepper.pl deali z podobnym tytułem. Pokazuje cenę, temperaturę i status. Przycisk "Szukaj" uruchamia ręcznie, zapytanie generowane automatycznie z tytułu.'
+        },
+        {
+          key: "enableKeywordFallback",
+          label: "Fallback słów kluczowych",
+          desc: "Jeśli historia nie zwróci wyników, spróbuje ponownie z uproszczonym zapytaniem (samo słowo kluczowe zamiast pełnej frazy)."
+        },
+        {
+          key: "enableMetaInfo",
+          label: "Meta-informacje deala",
+          desc: "Wyświetla dodatkowe dane pod panelem: ID okazji, autor, data dodania, liczba komentarzy."
+        },
+        {
+          key: "enableCategoryAdvisor",
+          label: "Doradca kategorii",
+          desc: "Sugeruje kategorie na podstawie tytułu deala porównując z historią kategoryzacji na Pepperze. Widoczny w bocznym panelu przy formularzach."
+        }
+      ]
+    },
+    {
+      id: "auto",
+      label: "Automatyzacje",
+      items: [
+        {
+          key: "enableAutoAmazonShipping",
+          label: "Auto-dostawa Amazon",
+          desc: "Wykrywa link Amazon.co.uk. Jeśli cena ≥ £65 → ustawia darmową dostawę. Jeśli < £65 → wpisuje 8,99 zł. Działa tylko gdy pole dostawy jest puste."
+        },
+        {
+          key: "enableAutoLocalStore",
+          label: "Auto-sklep lokalny",
+          desc: 'Rozpoznaje 20+ sieci (Biedronka, Lidl, Kaufland, Leroy Merlin…) z tytułu lub URL. Automatycznie ustawia link sklepu i zaznacza checkbox "Oferta lokalna".'
+        },
+        {
+          key: "enableAutoHoldNote",
+          label: "Auto-notatka hold",
+          desc: "Gdy wklejasz treść wiadomości hold do pola notatki, skrypt wyciąga z niej powód i uzupełnia pole automatycznie."
+        },
+        {
+          key: "enableInfractionNote",
+          label: "Auto-notatka kara",
+          desc: "W modalach infraction wyciąga powód z treści wiadomości i wkleja do pola notatki moderatora."
+        },
+        {
+          key: "enableMessageTemplates",
+          label: "Szablony wiadomości",
+          desc: "8 gotowych szablonów odpowiedzi na hold. Pojawiają się jako przyciski przy polu wiadomości. Kliknięcie wkleja tekst."
+        },
+        {
+          key: "enableApproveReasons",
+          label: "Szablony approve",
+          desc: '21 szablonów do "Approve & Send PM". Panel pojawia się przy przycisku zatwierdzenia. Każdy szablon dynamicznie podstawia tytuł i nazwę użytkownika.'
+        },
+        {
+          key: "enableFloatingButton",
+          label: "Pływający przycisk ✨",
+          desc: "Przycisk wstawiający spersonalizowany tekst do opisu i opcjonalnie ustawiający darmową dostawę. Tekst konfigurowalny w ustawieniach."
+        }
+      ]
+    },
+    {
+      id: "merchant",
+      label: "Dane merchantów",
+      items: [
+        {
+          key: "enableMerchantNotes",
+          label: "Notatki merchantów",
+          desc: "Notatki per merchant synchronizowane z Google Sheets. Widoczne przy każdym dealu danego merchanty. Dodaj, edytuj lub usuń z panelu bocznego. Delta sync — wysyła tylko zmiany."
+        },
+        {
+          key: "enableShippingCosts",
+          label: "Baza kosztów dostawy",
+          desc: 'Własna baza kosztów dostawy per merchant, synchronizowana z Google Sheets. Przycisk "Zastosuj" wpisuje koszt do formularza jednym kliknięciem.'
+        }
+      ]
+    },
+    {
+      id: "tools",
+      label: "Narzędzia",
+      items: [
+        {
+          key: "enableReverseImageSearch",
+          label: "Wyszukiwanie obrazem",
+          desc: "Dodaje przycisk Google Lens przy zdjęciach deala. Otwiera wyszukiwanie wizualne w nowej karcie."
+        },
+        {
+          key: "enableProductInspector",
+          label: "Inspektor produktu",
+          desc: "Wykrywa kody EAN/ISBN/ASIN w tytule i opisie. Generuje barcode, linki do Ceneo, Keepa, Google Shopping i innych porównywarek."
+        },
+        {
+          key: "enableLinkExpander",
+          label: "Rozwijacz linków",
+          desc: "Rozwija skrócone URLe (bit.ly, tinyurl itp.) w opisie deala i zastępuje je pełnymi adresami przed zatwierdzeniem."
+        },
+        {
+          key: "enableLensDescription",
+          label: "Opis z Google Lens",
+          desc: "Na stronie Google Lens dodaje przycisk do kopiowania tekstu AI Overview jako gotowego opisu deala."
+        },
+        {
+          key: "enableAllegroImages",
+          label: "Galeria Allegro",
+          desc: "Na stronie Allegro dodaje przycisk do pobrania zdjęć z galerii produktu i wgrania ich bezpośrednio do formularza deala."
+        },
+        {
+          key: "enableLockButtons",
+          label: "Przyciski lock",
+          desc: "Dodaje przyciski Edit Lock / Expire Lock przy dealu. Wysyła żądanie POST do pepper.pl/promocje/{slug}/edit-lock lub expire-lock."
+        },
+        {
+          key: "enableBannedHighlight",
+          label: "Podświetlanie zabanowanych",
+          desc: "Na listach deali koloruje karty dodane przez zabanowanych lub niezweryfikowanych użytkowników."
+        },
+        {
+          key: "enablePriceWarning",
+          label: "Ostrzeżenie o wzroście ceny",
+          desc: "Na liście kolejki sprawdza logi edycji pierwszych 10 deali. Wyświetla etykietę jeśli cena wzrosła o ponad 1% od ostatniej edycji."
+        },
+        {
+          key: "enableOfflineDealsFilter",
+          label: "Filtr deali offline",
+          desc: 'Dodaje zakładkę "Offline" na liście deali filtrującą tylko wygasłe/offline okazje. Pobiera status przez API Peppera.'
+        },
+        {
+          key: "enableExactTimestamps",
+          label: "Dokładne znaczniki czasu",
+          desc: 'Zamienia względne daty ("2 godziny temu") na pełne znaczniki czasowe (dd.mm.yyyy hh:mm) na listach kolejki.'
+        },
+        {
+          key: "enableUserAdminLinks",
+          label: "Linki admina",
+          desc: "Dodaje skróty do profilu moderacyjnego użytkownika, Metabase i historii IP przy kartach deali na liście."
+        }
+      ]
+    },
+    {
+      id: "panels",
+      label: "Panele boczne",
+      items: [
+        {
+          key: "enableSessionHistory",
+          label: "Historia sesji",
+          desc: "Lista deali otwartych w ciągu ostatniej doby. Automatycznie zapisywana, kliknięcie wraca do danego deala. Bieżący deal podświetlony."
+        },
+        {
+          key: "enableSnippets",
+          label: "Schowek fragmentów",
+          desc: "Własna biblioteka fragmentów tekstu. Kliknięcie kopiuje do schowka. Edytowalne i persystowane między sesjami."
+        }
+      ]
+    }
+  ];
+  function initCheatsheet(settings3) {
+    if (_injected3) return;
+    _injected3 = true;
+    GM_addStyle(`
+        #jp-cheatsheet {
+            position: fixed;
+            left: 0;
+            top: 700px;
+            z-index: 99998;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        #jp-cs-tab {
+            order: 2;
+            flex-shrink: 0;
+            width: 28px;
+            min-height: 100px;
+            background: #ff5200;
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 4px;
+            font-size: 10px;
+            font-weight: bold;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            user-select: none;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            font-family: inherit;
+        }
+
+        #jp-cs-tab:hover { background: #e64a00; }
+
+        #jp-cheatsheet.jp-cs-collapsed #jp-cs-inner { display: none; }
+
+        #jp-cs-inner {
+            order: 1;
+            width: 280px;
+            background: var(--jp-bg, #f9f9f9);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 3px 3px 14px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        #jp-cs-header {
+            background: #ff5200;
+            color: #fff;
+            padding: 7px 10px;
+            font-weight: bold;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #jp-cs-header-title { flex: 1; }
+
+        #jp-cs-collapse-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+
+        #jp-cs-collapse-btn:hover { background: rgba(255,255,255,0.35); }
+
+        #jp-cs-body {
+            max-height: calc(100vh - 760px);
+            overflow-y: auto;
+        }
+
+        .jp-cs-section {}
+
+        .jp-cs-section-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--jp-border, #e0e0e0);
+            user-select: none;
+            background: var(--jp-btn-bg, #fff);
+        }
+
+        .jp-cs-section-head:hover { background: var(--jp-btn-hover, #e6e6e6); }
+
+        .jp-cs-section-label {
+            flex: 1;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--jp-text-muted, #777);
+        }
+
+        .jp-cs-section-count {
+            font-size: 9px;
+            color: var(--jp-text-muted, #777);
+        }
+
+        .jp-cs-chevron {
+            font-size: 9px;
+            color: var(--jp-text-muted, #777);
+            transition: transform 0.15s;
+        }
+
+        .jp-cs-section.open .jp-cs-chevron { transform: rotate(90deg); }
+
+        .jp-cs-items {
+            display: none;
+            flex-direction: column;
+        }
+
+        .jp-cs-section.open .jp-cs-items { display: flex; }
+
+        .jp-cs-item {
+            padding: 6px 10px 6px 10px;
+            border-bottom: 1px solid var(--jp-border, #e0e0e0);
+            cursor: pointer;
+        }
+
+        .jp-cs-item:hover { background: var(--jp-btn-hover, #e6e6e6); }
+        .jp-cs-item:last-child { border-bottom: none; }
+
+        .jp-cs-item-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .jp-cs-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .jp-cs-dot-on  { background: #4caf50; }
+        .jp-cs-dot-off { background: #bdbdbd; }
+
+        .jp-cs-item-label {
+            flex: 1;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--jp-text, #333);
+        }
+
+        .jp-cs-item-label-off { color: var(--jp-text-muted, #777); }
+
+        .jp-cs-item-arrow {
+            font-size: 9px;
+            color: var(--jp-text-muted, #777);
+            transition: transform 0.15s;
+        }
+
+        .jp-cs-item.open .jp-cs-item-arrow { transform: rotate(90deg); }
+
+        .jp-cs-desc {
+            display: none;
+            font-size: 10px;
+            color: var(--jp-text-muted, #777);
+            margin-top: 4px;
+            line-height: 1.45;
+            padding-left: 13px;
+        }
+
+        .jp-cs-item.open .jp-cs-desc { display: block; }
+    `);
+    const wrapper = document.createElement("div");
+    wrapper.id = "jp-cheatsheet";
+    wrapper.classList.add("jp-cs-collapsed");
+    const activeCount = SECTIONS.reduce(
+      (n, s) => n + s.items.filter((i) => settings3[i.key] !== false).length,
+      0
+    );
+    const totalCount = SECTIONS.reduce((n, s) => n + s.items.length, 0);
+    wrapper.innerHTML = `
+        <button id="jp-cs-tab" title="Rozwiń FAQ i moduły">FAQ</button>
+        <div id="jp-cs-inner">
+            <div id="jp-cs-header">
+                <span id="jp-cs-header-title">FAQ / Moduły</span>
+                <span style="font-size:10px;opacity:.8;font-weight:normal">${activeCount}/${totalCount} aktywnych</span>
+                <button id="jp-cs-collapse-btn" title="Zwiń">◀</button>
+            </div>
+            <div id="jp-cs-body"></div>
+        </div>
+    `;
+    document.body.appendChild(wrapper);
+    const body = wrapper.querySelector("#jp-cs-body");
+    SECTIONS.forEach((section) => {
+      const activeInSection = section.items.filter((i) => settings3[i.key] !== false).length;
+      const sectionEl = document.createElement("div");
+      sectionEl.className = "jp-cs-section";
+      const head = document.createElement("div");
+      head.className = "jp-cs-section-head";
+      head.innerHTML = `
+            <span class="jp-cs-chevron">▶</span>
+            <span class="jp-cs-section-label">${section.label}</span>
+            <span class="jp-cs-section-count">${activeInSection}/${section.items.length}</span>
+        `;
+      const itemsEl = document.createElement("div");
+      itemsEl.className = "jp-cs-items";
+      section.items.forEach((item) => {
+        const isOn = settings3[item.key] !== false;
+        const itemEl = document.createElement("div");
+        itemEl.className = "jp-cs-item";
+        itemEl.innerHTML = `
+                <div class="jp-cs-item-head">
+                    <span class="jp-cs-dot ${isOn ? "jp-cs-dot-on" : "jp-cs-dot-off"}"></span>
+                    <span class="jp-cs-item-label ${isOn ? "" : "jp-cs-item-label-off"}">${item.label}</span>
+                    <span class="jp-cs-item-arrow">▶</span>
+                </div>
+                <div class="jp-cs-desc">${item.desc}</div>
+            `;
+        itemEl.addEventListener("click", () => {
+          itemEl.classList.toggle("open");
+        });
+        itemsEl.appendChild(itemEl);
+      });
+      head.addEventListener("click", () => {
+        sectionEl.classList.toggle("open");
+      });
+      sectionEl.append(head, itemsEl);
+      body.appendChild(sectionEl);
+    });
+    const tab = wrapper.querySelector("#jp-cs-tab");
+    const collapseBtn = wrapper.querySelector("#jp-cs-collapse-btn");
+    const setCollapsed = (collapsed) => {
+      wrapper.classList.toggle("jp-cs-collapsed", collapsed);
+      collapseBtn.textContent = collapsed ? "▶" : "◀";
+      collapseBtn.title = collapsed ? "Rozwiń" : "Zwiń";
+    };
+    tab.addEventListener("click", () => setCollapsed(!wrapper.classList.contains("jp-cs-collapsed")));
+    collapseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setCollapsed(!wrapper.classList.contains("jp-cs-collapsed"));
+    });
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -6098,7 +7434,11 @@
       enableCategoryAdvisor: true,
       enableOfflineDealsFilter: true,
       enableExactTimestamps: true,
-      enableUserAdminLinks: true
+      enableUserAdminLinks: true,
+      enableSessionHistory: true,
+      enableSnippets: true,
+      enableCheatsheet: true,
+      enableReportedReason: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -6120,6 +7460,9 @@
       location.reload();
     }
     injectThemeCSS(settings3);
+    if (settings3.enableSessionHistory) initSessionHistory(settings3);
+    if (settings3.enableSnippets) initSnippets();
+    if (settings3.enableCheatsheet) initCheatsheet(settings3);
     function settingsSectionHead(titleKey, descKey) {
       return `
             <h4 class="jp-settings-h4">${t(titleKey)}</h4>
@@ -6161,7 +7504,8 @@
           settingsModuleToggle("set-allegro-images", s.enableAllegroImages, "mAllegroImages", "mAllegroImagesHint"),
           settingsModuleToggle("set-fakepromo", s.enableFakePromo, "mFakePromo", "mFakePromoHint"),
           settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint"),
-          settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint")
+          settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint"),
+          settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
@@ -6180,6 +7524,11 @@
           settingsModuleToggle("set-price-warning", s.enablePriceWarning, "mPriceWarning", "mPriceWarningHint"),
           settingsModuleToggle("set-offline-filter", s.enableOfflineDealsFilter, "mOfflineDealsFilter", "mOfflineDealsFilterHint"),
           settingsModuleToggle("set-exact-timestamps", s.enableExactTimestamps, "mExactTimestamps", "mExactTimestampsHint")
+        ]),
+        settingsModuleGroup("secModSidePanels", "secModSidePanelsDesc", [
+          settingsModuleToggle("set-session-history", s.enableSessionHistory, "mSessionHistory", "mSessionHistoryHint"),
+          settingsModuleToggle("set-snippets", s.enableSnippets, "mSnippets", "mSnippetsHint"),
+          settingsModuleToggle("set-cheatsheet", s.enableCheatsheet, "mCheatsheet", "mCheatsheetHint")
         ])
       ].join("");
     }
@@ -6461,7 +7810,11 @@
           enableCategoryAdvisor: document.getElementById("set-category-advisor").checked,
           enableOfflineDealsFilter: document.getElementById("set-offline-filter").checked,
           enableExactTimestamps: document.getElementById("set-exact-timestamps").checked,
-          enableUserAdminLinks: document.getElementById("set-user-admin-links").checked
+          enableUserAdminLinks: document.getElementById("set-user-admin-links").checked,
+          enableReportedReason: document.getElementById("set-reported-reason").checked,
+          enableSessionHistory: document.getElementById("set-session-history").checked,
+          enableSnippets: document.getElementById("set-snippets").checked,
+          enableCheatsheet: document.getElementById("set-cheatsheet").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -8349,6 +9702,7 @@
       if (!document.querySelector(".mod-tools-container") && !window.jpDealCheckersAttached) {
         window.jpDealCheckersAttached = true;
         increment("totalPageChecks");
+        if (settings3.enableSessionHistory) recordDeal(currentTitle, location.href);
         const triggerVueInput = async (element, value) => {
           if (!element) return;
           element.focus();
@@ -9722,6 +11076,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           resetExactTimestamps();
           resetUserAdminLinks();
         }
+        if (settings3.enableSessionHistory) refreshSessionHistoryHighlight();
         let oldWarningBox = document.querySelector(".jp-price-warning-toast");
         if (oldWarningBox) oldWarningBox.remove();
       }
@@ -9743,6 +11098,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       initOfflineDealsFilter(settings3);
       initExactTimestamps(settings3);
       initUserAdminLinks(settings3);
+      initReportedReason(settings3);
       let now = Date.now();
       if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
         highlightEditedCards();
