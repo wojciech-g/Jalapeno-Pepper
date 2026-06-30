@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.14
+// @version      4.9.16
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1233,6 +1233,7 @@
     "cutt.ly",
     "goo.gl",
     "is.gd",
+    "share.google",
     "ow.ly",
     "rb.gy",
     "rebrand.ly",
@@ -1574,6 +1575,8 @@
       msgMerchantNoteDeleted: "✅ Notatka usunięta",
       msgMerchantNoteError: "❌ Błąd synchronizacji notatki",
       lblShippingCosts: "Baza kosztów dostawy",
+      mDealChangelog: "Tracker zmian w formularzu deala",
+      mDealChangelogHint: "Nad panelem dostawy pokazuje które pola zostały zmienione od momentu otwarcia strony (tytuł, URL, cena, sklep, dostawa).",
       lblShippingCost: "Koszt dostawy (PLN)",
       lblFreeDeliveryFrom: "Darmowa dostawa od (PLN)",
       lblShippingNote: "Notatka (opcjonalna)",
@@ -1875,6 +1878,8 @@
       msgMerchantNoteDeleted: "✅ Note deleted",
       msgMerchantNoteError: "❌ Note synchronization error",
       lblShippingCosts: "Shipping cost database",
+      mDealChangelog: "Deal form change tracker",
+      mDealChangelogHint: "Above the shipping panel, shows which fields were changed since opening the page (title, URL, price, merchant, delivery).",
       lblShippingCost: "Shipping cost (PLN)",
       lblFreeDeliveryFrom: "Free delivery from (PLN)",
       lblShippingNote: "Note (optional)",
@@ -5738,6 +5743,20 @@
   function escapeHtml3(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
+  var URL_RE = /https?:\/\/[^\s<>"]+/g;
+  function linkifyHtml(text) {
+    const str = String(text);
+    const parts = [];
+    let last = 0;
+    for (const m of str.matchAll(URL_RE)) {
+      if (m.index > last) parts.push(escapeHtml3(str.slice(last, m.index)));
+      const url = m[0];
+      parts.push(`<a class="jp-rr-link" href="${escapeHtml3(url)}" target="_blank" rel="noopener">${escapeHtml3(url)}</a>`);
+      last = m.index + url.length;
+    }
+    if (last < str.length) parts.push(escapeHtml3(str.slice(last)));
+    return parts.join("");
+  }
   function injectStyles() {
     GM_addStyle(`
         #jp-reported-reason-banner {
@@ -5772,6 +5791,14 @@
             font-size: 13px;
             color: var(--jp-text, #333);
             word-break: break-word;
+        }
+        #jp-reported-reason-banner .jp-rr-link {
+            color: #e65100;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+        #jp-reported-reason-banner .jp-rr-link:hover {
+            opacity: 0.8;
         }
         #jp-reported-reason-banner .jp-rr-reporter {
             font-size: 11px;
@@ -5809,7 +5836,7 @@
     banner.innerHTML = `
         <i class="material-icons jp-rr-icon">flag</i>
         <div class="jp-rr-body">
-            <div class="jp-rr-text"><span class="jp-rr-label">Powód:</span> ${entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${escapeHtml3(entry.reason)}”` : escapeHtml3(entry.label || entry.reason || "")}</div>
+            <div class=”jp-rr-text”><span class=”jp-rr-label”>Powód:</span> ${entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${linkifyHtml(entry.reason)}”` : linkifyHtml(entry.label || entry.reason || "")}</div>
             ${entry.userId ? `<div class="jp-rr-reporter">ID zgłaszającego: ${entry.userId}</div>` : ""}
         </div>
         <button id="jp-reported-reason-dismiss" title="Zamknij">✕</button>
@@ -7375,6 +7402,192 @@
     });
   }
 
+  // src/features/dealChangelog.js
+  var _stylesInjected2 = false;
+  var STORAGE_KEY_PREFIX = "jalapeno_changelog_";
+  var FIELDS = [
+    { key: "title", label: "Tytuł", sel: 'input[placeholder="Thread title"]' },
+    { key: "mainUrl", label: "URL", sel: 'textarea[name="mainUrl"]' },
+    { key: "canonUrl", label: "URL 2", sel: 'textarea[name="canonicalUrl"]' },
+    { key: "price", label: "Cena", sel: 'input[placeholder="Price"]' },
+    { key: "shipping", label: "Dostawa", sel: 'input[placeholder="Shipping costs"]' },
+    { key: "merchant", label: "Sklep", sel: 'input[placeholder="Merchant name"],input[placeholder="No merchant"]' },
+    { key: "coupon", label: "Kupon", sel: 'input[placeholder="Coupon name"]' }
+  ];
+  function injectStyles2() {
+    if (_stylesInjected2) return;
+    _stylesInjected2 = true;
+    GM_addStyle(`
+        #jp-deal-changelog {
+            width: 100%;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #ff9800;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.4;
+            color: var(--jp-text);
+        }
+        #jp-dc-header {
+            font-weight: 700;
+            font-size: 11px;
+            color: #ff9800;
+            margin-bottom: 7px;
+            letter-spacing: 0.02em;
+        }
+        .jp-dc-item {
+            display: grid;
+            grid-template-columns: 52px 1fr 12px 1fr;
+            gap: 2px 4px;
+            align-items: baseline;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--jp-border);
+        }
+        .jp-dc-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .jp-dc-label {
+            font-weight: 600;
+            color: var(--jp-text-muted, #888);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .jp-dc-from {
+            color: var(--jp-text-muted, #888);
+            text-decoration: line-through;
+            word-break: break-all;
+            font-size: 10px;
+        }
+        .jp-dc-arrow {
+            color: #ff9800;
+            font-size: 10px;
+            text-align: center;
+        }
+        .jp-dc-to {
+            color: var(--jp-text, #333);
+            font-weight: 500;
+            word-break: break-all;
+            font-size: 10px;
+        }
+        .jp-dc-empty-hint {
+            color: var(--jp-text-muted, #aaa);
+            font-size: 10px;
+            font-style: italic;
+        }
+    `);
+  }
+  function trunc(val, max) {
+    if (val === null || val === void 0 || val === "") return "(pusty)";
+    const s = String(val);
+    return s.length > max ? s.slice(0, max) + "…" : s;
+  }
+  function getFieldValue(field) {
+    const el = document.querySelector(field.sel);
+    return el ? el.value.trim() : null;
+  }
+  function getFreeDelivery() {
+    const labels = Array.from(document.querySelectorAll("label"));
+    const lbl = labels.find((l) => l.innerText.trim().includes("Free Delivery"));
+    if (!lbl) return null;
+    const wrapper = lbl.closest(".v-input--selection-controls");
+    if (!wrapper) return null;
+    const cb = wrapper.querySelector('input[type="checkbox"]');
+    if (cb) return cb.checked || cb.getAttribute("aria-checked") === "true";
+    return wrapper.classList.contains("v-input--is-dirty") || wrapper.classList.contains("v-input--is-label-active");
+  }
+  function initDealChangelog(stackEl, threadId) {
+    if (!stackEl || !threadId) return;
+    if (document.getElementById("jp-deal-changelog")) return;
+    injectStyles2();
+    const panel = document.createElement("div");
+    panel.id = "jp-deal-changelog";
+    panel.style.display = "none";
+    const shippingPanel = stackEl.querySelector("#jp-shipping-side-panel");
+    if (shippingPanel) {
+      stackEl.insertBefore(panel, shippingPanel);
+    } else {
+      stackEl.prepend(panel);
+    }
+    const snapshot = {};
+    function takeSnapshot() {
+      for (const f of FIELDS) {
+        const v = getFieldValue(f);
+        if (v !== null) snapshot[f.key] = v;
+      }
+      const fd = getFreeDelivery();
+      if (fd !== null) snapshot.freeDelivery = fd;
+    }
+    function getChanges() {
+      const changes = [];
+      for (const f of FIELDS) {
+        if (!(f.key in snapshot)) continue;
+        const cur = getFieldValue(f);
+        if (cur !== null && cur !== snapshot[f.key]) {
+          changes.push({ label: f.label, from: snapshot[f.key], to: cur });
+        }
+      }
+      if ("freeDelivery" in snapshot) {
+        const cur = getFreeDelivery();
+        if (cur !== null && cur !== snapshot.freeDelivery) {
+          changes.push({
+            label: "Darmowa dostawa",
+            from: snapshot.freeDelivery ? "Tak" : "Nie",
+            to: cur ? "Tak" : "Nie"
+          });
+        }
+      }
+      return changes;
+    }
+    function renderChanges() {
+      const changes = getChanges();
+      if (!changes.length) {
+        panel.style.display = "none";
+        return;
+      }
+      panel.style.display = "";
+      const maxUrl = 36, maxOther = 42;
+      panel.innerHTML = `
+            <div id="jp-dc-header">📝 Zmiany w tej sesji</div>
+            ${changes.map((c) => {
+        const isUrl = c.label.startsWith("URL");
+        const max = isUrl ? maxUrl : maxOther;
+        return `<div class="jp-dc-item">
+                    <span class="jp-dc-label">${c.label}</span>
+                    <span class="jp-dc-from" title="${c.from}">${trunc(c.from, max)}</span>
+                    <span class="jp-dc-arrow">→</span>
+                    <span class="jp-dc-to" title="${c.to}">${trunc(c.to, max)}</span>
+                </div>`;
+      }).join("")}
+        `;
+      try {
+        GM_setValue(STORAGE_KEY_PREFIX + threadId, { changes, ts: Date.now() });
+      } catch (_) {
+      }
+    }
+    function setupListeners() {
+      for (const f of FIELDS) {
+        const el = document.querySelector(f.sel);
+        if (!el) continue;
+        el.addEventListener("input", renderChanges);
+        el.addEventListener("change", renderChanges);
+      }
+      const root = document.querySelector(".layout.column.mb-3.px-4") || document.body;
+      new MutationObserver(renderChanges).observe(root, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "aria-checked"]
+      });
+    }
+    setTimeout(() => {
+      takeSnapshot();
+      setupListeners();
+    }, 80);
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -7438,7 +7651,8 @@
       enableSessionHistory: true,
       enableSnippets: true,
       enableCheatsheet: true,
-      enableReportedReason: true
+      enableReportedReason: true,
+      enableDealChangelog: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -7463,6 +7677,7 @@
     if (settings3.enableSessionHistory) initSessionHistory(settings3);
     if (settings3.enableSnippets) initSnippets();
     if (settings3.enableCheatsheet) initCheatsheet(settings3);
+    if (settings3.enableMerchantNotes) initAutopromoTracker();
     function settingsSectionHead(titleKey, descKey) {
       return `
             <h4 class="jp-settings-h4">${t(titleKey)}</h4>
@@ -7510,7 +7725,8 @@
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
           settingsModuleToggle("set-auto-local", s.enableAutoLocalStore, "mAutoLoc", "mAutoLocHint"),
-          settingsModuleToggle("set-shipping-costs", s.enableShippingCosts, "lblShippingCosts", "lblShippingCostsHint")
+          settingsModuleToggle("set-shipping-costs", s.enableShippingCosts, "lblShippingCosts", "lblShippingCostsHint"),
+          settingsModuleToggle("set-deal-changelog", s.enableDealChangelog, "mDealChangelog", "mDealChangelogHint")
         ]),
         settingsModuleGroup("secModMessages", "secModMessagesDesc", [
           settingsModuleToggle("set-hold-note", s.enableAutoHoldNote, "mHoldNote", "mHoldNoteHint"),
@@ -7814,7 +8030,8 @@
           enableReportedReason: document.getElementById("set-reported-reason").checked,
           enableSessionHistory: document.getElementById("set-session-history").checked,
           enableSnippets: document.getElementById("set-snippets").checked,
-          enableCheatsheet: document.getElementById("set-cheatsheet").checked
+          enableCheatsheet: document.getElementById("set-cheatsheet").checked,
+          enableDealChangelog: document.getElementById("set-deal-changelog").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -9470,6 +9687,34 @@
         ta.dataset.jpLastDesiredLine = desiredLine;
       }
     }
+    var _autopromoTrackerInit = false;
+    function initAutopromoTracker() {
+      if (_autopromoTrackerInit) return;
+      _autopromoTrackerInit = true;
+      document.addEventListener("click", function(e) {
+        const btn = e.target.closest("button");
+        if (!btn || !btn.classList.contains("primary")) return;
+        const btnText = btn.textContent || "";
+        if (!btnText.includes("Delete") || !btnText.includes("Ban")) return;
+        const modal = document.querySelector(".v-dialog--active") || document.querySelector('[role="dialog"]');
+        if (!modal) return;
+        const banTabActive = Array.from(modal.querySelectorAll(".v-tabs__item--active")).some((el) => el.textContent.includes("BAN") || el.getAttribute("href") === "#ban");
+        if (!banTabActive) return;
+        const reasonText = (modal.querySelector(".v-select__selection")?.textContent || "").trim();
+        if (!reasonText.toLowerCase().includes("autopromoc")) return;
+        const merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+        const merchantName = merchantInput?.value?.trim();
+        if (!merchantName) return;
+        const noteInput = modal.querySelector('input[placeholder="Leave a note for moderators"]');
+        const adminNote = noteInput?.value?.trim() || "";
+        const date = (/* @__PURE__ */ new Date()).toLocaleDateString("pl-PL");
+        const dealUrl = window.location.href;
+        const noteText = adminNote ? `🚫 Autopromo ${date} — ${dealUrl} · ${adminNote}` : `🚫 Autopromo ${date} — ${dealUrl}`;
+        saveMerchantNote(merchantName, noteText);
+        increment("autoMerchantNotesInserted");
+        showToast(`📋 Notatka autopromo zapisana dla: ${merchantName}`);
+      }, true);
+    }
     function checkInspectorModal() {
       if (!window.location.href.includes("/inspector/")) return;
       let textareas = Array.from(document.querySelectorAll("textarea"));
@@ -10144,6 +10389,10 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             sidePanel.className = "jp-shipping-side-panel";
             shippingStack.appendChild(sidePanel);
             mainFormPanel.appendChild(shippingStack);
+            if (settings3.enableDealChangelog) {
+              const _clThreadId = (window.location.pathname.match(/\/thread\/(\d+)/) || [])[1];
+              initDealChangelog(shippingStack, _clThreadId);
+            }
           } else if (settings3.enableFloatingButton && !document.querySelector("#jp-shipping-stack .mod-floating-btn")) {
             let shippingStack = document.getElementById("jp-shipping-stack");
             let floatBtn = document.createElement("button");
