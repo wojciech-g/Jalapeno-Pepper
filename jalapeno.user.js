@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      4.9.16
+// @version      5.0
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -15,10 +15,18 @@
 // @match        *://lens.google.com/*
 // @match        *://*.allegro.pl/*
 // @match        *://allegro.pl/*
+// @match        *://*.aliexpress.com/*
+// @match        *://aliexpress.com/*
+// @match        *://*.empik.com/*
+// @match        *://empik.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_deleteValue
+// @grant        GM_openInTab
+// @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // @connect      www.pepper.pl
@@ -61,7 +69,7 @@
                 --jp-input-bg: ${isDark ? "#313338" : "#fff"};
                 --jp-input-text: ${isDark ? darkTextColor : "#000"};
 
-                --jp-link: ${isDark ? "#4fc3f7" : "#03a9f4"};
+                --jp-link: ${isDark ? "#d84315" : "#e68a00"};
 
                 --jp-fake-btn-bg: ${isDark ? "#4a1c1c" : "#ff9800"};
                 --jp-fake-btn-hover: ${isDark ? "#732a2a" : "#e68a00"};
@@ -87,9 +95,9 @@
                 --jp-alert-field-bg: ${isDark ? "#423600" : "#fff9c4"};
                 --jp-alert-field-co: ${isDark ? "#ffeb3b" : "#333"};
 
-                --jp-template-btn-bg: ${isDark ? "#1e1f22" : "#e3f2fd"};
-                --jp-template-btn-hover: ${isDark ? "#383a40" : "#bbdefb"};
-                --jp-template-btn-border: ${isDark ? "#404249" : "#90caf9"};
+                --jp-template-btn-bg: ${isDark ? "#1e1f22" : "#fff3e0"};
+                --jp-template-btn-hover: ${isDark ? "#383a40" : "#ffe0b2"};
+                --jp-template-btn-border: ${isDark ? "#404249" : "#ffb74d"};
 
                 --jp-approve-bg: ${isDark ? "#383a40" : "#ff9800"};
                 --jp-approve-bg-hover: ${isDark ? "#404249" : "#e68a00"};
@@ -121,9 +129,9 @@
                 gap: 14px;
                 max-width: min(420px, calc(100vw - 40px));
                 padding: 12px 14px;
-                border: 1px solid var(--jp-stat-del-bo);
-                border-left: 4px solid #e65100;
-                border-radius: 8px;
+                border: 1px solid var(--jp-border);
+                border-left: 3px solid #c0392b;
+                border-radius: 6px;
                 background: var(--jp-modal-bg);
                 color: var(--jp-text);
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
@@ -175,7 +183,7 @@
                 align-items: center;
                 padding: 6px 12px;
                 border-radius: 4px;
-                background: #e65100;
+                background: #c0392b;
                 color: #fff !important;
                 font-size: 12px;
                 font-weight: 700;
@@ -184,7 +192,7 @@
                 transition: background 0.15s ease;
             }
             .jp-update-banner-download:hover {
-                background: #bf360c;
+                background: #922b21;
                 color: #fff !important;
             }
             .jp-update-banner-dismiss {
@@ -238,7 +246,8 @@
             #shopinfo {
                 text-align: center !important; padding: 15px !important; margin: 10px 0 !important;
                 background-color: var(--jp-bg) !important; color: var(--jp-text) !important;
-                border: 1px solid var(--jp-border) !important; border-radius: 8px !important; font-family: sans-serif !important;
+                border: 1px solid var(--jp-border) !important; border-left: 3px solid #c0392b !important;
+                border-radius: 6px !important; font-family: sans-serif !important;
             }
             #shopinfo img {
                 display: block !important; margin: 10px auto 0 auto !important; width: 25% !important; filter: ${isDark ? "invert(1) hue-rotate(180deg)" : "none"} !important;
@@ -250,8 +259,8 @@
             }
             .jp-merchant-note-input:focus {
                 outline: none !important;
-                border-color: #ff9800 !important;
-                box-shadow: 0 0 4px rgba(255, 152, 0, 0.3) !important;
+                border-color: #c0392b !important;
+                box-shadow: 0 0 4px rgba(192, 57, 43, 0.3) !important;
             }
             .jp-merchant-note-save:hover {
                 opacity: 0.9;
@@ -297,15 +306,13 @@
 
             /* MERCHANT NOTE ALERT BOX */
             .jp-merchant-note-alert {
-                background-color: var(--jp-template-btn-bg) !important;
-                color: white !important;
-                padding: 8px 12px !important;
-                text-align: left !important;
-                font-size: 12px !important;
-                border-radius: 4px !important;
+                background: var(--jp-bg) !important;
+                color: var(--jp-text) !important;
+                padding: 8px 10px !important;
+                font-size: 11px !important;
+                border-radius: 6px !important;
                 margin-bottom: 8px !important;
-                border-left: 3px solid #ff9800 !important;
-                z-index: 100 !important;
+                border-left: 3px solid #c0392b !important;
             }
 
             /* LOCK BUTTONS CONTAINER */
@@ -350,7 +357,6 @@
                 display: flex !important;
                 gap: 8px !important;
                 margin-bottom: 8px !important;
-                z-index: 100 !important;
             }
 
             .jp-note-buttons-wrapper .jp-merchant-note-alert {
@@ -363,12 +369,12 @@
 
             /* MERCHANT NOTE EDIT CONTAINER */
             .jp-merchant-note-edit-container {
-                background-color: var(--jp-template-btn-bg) !important;
-                padding: 10px 12px !important;
-                border-radius: 4px !important;
+                background: var(--jp-bg) !important;
+                padding: 8px 10px !important;
+                border: 1px solid var(--jp-border) !important;
+                border-radius: 6px !important;
                 margin-bottom: 8px !important;
-                border-left: 3px solid #ff9800 !important;
-                z-index: 100 !important;
+                border-left: 3px solid #c0392b !important;
             }
 
             .jp-merchant-note-edit-input {
@@ -385,7 +391,7 @@
 
             .jp-merchant-note-edit-input:focus {
                 outline: none !important;
-                border-color: #ff9800 !important;
+                border-color: #c0392b !important;
             }
 
             .jp-merchant-note-button-group {
@@ -426,8 +432,7 @@
                 font-size: 12px !important;
                 border-radius: 4px !important;
                 margin-bottom: 8px !important;
-                border-left: 3px solid #4fc3f7 !important;
-                z-index: 100 !important;
+                border-left: 3px solid #e68a00 !important;
             }
 
             .jp-shipping-cost-item {
@@ -437,7 +442,7 @@
                 padding: 6px;
                 border-radius: 3px;
                 margin-bottom: 6px;
-                border-left: 2px solid #4fc3f7;
+                border-left: 2px solid #e68a00;
                 background-color: rgba(255, 255, 255, 0.05);
             }
 
@@ -449,7 +454,7 @@
             }
 
             .jp-shipping-cost-btn {
-                background-color: #2196f3 !important;
+                background-color: #e68a00 !important;
                 color: white !important;
                 border: none !important;
                 padding: 4px 8px !important;
@@ -461,7 +466,7 @@
             }
 
             .jp-shipping-cost-btn:hover {
-                background-color: #1976d2 !important;
+                background-color: #cc7700 !important;
                 opacity: 0.9 !important;
             }
 
@@ -487,8 +492,7 @@
                 padding: 10px 12px !important;
                 border-radius: 4px !important;
                 margin-bottom: 8px !important;
-                border-left: 3px solid #4fc3f7 !important;
-                z-index: 100 !important;
+                border-left: 3px solid #e68a00 !important;
             }
 
             .jp-shipping-cost-form-row {
@@ -511,7 +515,7 @@
 
             .jp-shipping-cost-input:focus {
                 outline: none !important;
-                border-color: #4fc3f7 !important;
+                border-color: #e68a00 !important;
             }
 
             .jp-shipping-cost-button-group {
@@ -532,7 +536,7 @@
             }
 
             .jp-shipping-cost-save-edit {
-                background-color: #2196f3 !important;
+                background-color: #e68a00 !important;
             }
 
             .jp-shipping-cost-cancel-edit {
@@ -1431,6 +1435,8 @@
       mExactTimestampsHint: "Zamiast „4 hours ago” pokazuje Submitted/Published/Expires/Expired jako 23.06.2026 18:31:51 na new / on-hold / reported / expired.",
       mReportedReason: "Powód zgłoszenia przy edycji wątku",
       mReportedReasonHint: "Na stronie edycji wątku ze zgłoszeń (Reported) pokazuje baner z powodem zgłoszenia nad panelem narzędzi.",
+      mShopInfo: "Info o sklepie (Allegro / Erli / Ali / Amazon…)",
+      mShopInfoHint: "Przy edycji wątku automatycznie pobiera dane sprzedawcy z linku oferty i sprawdza bazę czarnej listy.",
       mUserAdminLinks: "Metabase + All IPs użytkownika",
       mUserAdminLinksHint: "Przy edycji wątku i w inspektorze usera — Metabase (Track UUID, co dodaje, głosy) oraz panel IP.",
       mJalapenoTools: "Jalapeño",
@@ -1512,6 +1518,11 @@
       lblFloatingTextHint: "Ten tekst zostanie dopisany na końcu tytułu po kliknięciu ✨.",
       lblFloatingFreeDel: "Zaznacz też „Free Delivery”",
       lblFloatingFreeDelHint: "Po dopisaniu tytułu automatycznie włącza darmową dostawę w formularzu.",
+      lblFloatingExpiry: "Ustaw datę wygaśnięcia:",
+      lblFloatingExpiryNone: "— brak —",
+      lblFloatingExpiryCustom: "Własna data (z ustawień)",
+      lblFloatingExpiryHint: "Po kliknięciu ✨ dodatkowo ustawia datę wygaśnięcia deala.",
+      lblFloatingExpiryCustomNote: "Własna data: ustaw w sekcji Konfiguracja → Własna data wygaśnięcia.",
       mFloatingBtn: "Szybki dopisek",
       mFloatingBtnShort: "Szybki dopisek",
       mFloatingBtnDone: "Gotowe",
@@ -1577,6 +1588,8 @@
       lblShippingCosts: "Baza kosztów dostawy",
       mDealChangelog: "Tracker zmian w formularzu deala",
       mDealChangelogHint: "Nad panelem dostawy pokazuje które pola zostały zmienione od momentu otwarcia strony (tytuł, URL, cena, sklep, dostawa).",
+      mDealDateTools: "Narzędzia daty wygaśnięcia",
+      mDealDateToolsHint: "Nad panelem dostawy pokazuje aktualną datę/czas wygaśnięcia i pozwala ustawić je jednym kliknięciem (Dziś 23:59, +7 dni, +30 dni, +90 dni).",
       lblShippingCost: "Koszt dostawy (PLN)",
       lblFreeDeliveryFrom: "Darmowa dostawa od (PLN)",
       lblShippingNote: "Notatka (opcjonalna)",
@@ -1590,6 +1603,8 @@
       mBannedHighlight: "Podświetlenie „banned”",
       lblShippingOffset: "Wysokość panelu dostawy (px):",
       lblShippingOffsetHint: "Odstęp od góry formularza — dotyczy przycisku ✨ i panelu dostawy po prawej.",
+      lblDealDateCustom: "Własna data wygaśnięcia:",
+      lblDealDateCustomHint: "Dodaje własny przycisk w panelu daty. Format: DD.MM.YYYY lub DD.MM.YYYY HH:MM (np. 31.12.2026 23:59).",
       mPriceWarning: "Alert wzrostu ceny na liście",
       mImageSearch: "Wyszukiwanie obrazem (Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
@@ -1734,6 +1749,8 @@
       mExactTimestampsHint: "Replaces “4 hours ago” with Submitted/Published/Expires/Expired as 23.06.2026 18:31:51 on new / on-hold / reported / expired.",
       mReportedReason: "Report reason on thread edit page",
       mReportedReasonHint: "On a thread edit page coming from the Reported queue, shows a banner with the report reason above the tools panel.",
+      mShopInfo: "Shop info (Allegro / Erli / Ali / Amazon…)",
+      mShopInfoHint: "On thread edit, auto-fetches seller info from the offer link and checks the blacklist.",
       mUserAdminLinks: "Metabase + user All IPs",
       mUserAdminLinksHint: "On thread edit and inspector profile — Metabase (Track UUID, posts, votes) and IP panel.",
       mJalapenoTools: "Jalapeño",
@@ -1815,6 +1832,11 @@
       lblFloatingTextHint: "This text is appended to the end of the title when you click ✨.",
       lblFloatingFreeDel: "Also check “Free Delivery”",
       lblFloatingFreeDelHint: "After appending the title, automatically enables free delivery in the form.",
+      lblFloatingExpiry: "Set expiry date:",
+      lblFloatingExpiryNone: "— none —",
+      lblFloatingExpiryCustom: "Custom date (from settings)",
+      lblFloatingExpiryHint: "After clicking ✨, also sets the deal expiry date.",
+      lblFloatingExpiryCustomNote: "Custom date: set in Configuration → Custom expiry date.",
       mFloatingBtn: "Quick append",
       mFloatingBtnShort: "Quick append",
       mFloatingBtnDone: "Done",
@@ -1880,6 +1902,8 @@
       lblShippingCosts: "Shipping cost database",
       mDealChangelog: "Deal form change tracker",
       mDealChangelogHint: "Above the shipping panel, shows which fields were changed since opening the page (title, URL, price, merchant, delivery).",
+      mDealDateTools: "Expiry date tools",
+      mDealDateToolsHint: "Above the shipping panel, shows the current expiry date/time and lets you set it with one click (Today 23:59, +7 days, +30 days, +90 days).",
       lblShippingCost: "Shipping cost (PLN)",
       lblFreeDeliveryFrom: "Free delivery from (PLN)",
       lblShippingNote: "Note (optional)",
@@ -1893,6 +1917,8 @@
       mBannedHighlight: "Highlight “banned”",
       lblShippingOffset: "Shipping panel top offset (px):",
       lblShippingOffsetHint: "Distance from top of the form — applies to ✨ button and shipping panel on the right.",
+      lblDealDateCustom: "Custom expiry date:",
+      lblDealDateCustomHint: "Adds a custom button to the date panel. Format: DD.MM.YYYY or DD.MM.YYYY HH:MM (e.g. 31.12.2026 23:59).",
       mPriceWarning: "Price rise alert on queue list",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
@@ -2022,6 +2048,7 @@
   }
   function highlightBannedAndUnauthenticated() {
     document.querySelectorAll("*").forEach((element) => {
+      if (element.closest("#jalapeno-settings-modal, #jp-welcome-splash")) return;
       for (let node of element.childNodes) {
         if (node.nodeType === Node.TEXT_NODE && !element.dataset.jpHighlighted) {
           let text = node.textContent.toLowerCase();
@@ -3679,7 +3706,6 @@
 
   // src/features/allegroImages.js
   var FETCH_TIMEOUT_MS = 12e3;
-  var PEPPER_UPLOAD_URL = "https://www.pepper.pl/image/upload-from-image-uri-or-image-file/thread_medium";
   var UI_ASSET_PATTERN = /action-common|arrowhead/i;
   var PRODUCT_IMAGE_PATTERN = /a\.allegroimg\.com\/(?:s\d+|original)\/[a-f0-9]+\/[a-f0-9]+/i;
   function isProductImageUrl(src) {
@@ -3790,10 +3816,6 @@
     }
     return [...byKey.values()];
   }
-  function getXsrfToken() {
-    const match = document.cookie.match(/xsrf_t=([^;]+)/);
-    return match ? decodeURIComponent(match[1]).replace(/^"|"$/g, "") : "";
-  }
   function gmFetchHtml(url) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
@@ -3837,105 +3859,41 @@
     const main = document.querySelector('textarea[name="mainUrl"]')?.value?.trim();
     return main || null;
   }
-  function extractUploadedImageUrl(data) {
-    if (!data) return null;
-    const image = data.image || data;
-    const slot = data.slot;
-    if (image.thread_medium?.url) return image.thread_medium.url;
-    if (image.raw?.thread_medium?.url) return image.raw.thread_medium.url;
-    if (slot && image.raw?.[slot]?.url) return image.raw[slot].url;
-    for (const bucket of ["raw", "thread_medium", "thread_large", "thread_small"]) {
-      const entry = image[bucket];
-      if (!entry) continue;
-      if (typeof entry.url === "string") return entry.url;
-      if (typeof entry === "object") {
-        const first = Object.values(entry).find((v) => v && typeof v.url === "string");
-        if (first) return first.url;
+  function waitForElement(selector, timeout) {
+    return new Promise((resolve) => {
+      const existing = document.querySelector(selector);
+      if (existing) {
+        resolve(existing);
+        return;
       }
-    }
-    if (typeof image.url === "string") return image.url;
-    if (typeof data.url === "string") return data.url;
-    return null;
-  }
-  function applyImageToEditor(imageUrl, responseData) {
-    const editor = document.querySelector(".imageEditor");
-    if (!editor || !imageUrl) return;
-    const img = editor.querySelector("img[src]");
-    if (img && !img.src.startsWith("data:image/gif")) {
-      img.src = imageUrl;
-    }
-    const vImg = editor.querySelector(".v-image__image");
-    if (vImg) {
-      vImg.style.backgroundImage = `url("${imageUrl}")`;
-    }
-    const imageData = responseData?.image ?? responseData;
-    if (!imageData) return;
-    let node = editor;
-    while (node) {
-      const vm = node.__vue__;
-      if (vm && vm.$data) {
-        let updated = false;
-        if ("image" in vm.$data) {
-          vm.$data.image = imageData;
-          updated = true;
-        } else if ("value" in vm.$data) {
-          vm.$data.value = imageData;
-          updated = true;
+      const observer = new MutationObserver(() => {
+        const el = document.querySelector(selector);
+        if (el) {
+          observer.disconnect();
+          resolve(el);
         }
-        if (updated) {
-          try {
-            vm.$forceUpdate?.();
-          } catch (_) {
-          }
-          try {
-            vm.$emit("input", imageData);
-          } catch (_) {
-          }
-          try {
-            vm.$emit("change", imageData);
-          } catch (_) {
-          }
-          return;
-        }
-      }
-      node = node.parentElement;
-    }
-  }
-  function uploadImageFromUri(imageUrl) {
-    const fd = new FormData();
-    fd.append("image_url", imageUrl);
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: PEPPER_UPLOAD_URL,
-        headers: {
-          "X-XSRF-TOKEN": getXsrfToken(),
-          "X-Requested-With": "XMLHttpRequest",
-          Accept: "application/json"
-        },
-        data: fd,
-        onload(res) {
-          try {
-            const parsed = JSON.parse(res.responseText || "{}");
-            if (parsed?.status === "success") {
-              const uploadedUrl = extractUploadedImageUrl(parsed.data);
-              if (uploadedUrl) {
-                applyImageToEditor(uploadedUrl, parsed.data);
-                resolve(uploadedUrl);
-                return;
-              }
-              reject(new Error("No image URL in upload response"));
-              return;
-            }
-            reject(new Error(parsed?.messages?.[0] || "HTTP " + res.status));
-          } catch (err) {
-            reject(new Error("Upload response parse failed: " + err.message));
-          }
-        },
-        onerror: () => reject(new Error("Upload network error")),
-        ontimeout: () => reject(new Error("Upload timed out"))
       });
+      observer.observe(document.body, { subtree: true, childList: true });
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(null);
+      }, timeout);
     });
+  }
+  async function addImageViaUI(imageUrl) {
+    const addViaUrlBtn = [...document.querySelectorAll(".v-btn__content")].find((el) => el.textContent.includes("Add via URL"))?.closest(".v-btn");
+    if (!addViaUrlBtn) throw new Error("Add via URL button not found");
+    addViaUrlBtn.click();
+    const textarea = await waitForElement('textarea[placeholder="Image URL"]', 3e3);
+    if (!textarea) throw new Error("Image URL textarea not found");
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+    nativeSetter.call(textarea, imageUrl);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 80));
+    const container = textarea.closest(".v-card, .imageEditor") || document.body;
+    const addBtn = [...container.querySelectorAll(".v-btn__content")].find((el) => el.textContent.trim() === "Add")?.closest(".v-btn");
+    if (!addBtn) throw new Error("Add button not found");
+    addBtn.click();
   }
   async function pullAllegroImageIntoDeal(offerUrl) {
     if (!isAllegroOfferUrl(offerUrl)) {
@@ -3949,7 +3907,7 @@
         const html = await gmFetchHtml(fetchUrl);
         const images = extractAllegroGalleryFromHtml(html);
         if (!images.length) continue;
-        await uploadImageFromUri(images[0]);
+        await addImageViaUI(images[0]);
         increment("allegroImagePulls");
         showToast(t("mAllegroImgUploaded"));
         return;
@@ -4989,7 +4947,7 @@
     const p = parseInt(new URLSearchParams(window.location.search).get("page") || "1", 10);
     return Number.isFinite(p) && p > 0 ? p : 1;
   }
-  function getXsrfToken2() {
+  function getXsrfToken() {
     const m = document.cookie.match(/xsrf_t=([^;]+)/);
     return m ? decodeURIComponent(m[1]).replace(/^"|"$/g, "") : "";
   }
@@ -5025,7 +4983,7 @@
       headers: {
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        "X-XSRF-TOKEN": getXsrfToken2()
+        "X-XSRF-TOKEN": getXsrfToken()
       }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -5613,7 +5571,7 @@
   }
 
   // src/utils/pepperAdmin.js
-  function getXsrfToken3() {
+  function getXsrfToken2() {
     const m = document.cookie.match(/xsrf_t=([^;]+)/);
     return m ? decodeURIComponent(m[1]).replace(/^"|"$/g, "") : "";
   }
@@ -5638,7 +5596,7 @@
       headers: {
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        "X-XSRF-TOKEN": getXsrfToken3()
+        "X-XSRF-TOKEN": getXsrfToken2()
       }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -5650,7 +5608,7 @@
       headers: {
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        "X-XSRF-TOKEN": getXsrfToken3()
+        "X-XSRF-TOKEN": getXsrfToken2()
       }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -5764,17 +5722,17 @@
             align-items: flex-start;
             gap: 10px;
             margin: 0 0 12px 0;
-            padding: 11px 14px;
-            background: var(--jp-row-bg, #fff8f1);
-            border: 1px solid var(--jp-border, #e0e0e0);
-            border-left: 4px solid #e65100;
+            padding: 10px 12px;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
             font-size: 13px;
             line-height: 1.5;
             color: var(--jp-text, #333);
         }
         #jp-reported-reason-banner .jp-rr-icon {
-            color: #e65100;
+            color: #c0392b;
             font-size: 18px;
             flex-shrink: 0;
             margin-top: 1px;
@@ -5785,7 +5743,7 @@
         }
         #jp-reported-reason-banner .jp-rr-label {
             font-weight: 700;
-            color: #e65100;
+            color: #c0392b;
         }
         #jp-reported-reason-banner .jp-rr-text {
             font-size: 13px;
@@ -5793,7 +5751,7 @@
             word-break: break-word;
         }
         #jp-reported-reason-banner .jp-rr-link {
-            color: #e65100;
+            color: #c0392b;
             text-decoration: underline;
             word-break: break-all;
         }
@@ -5819,7 +5777,7 @@
         }
         #jp-reported-reason-dismiss:hover {
             opacity: 1;
-            color: #e65100;
+            color: #c0392b;
         }
     `);
   }
@@ -6354,7 +6312,7 @@
             flex-shrink: 0;
             width: 28px;
             min-height: 100px;
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             border: none;
             border-radius: 0 8px 8px 0;
@@ -6372,7 +6330,7 @@
             font-family: inherit;
         }
 
-        #jp-hist-tab:hover { background: #e64a00; }
+        #jp-hist-tab:hover { background: #922b21; }
 
         #jp-session-hist.jp-hist-collapsed #jp-hist-inner { display: none; }
 
@@ -6387,7 +6345,7 @@
         }
 
         #jp-hist-header {
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             padding: 7px 10px;
             font-weight: bold;
@@ -6449,11 +6407,11 @@
 
         .jp-hist-item:hover {
             background: var(--jp-btn-hover, #e6e6e6);
-            border-color: #ff5200;
+            border-color: #c0392b;
         }
 
         .jp-hist-item-current {
-            border-color: #ff5200;
+            border-color: #c0392b;
             background: var(--jp-row-bg, #f0f8ff);
         }
 
@@ -6490,7 +6448,7 @@
         }
 
         #jp-hist-search:focus {
-            border-color: #ff5200;
+            border-color: #c0392b;
         }
 
         .jp-hist-empty {
@@ -6709,7 +6667,7 @@
             flex-shrink: 0;
             width: 28px;
             min-height: 100px;
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             border: none;
             border-radius: 0 8px 8px 0;
@@ -6727,7 +6685,7 @@
             font-family: inherit;
         }
 
-        #jp-snip-tab:hover { background: #e64a00; }
+        #jp-snip-tab:hover { background: #922b21; }
 
         #jp-snippets.jp-snip-collapsed #jp-snip-inner { display: none; }
 
@@ -6742,7 +6700,7 @@
         }
 
         #jp-snip-header {
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             padding: 7px 10px;
             font-weight: bold;
@@ -6817,7 +6775,7 @@
 
         .jp-snip-item:hover {
             background: var(--jp-btn-hover, #e6e6e6);
-            border-color: #ff5200;
+            border-color: #c0392b;
         }
 
         .jp-snip-body {
@@ -6893,7 +6851,7 @@
         }
 
         .jp-snip-input:focus,
-        .jp-snip-textarea:focus { border-color: #ff5200; }
+        .jp-snip-textarea:focus { border-color: #c0392b; }
 
         .jp-snip-form-btns {
             display: flex;
@@ -6913,11 +6871,11 @@
         }
 
         .jp-snip-save-btn {
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
         }
 
-        .jp-snip-save-btn:hover { background: #e64a00; }
+        .jp-snip-save-btn:hover { background: #922b21; }
 
         .jp-snip-cancel-btn {
             background: var(--jp-btn-bg, #fff);
@@ -7163,7 +7121,7 @@
             flex-shrink: 0;
             width: 28px;
             min-height: 100px;
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             border: none;
             border-radius: 0 8px 8px 0;
@@ -7181,7 +7139,7 @@
             font-family: inherit;
         }
 
-        #jp-cs-tab:hover { background: #e64a00; }
+        #jp-cs-tab:hover { background: #922b21; }
 
         #jp-cheatsheet.jp-cs-collapsed #jp-cs-inner { display: none; }
 
@@ -7197,7 +7155,7 @@
         }
 
         #jp-cs-header {
-            background: #ff5200;
+            background: #c0392b;
             color: #fff;
             padding: 7px 10px;
             font-weight: bold;
@@ -7412,7 +7370,8 @@
     { key: "price", label: "Cena", sel: 'input[placeholder="Price"]' },
     { key: "shipping", label: "Dostawa", sel: 'input[placeholder="Shipping costs"]' },
     { key: "merchant", label: "Sklep", sel: 'input[placeholder="Merchant name"],input[placeholder="No merchant"]' },
-    { key: "coupon", label: "Kupon", sel: 'input[placeholder="Coupon name"]' }
+    { key: "coupon", label: "Kupon", sel: 'input[placeholder="Coupon name"]' },
+    { key: "nbp", label: "NBP", sel: 'input[placeholder="NBP"]' }
   ];
   function injectStyles2() {
     if (_stylesInjected2) return;
@@ -7422,7 +7381,7 @@
             width: 100%;
             background: var(--jp-bg);
             border: 1px solid var(--jp-border);
-            border-left: 3px solid #ff9800;
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
             padding: 10px 12px;
             font-size: 11px;
@@ -7432,7 +7391,7 @@
         #jp-dc-header {
             font-weight: 700;
             font-size: 11px;
-            color: #ff9800;
+            color: #c0392b;
             margin-bottom: 7px;
             letter-spacing: 0.02em;
         }
@@ -7463,7 +7422,7 @@
             font-size: 10px;
         }
         .jp-dc-arrow {
-            color: #ff9800;
+            color: #c0392b;
             font-size: 10px;
             text-align: center;
         }
@@ -7588,6 +7547,1256 @@
     }, 80);
   }
 
+  // src/features/dealDateTools.js
+  var _stylesInjected3 = false;
+  function injectStyles3() {
+    if (_stylesInjected3) return;
+    _stylesInjected3 = true;
+    GM_addStyle(`
+        #jp-date-tools {
+            width: 100%;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+        #jp-dt-header {
+            font-weight: 700;
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 5px;
+        }
+        #jp-dt-current {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--jp-text);
+            margin-bottom: 6px;
+        }
+        .jp-dt-val { font-weight: 600; }
+        .jp-dt-val.changed {
+            color: #c0392b;
+        }
+        .jp-dt-from {
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            text-decoration: line-through;
+        }
+
+        #jp-dt-buttons {
+            display: flex;
+            gap: 4px;
+        }
+        .jp-dt-preset {
+            flex: 1;
+            padding: 3px 4px;
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--jp-btn-bg, #3b3d41);
+            color: var(--jp-text);
+            border: 1px solid var(--jp-border);
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .jp-dt-preset:hover:not(:disabled) {
+            background: #c0392b;
+            color: #fff;
+            border-color: #c0392b;
+        }
+        .jp-dt-preset:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    `);
+  }
+  function delay2(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+  function findDateInput() {
+    let last = null;
+    for (const inp of document.querySelectorAll('.v-input--is-readonly input[readonly][type="text"]')) {
+      if (/^\d{1,2}\.\d{2}\.\d{4}$/.test(inp.value.trim())) last = inp;
+    }
+    return last;
+  }
+  function findTimeInput() {
+    let last = null;
+    for (const inp of document.querySelectorAll('.v-input--is-readonly input[readonly][type="text"]')) {
+      if (/^\d{1,2}:\d{2}(\s*(AM|PM))?$/i.test(inp.value.trim())) last = inp;
+    }
+    return last;
+  }
+  function getInputLabel(input) {
+    const vInput = input.closest(".v-input");
+    if (!vInput) return "";
+    const label = vInput.querySelector(".v-label");
+    return label ? label.textContent.trim().toLowerCase() : "";
+  }
+  function findExpiryPairForSetting(quiet = false) {
+    let dateInp = findDateInput();
+    let timeInp = findTimeInput();
+    if (dateInp && timeInp) return { date: dateInp, time: timeInp };
+    const all = Array.from(document.querySelectorAll('.v-input input[readonly][type="text"]')).filter((i) => !i.closest(".v-select") && !i.closest(".v-autocomplete") && !i.closest(".v-combobox"));
+    if (!quiet) console.log(
+      `[JP dateTools] pola (bez selectów, ${all.length}):`,
+      all.map((i) => {
+        const r = i.getBoundingClientRect();
+        return { val: i.value || "(pusty)", left: Math.round(r.left), top: Math.round(r.top), label: getInputLabel(i) };
+      })
+    );
+    if (all.length === 0) return { date: null, time: null };
+    const expiryKw = ["zakończenia", "wygaśnięcia", "end", "expir", "koniec"];
+    const byLabel = all.filter((i) => expiryKw.some((kw) => getInputLabel(i).includes(kw)));
+    if (byLabel.length >= 2) {
+      byLabel.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      return { date: byLabel[0], time: byLabel[1] };
+    }
+    if (byLabel.length === 1) return { date: byLabel[0], time: null };
+    const aboveViewport = all.filter((i) => i.getBoundingClientRect().top < 0);
+    const visible = all.filter((i) => i.getBoundingClientRect().top >= 0);
+    const pool = visible.length ? visible : all;
+    const rows = [];
+    for (const inp of pool) {
+      const t2 = Math.round(inp.getBoundingClientRect().top);
+      const row = rows.find((r) => Math.abs(r.top - t2) <= 15);
+      if (row) row.inputs.push(inp);
+      else rows.push({ top: t2, inputs: [inp] });
+    }
+    rows.sort((a, b) => a.top - b.top);
+    const targetRow = rows[rows.length - 1];
+    targetRow.inputs.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    if (!quiet) console.log("[JP dateTools] para fallback (ostatni wiersz top=" + targetRow.top + "):", targetRow.inputs.map((i) => Math.round(i.getBoundingClientRect().left)));
+    return { date: targetRow.inputs[targetRow.inputs.length - 1], time: null };
+  }
+  function openPickerFor(input) {
+    const slot = input.closest(".v-input__slot");
+    if (slot) slot.click();
+    else input.click();
+  }
+  function parsePickerHeader(text) {
+    const MONTHS = {
+      JAN: 1,
+      FEB: 2,
+      MAR: 3,
+      APR: 4,
+      MAY: 5,
+      JUN: 6,
+      JUL: 7,
+      AUG: 8,
+      SEP: 9,
+      OCT: 10,
+      NOV: 11,
+      DEC: 12,
+      STY: 1,
+      LUT: 2,
+      KWI: 4,
+      MAJ: 5,
+      CZE: 6,
+      LIP: 7,
+      SIE: 8,
+      WRZ: 9,
+      LIS: 11,
+      GRU: 12
+    };
+    const t2 = text.toUpperCase().trim();
+    const m1 = t2.match(/^([A-ZĄŻŹŚĆŃÓŁ]{3})[A-Z]*\s+(\d{4})$/);
+    if (m1) {
+      const mon = MONTHS[m1[1]];
+      if (mon) return { month: mon, year: parseInt(m1[2]) };
+    }
+    const m2 = t2.match(/^(\d{4})-(\d{2})$/);
+    if (m2) return { month: parseInt(m2[2]), year: parseInt(m2[1]) };
+    return null;
+  }
+  async function setDatePicker(input, targetDay, targetMonth, targetYear) {
+    openPickerFor(input);
+    await delay2(300);
+    const table = document.querySelector(".v-date-picker-table--date");
+    if (!table) {
+      console.log("[JP dateTools] ✗ picker daty nie otworzył się");
+      return false;
+    }
+    for (let i = 0; i < 36; i++) {
+      const headerBtn = document.querySelector(".v-date-picker-header__value button");
+      if (!headerBtn) break;
+      const parsed = parsePickerHeader(headerBtn.textContent);
+      if (!parsed) break;
+      if (parsed.year === targetYear && parsed.month === targetMonth) break;
+      const goBack = parsed.year > targetYear || parsed.year === targetYear && parsed.month > targetMonth;
+      const navBtn = goBack ? document.querySelector(".v-date-picker-header > button:first-child") : document.querySelector(".v-date-picker-header > button:last-child");
+      if (!navBtn) break;
+      navBtn.click();
+      await delay2(120);
+    }
+    const dayBtns = table.querySelectorAll("tbody .v-btn");
+    for (const btn of dayBtns) {
+      const label = (btn.querySelector(".v-btn__content") || btn).textContent.trim();
+      if (parseInt(label) === targetDay && !btn.disabled && !btn.classList.contains("v-btn--disabled")) {
+        btn.click();
+        break;
+      }
+    }
+    await delay2(120);
+    const pickerRoot = table.closest(".v-picker");
+    if (pickerRoot) {
+      const actions = pickerRoot.querySelector(".v-picker__actions");
+      if (actions) {
+        const okBtn = Array.from(actions.querySelectorAll(".v-btn")).find((b) => /^ok$/i.test(b.textContent.trim()));
+        if (okBtn) okBtn.click();
+      }
+    }
+    return true;
+  }
+  async function setTimePicker(input, hour24, minute) {
+    openPickerFor(input);
+    await delay2(300);
+    const pickerRoot = document.querySelector(".v-picker--time");
+    if (!pickerRoot) {
+      console.log("[JP dateTools] ✗ picker czasu nie otworzył się");
+      return false;
+    }
+    const vComp = pickerRoot.__vue__;
+    if (vComp) {
+      const has12h = "period" in vComp || !!pickerRoot.querySelector(".v-time-picker-title__ampm");
+      if (has12h) {
+        const period = hour24 >= 12 ? "pm" : "am";
+        const h12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+        if ("period" in vComp) vComp.period = period;
+        const ampmSpans = pickerRoot.querySelectorAll(".v-time-picker-title__ampm span");
+        const targetLabel = hour24 >= 12 ? "PM" : "AM";
+        const periodSpan = Array.from(ampmSpans).find((s) => s.textContent.trim() === targetLabel);
+        if (periodSpan) periodSpan.click();
+        await delay2(80);
+        if ("inputHour" in vComp) vComp.inputHour = h12;
+        await delay2(80);
+        if ("inputMinute" in vComp) vComp.inputMinute = minute;
+      } else {
+        if ("inputHour" in vComp) vComp.inputHour = hour24;
+        await delay2(80);
+        if ("inputMinute" in vComp) vComp.inputMinute = minute;
+      }
+    } else {
+      console.log("[JP dateTools] ✗ brak __vue__ na time pickerze — nie można ustawić czasu automatycznie");
+    }
+    await delay2(150);
+    const actions = pickerRoot.querySelector(".v-picker__actions");
+    if (actions) {
+      const okBtn = Array.from(actions.querySelectorAll(".v-btn")).find((b) => /^ok$/i.test(b.textContent.trim()));
+      if (okBtn) okBtn.click();
+    }
+    return true;
+  }
+  function parseCustomPresetString(str) {
+    if (!str) return null;
+    const s = str.trim();
+    const m = s.match(/^(\d{1,2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+    if (!m) return null;
+    return {
+      d: parseInt(m[1]),
+      mo: parseInt(m[2]),
+      y: parseInt(m[3]),
+      h: m[4] != null ? parseInt(m[4]) : 23,
+      m: m[5] != null ? parseInt(m[5]) : 59
+    };
+  }
+  async function applyPreset(preset) {
+    let d, mo, y, h, m;
+    if (preset.abs) {
+      ({ d, mo, y, h, m } = preset.abs);
+    } else {
+      const now = /* @__PURE__ */ new Date();
+      now.setDate(now.getDate() + preset.days);
+      d = now.getDate();
+      mo = now.getMonth() + 1;
+      y = now.getFullYear();
+      h = preset.h;
+      m = preset.m;
+    }
+    console.log(`[JP dateTools] ustawiam: ${d}.${String(mo).padStart(2, "0")}.${y} ${h}:${String(m).padStart(2, "0")}`);
+    const { date: dateInput } = findExpiryPairForSetting();
+    if (!dateInput) {
+      console.log("[JP dateTools] ✗ nie znaleziono pola daty");
+      return;
+    }
+    const okDate = await setDatePicker(dateInput, d, mo, y);
+    console.log("[JP dateTools] data:", okDate ? "✓" : "✗");
+    await delay2(300);
+    const { time: timeInput } = findExpiryPairForSetting();
+    if (timeInput) {
+      const okTime = await setTimePicker(timeInput, h, m);
+      console.log("[JP dateTools] czas:", okTime ? "✓" : "✗");
+    } else {
+      console.log("[JP dateTools] ✗ nie znaleziono pola czasu po ustawieniu daty");
+    }
+  }
+  function buildPresetFromKey(key, customDateStr) {
+    if (!key) return null;
+    if (key === "today") return { days: 0, h: 23, m: 59 };
+    if (key === "+7") return { days: 7, h: 23, m: 59 };
+    if (key === "+30") return { days: 30, h: 23, m: 59 };
+    if (key === "custom") {
+      const abs = parseCustomPresetString(customDateStr);
+      return abs ? { abs } : null;
+    }
+    return null;
+  }
+  function initDealDateTools(stackEl, settings3) {
+    if (!stackEl) return;
+    if (document.getElementById("jp-date-tools")) return;
+    injectStyles3();
+    const panel = document.createElement("div");
+    panel.id = "jp-date-tools";
+    const changelogEl = stackEl.querySelector("#jp-deal-changelog");
+    const shippingEl = stackEl.querySelector("#jp-shipping-side-panel");
+    const anchor = changelogEl || shippingEl;
+    if (anchor) stackEl.insertBefore(panel, anchor);
+    else stackEl.prepend(panel);
+    const PRESETS = [
+      { label: "Dziś 23:59", days: 0, h: 23, m: 59 },
+      { label: "+7 dni", days: 7, h: 23, m: 59 },
+      { label: "+30 dni", days: 30, h: 23, m: 59 }
+    ];
+    const customAbs = parseCustomPresetString(settings3 && settings3.dealDateCustom);
+    if (customAbs) {
+      const dayStr = `${customAbs.d}.${String(customAbs.mo).padStart(2, "0")}`;
+      PRESETS.push({ label: dayStr, abs: customAbs });
+    }
+    let snapshot = { date: null, time: null };
+    function render() {
+      const { date: _dateInp, time: _timeInp } = findExpiryPairForSetting(true);
+      const date = _dateInp?.value?.trim() || null;
+      const time = _timeInp?.value?.trim() || null;
+      const changed = snapshot.date && date && date !== snapshot.date || snapshot.time && time && time !== snapshot.time;
+      const current = [date, time].filter(Boolean).join(" ") || null;
+      const prev = [snapshot.date, snapshot.time].filter(Boolean).join(" ") || null;
+      const display = current ? `<span class="jp-dt-val${changed ? " changed" : ""}">${current}</span>` + (changed ? ` <span class="jp-dt-from">${prev}</span>` : "") : `<span style="opacity:.4">—</span>`;
+      const btns = PRESETS.map(
+        (p, i) => `<button class="jp-dt-preset" data-idx="${i}">${p.label}</button>`
+      ).join("");
+      panel.innerHTML = `
+            <div id="jp-dt-header">⏰ Data wygaśnięcia</div>
+            <div id="jp-dt-current">${display}</div>
+            <div id="jp-dt-buttons">${btns}</div>
+        `;
+    }
+    let _busy = false;
+    panel.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".jp-dt-preset");
+      if (!btn || _busy) return;
+      _busy = true;
+      const preset = PRESETS[+btn.dataset.idx];
+      console.log("[JP dateTools] preset kliknięty:", btn.textContent.trim(), preset);
+      panel.querySelectorAll(".jp-dt-preset").forEach((b) => {
+        b.disabled = true;
+      });
+      await applyPreset(preset);
+      await delay2(400);
+      render();
+      panel.querySelectorAll(".jp-dt-preset").forEach((b) => {
+        b.disabled = false;
+      });
+      _busy = false;
+    });
+    let _last = { date: null, time: null };
+    setInterval(() => {
+      const { date: _dInp, time: _tInp } = findExpiryPairForSetting(true);
+      const date = _dInp?.value?.trim() || null;
+      const time = _tInp?.value?.trim() || null;
+      if (date !== _last.date || time !== _last.time) {
+        _last = { date, time };
+        render();
+      }
+    }, 500);
+    setTimeout(() => {
+      const { date: _snapD, time: _snapT } = findExpiryPairForSetting(true);
+      snapshot.date = _snapD?.value?.trim() || null;
+      snapshot.time = _snapT?.value?.trim() || null;
+      render();
+    }, 150);
+  }
+
+  // src/features/shopInfo.js
+  var _KEY_ALI = "jalapenoShopAli";
+  var _KEY_ALI_NONCE = "jalapenoShopAliNonce";
+  var _KEY_EMP = "jalapenoShopEmpik";
+  var _KEY_EMP_NONCE = "jalapenoShopEmpikNonce";
+  var _NONCE_PARAM = "_jp";
+  var _styleInjected = false;
+  var _daneFirmy = null;
+  var _aliListener = null;
+  var _empListener = null;
+  function isShopInfoTabContext() {
+    const nonce = new URLSearchParams(location.search).get(_NONCE_PARAM);
+    if (!nonce) return false;
+    if (/aliexpress\.com/.test(location.hostname)) return GM_getValue(_KEY_ALI_NONCE, "") === nonce;
+    if (/empik\.com/.test(location.hostname)) return GM_getValue(_KEY_EMP_NONCE, "") === nonce;
+    return false;
+  }
+  function runShopInfoTabContext() {
+    if (/aliexpress\.com/.test(location.hostname)) _runAliTab();
+    else if (/empik\.com/.test(location.hostname)) _runEmpikTab();
+  }
+  function _waitForEl(selector, cb, tries = 20) {
+    if (document.querySelector(selector)) {
+      cb();
+      return;
+    }
+    if (tries < 1) return;
+    setTimeout(() => _waitForEl(selector, cb, tries - 1), 500);
+  }
+  function _runAliTab() {
+    document.title = "*JP* " + document.title;
+    let done = false;
+    const finish = (data) => {
+      if (done) return;
+      done = true;
+      GM_setValue(_KEY_ALI, JSON.stringify(data));
+      GM_deleteValue(_KEY_ALI_NONCE);
+      setTimeout(() => window.close(), 150);
+    };
+    const collectAlt = () => {
+      if (done) return;
+      try {
+        const a = document.querySelector('a[href*="storeNum"]');
+        const storeNum = a?.href.match(/storeNum=(\d+)/)?.[1];
+        finish({
+          merchant: "aliexpress",
+          shopID: storeNum || "-",
+          nazwa: a?.innerText || "-",
+          dane: storeNum ? `<br>Dane firmy: <a href="https://shoprenderview.aliexpress.com/credential/showcredential.htm?storeNum=${storeNum}" target="_blank">Kliknij</a>` : "",
+          faktura: void 0,
+          czas: _now()
+        });
+      } catch {
+        finish(_aliErr("alt"));
+      }
+    };
+    const collectMain = () => {
+      if (done) return;
+      try {
+        const storeEl = document.querySelector('a[class*="store-detail"]');
+        const storeNum = storeEl?.href.match(/store\/(\d+)/)?.[1];
+        const storeName = document.querySelector('span[class*="store-detail--storeName"]')?.innerText;
+        finish({
+          merchant: "aliexpress",
+          shopID: storeNum || "-",
+          nazwa: storeName || "-",
+          dane: storeNum ? `<br>Dane firmy: <a href="https://shoprenderview.aliexpress.com/credential/showcredential.htm?storeNum=${storeNum}" target="_blank">Kliknij</a>` : "",
+          faktura: void 0,
+          czas: _now()
+        });
+      } catch {
+        finish(_aliErr("main"));
+      }
+    };
+    _waitForEl('a[class*="store-detail--"]', () => {
+      const el = document.querySelector('a[class*="store-detail--"]');
+      el?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      _waitForEl('a[href*="storeNum"]', collectAlt);
+    });
+    _waitForEl('a[href*="showcredential"]', collectMain);
+  }
+  function _aliErr(variant) {
+    return { merchant: "aliexpress", shopID: "-", nazwa: `Błąd odczytu (${variant})`, dane: "", faktura: null, czas: _now() };
+  }
+  function _runEmpikTab() {
+    document.title = "*JP* " + document.title;
+    let done = false;
+    const finish = (data) => {
+      if (done) return;
+      done = true;
+      GM_setValue(_KEY_EMP, JSON.stringify(data));
+      GM_deleteValue(_KEY_EMP_NONCE);
+      setTimeout(() => window.close(), 150);
+    };
+    const collect = () => {
+      if (done) return;
+      try {
+        const storeNum = document.querySelector('meta[property="product:merchant_id"]')?.content;
+        const storeName = document.querySelector('span[data-ta="merchant-name"]')?.innerText;
+        finish({
+          merchant: "empik",
+          shopID: storeNum || "-",
+          nazwa: storeName || "b/d",
+          dane: storeNum ? "" : "Oferta może być niedostępna",
+          faktura: null,
+          czas: _now()
+        });
+      } catch {
+        finish({ merchant: "empik", shopID: "-", nazwa: "Błąd odczytu", dane: "", faktura: null, czas: _now() });
+      }
+    };
+    _waitForEl('span[data-ta="merchant-name"]', collect);
+    _waitForEl('button[data-ta="notify-me-button"]', collect);
+  }
+  function resetShopInfo() {
+    document.getElementById("jp-shopinfo")?.classList.remove("jp-shopinfo-show");
+    _daneFirmy = null;
+    _dropListeners();
+    GM_deleteValue(_KEY_ALI_NONCE);
+    GM_deleteValue(_KEY_EMP_NONCE);
+  }
+  function initShopInfo(urlTextarea) {
+    _injectStyles();
+    _ensureDiv();
+    const url = urlTextarea.value.trim();
+    if (url) _lookup(url);
+    let deb;
+    urlTextarea.addEventListener("input", () => {
+      clearTimeout(deb);
+      deb = setTimeout(() => {
+        resetShopInfo();
+        const u = urlTextarea.value.trim();
+        if (u) _lookup(u);
+      }, 800);
+    });
+  }
+  function _lookup(url) {
+    _daneFirmy = { merchant: null, shopID: null, nazwa: null, dane: "", faktura: null, czas: null };
+    if (/allegro\.pl/.test(url)) {
+      _daneFirmy.merchant = "allegro";
+      _showLoading();
+      _startAllegro(url);
+      return;
+    }
+    if (/erli\.pl/.test(url)) {
+      _daneFirmy.merchant = "erli";
+      _showLoading();
+      _startErli(url);
+      return;
+    }
+    if (/aliexpress/.test(url)) {
+      _daneFirmy.merchant = "aliexpress";
+      _showLoading();
+      _startAliexpress(url);
+      return;
+    }
+    if (/amazon/.test(url)) {
+      _daneFirmy.merchant = "amazon";
+      _showLoading();
+      _startAmazon(url);
+      return;
+    }
+    if (/empik\.com/.test(url)) {
+      _daneFirmy.merchant = "empik";
+      _showLoading();
+      _startEmpik(url);
+      return;
+    }
+    if (/ebay/.test(url)) {
+      _daneFirmy.merchant = "ebay";
+      _showLoading();
+      _startEbay(url);
+      return;
+    }
+    if (/kaufland/.test(url)) {
+      _daneFirmy.merchant = "kaufland";
+      _showLoading();
+      _startKaufland(url);
+      return;
+    }
+    document.getElementById("jp-shopinfo")?.classList.remove("jp-shopinfo-show");
+  }
+  function _ensureDiv() {
+    if (document.getElementById("jp-shopinfo")) return;
+    const div = document.createElement("div");
+    div.id = "jp-shopinfo";
+    div.innerHTML = `
+        <div id="jp-shopinfo-inner">
+            <div id="jp-shopinfo-header">
+                <span id="jp-shopinfo-title">Info o sklepie</span>
+                <button id="jp-shopinfo-close" title="Zamknij">✕</button>
+            </div>
+            <div id="jp-shopinfo-body"></div>
+            <div id="jp-shopinfo-status"></div>
+        </div>`;
+    document.body.appendChild(div);
+    div.querySelector("#jp-shopinfo-close").addEventListener("click", () => {
+      div.classList.remove("jp-shopinfo-show");
+    });
+  }
+  function _showLoading() {
+    const div = document.getElementById("jp-shopinfo");
+    if (!div) return;
+    div.querySelector("#jp-shopinfo-body").innerHTML = '<span class="jp-shopinfo-muted">Ładowanie…</span>';
+    div.querySelector("#jp-shopinfo-status").innerHTML = "";
+    div.classList.add("jp-shopinfo-show");
+  }
+  function _showResult() {
+    const div = document.getElementById("jp-shopinfo");
+    if (!div) return;
+    const d = _daneFirmy;
+    const esc = _esc;
+    let html = "";
+    if (d.shopID && d.shopID !== "-") html += `ShopID:&nbsp;<b>${esc(d.shopID)}</b><br>`;
+    if (d.nazwa && d.nazwa !== "-") html += `Nazwa:&nbsp;<b>${esc(d.nazwa)}</b><br>`;
+    if (d.dane) html += d.dane;
+    if (d.faktura != null) html += `<br>Faktura:&nbsp;<b>${esc(d.faktura)}</b>`;
+    if (d.czas) html += `<br><small class="jp-shopinfo-muted">Odczytano: ${esc(d.czas)}</small>`;
+    div.querySelector("#jp-shopinfo-body").innerHTML = html;
+    div.querySelector("#jp-shopinfo-status").innerHTML = "";
+    div.classList.add("jp-shopinfo-show");
+    if (d.merchant && d.shopID && d.shopID !== "-") _checkBlacklist(d);
+  }
+  function _checkBlacklist(data) {
+    const statusEl = document.getElementById("jp-shopinfo-status");
+    if (!statusEl) return;
+    statusEl.innerHTML = '<span class="jp-shopinfo-muted">Sprawdzanie bazy…</span>';
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: `https://pepper.spamowisko.ovh/shops.php?merchant=${encodeURIComponent(data.merchant)}&shop=${encodeURIComponent(data.shopID)}`,
+      onload(res) {
+        try {
+          _renderBlacklist(JSON.parse(res.responseText), data, statusEl);
+        } catch {
+          statusEl.innerHTML = "";
+        }
+      },
+      onerror() {
+        statusEl.innerHTML = "";
+      }
+    });
+  }
+  function _renderBlacklist(result, data, statusEl) {
+    const esc = _esc;
+    if (result.action === "search") {
+      const isBlack = result.type === "blacklista";
+      const cls = isBlack ? "jp-shopinfo-blacklisted" : "jp-shopinfo-warned";
+      const label = isBlack ? "⛔ CZARNOLISTA" : "⚠️ MODEROWANY";
+      const reason = esc(result.shopReason || "").replace(/(?:\\r\\n|\\r|\\n)/g, "<br>");
+      statusEl.innerHTML = `<span class="${cls}">${label}</span><br><b>Data:</b> ${esc(result.data)}<br><b>Nazwa:</b> ${esc(result.shopName)}<br><b>Powód:</b> ${reason}`;
+    } else if (result.action === "not_found") {
+      statusEl.innerHTML = '<span class="jp-shopinfo-ok">✓ Brak wpisu</span>';
+      const br = document.createElement("br");
+      const btn = document.createElement("button");
+      btn.className = "jp-shopinfo-add-btn";
+      btn.textContent = "Dodaj wpis";
+      btn.addEventListener("click", () => _showAddModal(data));
+      statusEl.append(br, btn);
+    } else if (result.action === "deleted") {
+      statusEl.innerHTML = '<span class="jp-shopinfo-ok">Wpis usunięty</span>';
+    }
+  }
+  function _showAddModal(data) {
+    document.getElementById("jp-shopinfo-modal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "jp-shopinfo-modal";
+    modal.innerHTML = `
+        <div id="jp-shopinfo-backdrop"></div>
+        <div id="jp-shopinfo-modal-box">
+            <h3 style="margin:0 0 12px;font-size:14px;color:var(--jp-text,#333)">Dodaj wpis do bazy</h3>
+            <label class="jp-si-label">ID Sklepu
+                <input id="jp-si-shopid"   type="text" class="jp-si-input" value="${_escAttr(data.shopID)}">
+            </label>
+            <label class="jp-si-label">Nazwa sklepu
+                <input id="jp-si-shopname" type="text" class="jp-si-input" value="${_escAttr(data.nazwa || "")}">
+            </label>
+            <label class="jp-si-label">Powód
+                <textarea id="jp-si-reason" class="jp-si-input" rows="4" placeholder="Podaj powód…"></textarea>
+            </label>
+            <input type="hidden" id="jp-si-merchant" value="${_escAttr(data.merchant)}">
+            <div style="display:flex;gap:8px;margin-top:8px">
+                <button id="jp-si-save"   class="jp-si-save-btn">Dodaj wpis</button>
+                <button id="jp-si-cancel" class="jp-si-cancel-btn">Anuluj</button>
+            </div>
+            <div id="jp-si-feedback" style="margin-top:8px;font-size:11px"></div>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector("#jp-shopinfo-backdrop").addEventListener("click", () => modal.remove());
+    modal.querySelector("#jp-si-cancel").addEventListener("click", () => modal.remove());
+    modal.querySelector("#jp-si-save").addEventListener("click", () => _submitAdd(modal, data));
+  }
+  function _submitAdd(modal, data) {
+    const merchant = modal.querySelector("#jp-si-merchant").value;
+    const shopID = modal.querySelector("#jp-si-shopid").value;
+    const shopName = modal.querySelector("#jp-si-shopname").value;
+    const shopReason = modal.querySelector("#jp-si-reason").value;
+    const feedback = modal.querySelector("#jp-si-feedback");
+    if (!shopID || !shopReason) {
+      feedback.textContent = "Wypełnij wymagane pola.";
+      return;
+    }
+    feedback.style.color = "";
+    feedback.textContent = "Zapisywanie…";
+    GM_xmlhttpRequest({
+      method: "POST",
+      url: "https://pepper.spamowisko.ovh/shops.php",
+      data: `addShop=1&merchant=${encodeURIComponent(merchant)}&shopID=${encodeURIComponent(shopID)}&shopName=${encodeURIComponent(shopName)}&shopReason=${encodeURIComponent(shopReason)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": "user=g0ds" },
+      onload(res) {
+        try {
+          const resp = JSON.parse(res.responseText);
+          if (resp.action === "added") {
+            feedback.style.color = "#27ae60";
+            feedback.textContent = "Wpis został dodany.";
+            setTimeout(() => {
+              modal.remove();
+              _checkBlacklist(_daneFirmy);
+            }, 1200);
+          } else {
+            feedback.style.color = resp.color || "var(--jp-text,#333)";
+            feedback.textContent = resp.action || "Nieznany błąd.";
+          }
+        } catch {
+          feedback.textContent = "Błąd odpowiedzi serwera.";
+        }
+      },
+      onerror() {
+        feedback.textContent = "Błąd sieci.";
+      }
+    });
+  }
+  function _startAllegro(url) {
+    if (/uzytkownik/.test(url)) {
+      _fetchAllegro(url, { Accept: "text/html,application/xhtml+xml" }, (res) => {
+        const html = new DOMParser().parseFromString(res, "text/html");
+        try {
+          const offerUrl = html.querySelector('a[href*="oferta"]').href;
+          setTimeout(() => _fetchAllegroOffer(offerUrl), 750);
+        } catch {
+          Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Nie znaleziono oferty", czas: _now() });
+          _showResult();
+        }
+      });
+    } else {
+      _fetchAllegroOffer(url);
+    }
+  }
+  function _fetchAllegroOffer(url) {
+    _fetchAllegro(url, { Accept: "application/json" }, (res, status) => {
+      _daneFirmy.dane = "";
+      _daneFirmy.czas = _now();
+      if (status === 404) {
+        Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Oferta niedostępna" });
+        _showResult();
+        return;
+      }
+      let j;
+      try {
+        j = JSON.parse(res);
+      } catch {
+        Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Oferta niedostępna" });
+        _showResult();
+        return;
+      }
+      if (!j["allegro.showoffer.seller.summary"]?.offer) {
+        if (status === 403) {
+          Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: `Captcha?<br><a target="_blank" href="${_esc(j.url || url)}">Kliknij</a>` });
+        } else {
+          Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Oferta niedostępna" });
+        }
+        _showResult();
+        return;
+      }
+      const offer = j["allegro.showoffer.seller.summary"].offer;
+      try {
+        _daneFirmy.shopID = offer.seller.login;
+      } catch {
+        _daneFirmy.shopID = "Błąd shopID";
+      }
+      try {
+        _daneFirmy.nazwa = offer.seller.name;
+      } catch {
+        _daneFirmy.nazwa = "Błąd nazwy";
+      }
+      const sc = j.summaryOneColumn;
+      const t2 = (fn, fallback) => {
+        try {
+          return fn();
+        } catch {
+          return fallback;
+        }
+      };
+      _daneFirmy.dane += t2(() => `<br>${sc.offer.seller.company.name}`, "<br>Błąd nazwy firmy");
+      _daneFirmy.dane += t2(() => `<br>${sc.offer.seller.company.address.street}`, "<br>Błąd ulicy");
+      _daneFirmy.dane += t2(() => `<br>${sc.offer.seller.company.address.zipCode} ${sc.offer.seller.company.address.city}`, "<br>Błąd miasta");
+      _daneFirmy.dane += t2(() => `<br>NIP: ${sc.offer.seller.company.taxIdentificationNumber}`, "<br>Błąd NIP");
+      _daneFirmy.dane += t2(() => {
+        const krs = sc.offer.seller.company.nationalCourtRegisterNumber;
+        return `<br>KRS: ${krs === null ? "&lt;brak&gt;" : krs}`;
+      }, "<br>Błąd KRS");
+      _daneFirmy.dane += t2(() => `<br><span style="font-size:9px">Ilość sztuk: ${sc.offer.stock.available}</span>`, "");
+      _daneFirmy.dane += t2(() => sc.offer.sellingMode.buyNow.active === false ? '<br><span style="font-size:9px">Brak opcji kup teraz</span>' : "", "");
+      try {
+        offer.parameters.forEach((p) => {
+          if (p.name === "Faktura") _daneFirmy.faktura = p.values[0].valueLabel;
+        });
+      } catch {
+        _daneFirmy.faktura = "Błąd odczytu faktury";
+      }
+      _showResult();
+    });
+  }
+  function _fetchAllegro(url, extraHeaders, cb) {
+    GM_xmlhttpRequest({
+      method: "GET",
+      url,
+      nocache: true,
+      fetch: true,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
+        ...extraHeaders
+      },
+      onload(res) {
+        cb(res.responseText, res.status);
+      },
+      onerror() {
+        cb("", 0);
+      }
+    });
+  }
+  function _startErli(url) {
+    let erliUrl = url;
+    const produkty = url.match(/produkty\/(\d+)/);
+    if (produkty) erliUrl = `https://erli.pl/produkt/produkt,${produkty[1]}`;
+    _fetchHtml(erliUrl, {
+      Cookie: "datadome=Y45hIA3jsFgUGF4IkzPZENifQ8rfXTF4-AoyaNJyLLSrIankIxr4YiHkwZfPS3q7oh29iDx_EqeCCMztmxFH16iVH6ELz4dAmzfCZg~pqGWKmeCFONe2H~7km0jU20a"
+    }, (html) => {
+      let shopID, shopName;
+      const shopLink = html.querySelector('a[href*="sklep/"]');
+      if (shopLink) {
+        const m = shopLink.href.match(/sklep\/([a-zA-Z0-9_-]+)\/(\d+)/);
+        if (m) {
+          shopName = m[1];
+          shopID = m[2];
+        }
+      }
+      if (!shopID) {
+        for (const s of html.querySelectorAll("script")) {
+          const m = s.textContent.match(/"name":"([^"]+)","shopId":(\d+)/);
+          if (m) {
+            shopName = m[1];
+            shopID = m[2];
+            break;
+          }
+        }
+      }
+      if (!shopID) {
+        Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Nie udało się odczytać danych" });
+        _showResult();
+        return;
+      }
+      _daneFirmy.shopID = shopID;
+      _daneFirmy.nazwa = shopName;
+      _fetchJson(`https://erli.pl/svc/shop/${shopID}/info/extended`, {
+        Accept: "application/json, text/plain, */*"
+      }, (data) => {
+        try {
+          const c = data.company;
+          _daneFirmy.dane = `${c.companyName}<br>${c.address}<br>${c.zip} ${c.city}<br>NIP: ${c.nip}`;
+          _daneFirmy.faktura = data.invoiceType;
+        } catch {
+          _daneFirmy.dane = "Błąd odczytu danych sklepu";
+        }
+        _showResult();
+      });
+    });
+  }
+  function _startAliexpress(url) {
+    _dropListeners();
+    const nonce = Math.random().toString(36).slice(2);
+    GM_setValue(_KEY_ALI, "waiting");
+    GM_setValue(_KEY_ALI_NONCE, nonce);
+    GM_openInTab(_tagUrl(url, nonce), true);
+    _aliListener = GM_addValueChangeListener(_KEY_ALI, (key, oldVal, newVal) => {
+      if (!newVal || newVal === "waiting") return;
+      try {
+        Object.assign(_daneFirmy, JSON.parse(newVal));
+      } catch {
+        _daneFirmy.dane = "Błąd odczytu danych (Ali)";
+      }
+      _showResult();
+    });
+  }
+  function _startEmpik(url) {
+    _dropListeners();
+    const nonce = Math.random().toString(36).slice(2);
+    GM_setValue(_KEY_EMP, "waiting");
+    GM_setValue(_KEY_EMP_NONCE, nonce);
+    GM_openInTab(_tagUrl(url, nonce), true);
+    _empListener = GM_addValueChangeListener(_KEY_EMP, (key, oldVal, newVal) => {
+      if (!newVal || newVal === "waiting") return;
+      try {
+        Object.assign(_daneFirmy, JSON.parse(newVal));
+      } catch {
+        _daneFirmy.dane = "Błąd odczytu danych (Empik)";
+      }
+      _showResult();
+    });
+  }
+  function _tagUrl(url, nonce) {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}${_NONCE_PARAM}=${nonce}`;
+  }
+  function _startAmazon(url) {
+    const isAmazonPl = /amazon\.pl/.test(url);
+    _fetchHtml(url, {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
+    }, (html) => {
+      _daneFirmy.dane = "<b>Informacje o sprzedaży/wysyłce:</b><br>";
+      _daneFirmy.shopID = "-";
+      _daneFirmy.nazwa = "-";
+      _daneFirmy.czas = _now();
+      if (isAmazonPl) {
+        const tabular = html.querySelector("div#tabular_feature_div");
+        if (tabular) {
+          try {
+            const ns = tabular.firstElementChild.firstElementChild.children;
+            _daneFirmy.dane += `${ns[2].innerText}: <b>${ns[3].innerText}</b><br>${ns[4].innerText}: <b>${ns[5].innerText}</b>`;
+          } catch {
+            _daneFirmy.dane += "Błąd węzła. Sprawdź na stronie.<br>";
+          }
+        } else if (html.querySelector('div[data-feature-name="merchantInfoFeature"]')) {
+          try {
+            const mf = html.querySelector('div[data-feature-name="merchantInfoFeature"]');
+            _daneFirmy.dane += mf.querySelector("div:nth-child(1)").innerText + " " + mf.querySelector("div:nth-child(2) > span").innerText + "<br>";
+            try {
+              _daneFirmy.dane += "(" + JSON.parse(mf.querySelector("div:nth-child(2) script").innerText).merchantId + ")";
+            } catch {
+            }
+            _daneFirmy.dane += "<br>";
+            const ff = html.querySelectorAll('div[offer-display-feature-name="desktop-fulfiller-info"]');
+            if (ff.length > 1) _daneFirmy.dane += "Wysyłka: " + ff[1].querySelector("div > span").innerText.replace("\n", " ") + "<br>";
+          } catch {
+            _daneFirmy.dane += "Błąd węzła (v2). Sprawdź na stronie.<br>";
+          }
+        } else {
+          _daneFirmy.dane += "Błąd. Sprawdź na stronie.<br>";
+        }
+      } else {
+        try {
+          _daneFirmy.dane += "Wysyłka: " + html.querySelector('div[data-feature-name="merchantInfoFeature"] span.a-size-small.offer-display-feature-text-message').innerHTML + "<br>";
+        } catch {
+          _daneFirmy.dane += "Błąd węzła (wysyłka)!<br>";
+        }
+        try {
+          const ff = html.querySelectorAll('div[offer-display-feature-name="desktop-fulfiller-info"]');
+          _daneFirmy.dane += "Sprzedaż: " + ff[1].querySelector("span.a-size-small.offer-display-feature-text-message").innerHTML + "<br>";
+        } catch {
+          _daneFirmy.dane += "Błąd węzła (sprzedaż)!<br>";
+        }
+      }
+      _showResult();
+    });
+  }
+  function _startEbay(url) {
+    _fetchHtml(url, {}, (html) => {
+      const sellerEl = html.querySelector("div.ux-seller-section__item--seller span");
+      if (!sellerEl) {
+        Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Błąd węzła. Sprawdź na stronie." });
+        _showResult();
+        return;
+      }
+      _daneFirmy.shopID = sellerEl.textContent.trim();
+      _daneFirmy.nazwa = _daneFirmy.shopID;
+      const storeLink = html.querySelector('a[href*="/usr/"]');
+      if (!storeLink) {
+        _daneFirmy.czas = _now();
+        _showResult();
+        return;
+      }
+      _fetchHtml(storeLink.href, {}, (html2) => {
+        const firma = html2.querySelector("div.str-business-details__seller-info");
+        if (firma) firma.childNodes.forEach((n) => {
+          if (n.innerHTML) _daneFirmy.dane += n.innerHTML + "<br>";
+        });
+        _daneFirmy.czas = _now();
+        _showResult();
+      });
+    });
+  }
+  function _startKaufland(url) {
+    if (!/product/.test(url)) {
+      _showResult();
+      return;
+    }
+    GM_xmlhttpRequest({
+      method: "GET",
+      url,
+      onload(res) {
+        const vendorID = res.responseText.match(/id:"(\d+)",/);
+        if (!vendorID) {
+          Object.assign(_daneFirmy, {
+            shopID: "-",
+            nazwa: "-",
+            dane: res.responseText.includes("captcha-box") ? "Captcha :(" : "Nie udało się odczytać ID sprzedawcy."
+          });
+          _showResult();
+          return;
+        }
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: `https://www.kaufland.pl/backend/product-detail-page/v1/${vendorID[1]}/seller-info`,
+          onload(res2) {
+            try {
+              const s = JSON.parse(res2.responseText).sellerInformation;
+              Object.assign(_daneFirmy, {
+                shopID: s.name,
+                nazwa: s.name,
+                dane: s.legalData.imprint + `<br>${s.sellerCountry} (${s.sellerCountryISO})`,
+                czas: _now()
+              });
+            } catch {
+              _daneFirmy.dane = "Błąd odczytu danych sprzedawcy.";
+            }
+            _showResult();
+          },
+          onerror() {
+            _daneFirmy.dane = "Błąd sieci (sprzedawca).";
+            _showResult();
+          }
+        });
+      },
+      onerror() {
+        _daneFirmy.dane = "Błąd sieci.";
+        _showResult();
+      }
+    });
+  }
+  function _now() {
+    return (/* @__PURE__ */ new Date()).toLocaleString("pl-PL", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+  }
+  var _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36";
+  function _fetchHtml(url, extraHeaders, cb) {
+    GM_xmlhttpRequest({
+      method: "GET",
+      url,
+      headers: {
+        "User-Agent": _UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ...extraHeaders
+      },
+      onload(res) {
+        cb(new DOMParser().parseFromString(res.responseText, "text/html"));
+      },
+      onerror() {
+        cb(new DOMParser().parseFromString("", "text/html"));
+      }
+    });
+  }
+  function _fetchJson(url, extraHeaders, cb) {
+    GM_xmlhttpRequest({
+      method: "GET",
+      url,
+      headers: { "User-Agent": _UA, "Accept": "application/json", ...extraHeaders },
+      onload(res) {
+        try {
+          cb(JSON.parse(res.responseText));
+        } catch {
+          cb({});
+        }
+      },
+      onerror() {
+        cb({});
+      }
+    });
+  }
+  function _esc(s) {
+    return s == null ? "" : String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function _escAttr(s) {
+    return s == null ? "" : String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function _dropListeners() {
+    if (_aliListener) {
+      try {
+        GM_removeValueChangeListener?.(_aliListener);
+      } catch {
+      }
+      _aliListener = null;
+    }
+    if (_empListener) {
+      try {
+        GM_removeValueChangeListener?.(_empListener);
+      } catch {
+      }
+      _empListener = null;
+    }
+  }
+  function _injectStyles() {
+    if (_styleInjected) return;
+    _styleInjected = true;
+    GM_addStyle(`
+        #jp-shopinfo {
+            position: fixed;
+            top: 115px;
+            left: 0;
+            width: 240px;
+            z-index: 99997;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            display: none;
+            /* cap height so it doesn't overlap Historia tab sitting at top: 380px */
+            max-height: 257px;
+        }
+        #jp-shopinfo.jp-shopinfo-show { display: flex; flex-direction: column; }
+
+        #jp-shopinfo-inner {
+            background: var(--jp-bg, #f9f9f9);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: none;
+            border-radius: 0 6px 6px 0;
+            box-shadow: 3px 3px 14px rgba(0,0,0,0.12);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1;
+        }
+
+        #jp-shopinfo-header {
+            background: #c0392b;
+            color: #fff;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #jp-shopinfo-title { flex: 1; }
+        #jp-shopinfo-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+        #jp-shopinfo-close:hover { background: rgba(255,255,255,0.35); }
+
+        #jp-shopinfo-body {
+            padding: 8px 10px;
+            color: var(--jp-text, #333);
+            font-size: 11px;
+            line-height: 1.6;
+            overflow-y: auto;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        #jp-shopinfo-status {
+            padding: 4px 10px 8px;
+            font-size: 11px;
+            border-top: 1px solid var(--jp-border, #e0e0e0);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .jp-shopinfo-muted       { color: var(--jp-text-muted, #777); font-style: italic; }
+        .jp-shopinfo-blacklisted { color: #c0392b; font-weight: bold; }
+        .jp-shopinfo-warned      { color: #e67e22; font-weight: bold; }
+        .jp-shopinfo-ok          { color: #27ae60; }
+
+        .jp-shopinfo-add-btn {
+            margin-top: 4px;
+            padding: 3px 8px;
+            font-size: 11px;
+            background: var(--jp-btn-bg, #fff);
+            border: 1px solid var(--jp-border, #ccc);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--jp-text, #333);
+            font-family: inherit;
+        }
+        .jp-shopinfo-add-btn:hover { background: #c0392b; color: #fff; border-color: #c0392b; }
+
+        #jp-shopinfo-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 100000;
+        }
+        #jp-shopinfo-modal-box {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100001;
+            background: var(--jp-bg, #fff);
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            padding: 16px;
+            width: 360px;
+            max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+        }
+        .jp-si-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: var(--jp-text-muted, #777);
+        }
+        .jp-si-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid var(--jp-border, #ccc);
+            border-radius: 4px;
+            background: var(--jp-btn-bg, #fff);
+            color: var(--jp-text, #333);
+            font-family: inherit;
+            outline: none;
+            resize: vertical;
+        }
+        .jp-si-input:focus { border-color: #c0392b; }
+        .jp-si-save-btn {
+            flex: 1;
+            padding: 5px 0;
+            background: #c0392b;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            font-weight: 600;
+        }
+        .jp-si-save-btn:hover { background: #922b21; }
+        .jp-si-cancel-btn {
+            flex: 1;
+            padding: 5px 0;
+            background: var(--jp-btn-bg, #fff);
+            border: 1px solid var(--jp-border, #ccc);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--jp-text, #333);
+        }
+        .jp-si-cancel-btn:hover { background: var(--jp-btn-hover, #e6e6e6); }
+    `);
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -7630,6 +8839,7 @@
       enableFloatingButton: true,
       customFloatingText: " - Spersonalizuj mnie w ustawieniach!",
       floatingButtonAutoFreeDelivery: false,
+      floatingButtonExpiryPreset: "",
       enableMoveApproveBtn: false,
       enableInfractionNote: true,
       enableMerchantNotes: true,
@@ -7652,7 +8862,10 @@
       enableSnippets: true,
       enableCheatsheet: true,
       enableReportedReason: true,
-      enableDealChangelog: true
+      enableDealChangelog: true,
+      enableDealDateTools: true,
+      dealDateCustom: "",
+      enableShopInfo: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -7664,6 +8877,12 @@
     }
     if (isAllegroContext) {
       initAllegroImages(settings3);
+      return;
+    }
+    const isAliexpressContext = /aliexpress\.com/.test(location.hostname);
+    const isEmpikContext = /empik\.com/.test(location.hostname);
+    if (isAliexpressContext || isEmpikContext) {
+      if (settings3.enableShopInfo !== false && isShopInfoTabContext()) runShopInfoTabContext();
       return;
     }
     initAnalytics();
@@ -7707,6 +8926,7 @@
       const s = settings3;
       return [
         settingsModuleGroup("secModDealPanel", "secModDealPanelDesc", [
+          settingsModuleToggle("set-banned-highlight", s.enableBannedHighlight, "mBannedHighlight", "mBannedHighlightHint"),
           settingsModuleToggle("set-calc", s.enableCalculator, "mCalc", "mCalcHint"),
           settingsModuleToggle("set-hist", s.enableHistory, "mHist", "mHistHint"),
           settingsModuleToggle("set-meta", s.enableMetaInfo, "mMeta", "mMetaHint"),
@@ -7720,13 +8940,15 @@
           settingsModuleToggle("set-fakepromo", s.enableFakePromo, "mFakePromo", "mFakePromoHint"),
           settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint"),
           settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint"),
-          settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint")
+          settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint"),
+          settingsModuleToggle("set-shop-info", s.enableShopInfo, "mShopInfo", "mShopInfoHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
           settingsModuleToggle("set-auto-local", s.enableAutoLocalStore, "mAutoLoc", "mAutoLocHint"),
           settingsModuleToggle("set-shipping-costs", s.enableShippingCosts, "lblShippingCosts", "lblShippingCostsHint"),
-          settingsModuleToggle("set-deal-changelog", s.enableDealChangelog, "mDealChangelog", "mDealChangelogHint")
+          settingsModuleToggle("set-deal-changelog", s.enableDealChangelog, "mDealChangelog", "mDealChangelogHint"),
+          settingsModuleToggle("set-deal-date-tools", s.enableDealDateTools, "mDealDateTools", "mDealDateToolsHint")
         ]),
         settingsModuleGroup("secModMessages", "secModMessagesDesc", [
           settingsModuleToggle("set-hold-note", s.enableAutoHoldNote, "mHoldNote", "mHoldNoteHint"),
@@ -7792,14 +9014,6 @@
                         </select>
                     </div>
                 </div>
-                <label class="jp-module-toggle jp-module-toggle--solo" style="margin-top: 12px;">
-                    <input type="checkbox" id="set-banned-highlight" ${settings3.enableBannedHighlight ? "checked" : ""}>
-                    <span class="jp-module-toggle-body">
-                        <span class="jp-module-toggle-title">${t("mBannedHighlight")}</span>
-                        <span class="jp-module-toggle-hint">${t("mBannedHighlightHint")}</span>
-                    </span>
-                </label>
-
                 ${settingsSectionHead("secModules", "secModulesDesc")}
                 <div class="jp-settings-groups">${buildSettingsModulesHtml()}</div>
 
@@ -7827,6 +9041,16 @@
                                 </span>
                             </label>
                         </div>
+                        <div>
+                            <label>${t("lblFloatingExpiry")}</label>
+                            <select id="set-floating-expiry" style="width:100%">
+                                <option value="" ${!settings3.floatingButtonExpiryPreset ? "selected" : ""}>${t("lblFloatingExpiryNone")}</option>
+                                <option value="today" ${settings3.floatingButtonExpiryPreset === "today" ? "selected" : ""}>Dziś 23:59</option>
+                                <option value="+7" ${settings3.floatingButtonExpiryPreset === "+7" ? "selected" : ""}>+7 dni 23:59</option>
+                                <option value="custom" ${settings3.floatingButtonExpiryPreset === "custom" ? "selected" : ""}>${t("lblFloatingExpiryCustom")}</option>
+                            </select>
+                            <div class="jp-settings-field-hint">${t("lblFloatingExpiryHint")}<br>${t("lblFloatingExpiryCustomNote")}</div>
+                        </div>
                     </div>
                 </div>
 
@@ -7844,6 +9068,11 @@
                         <label>${t("lblShippingOffset")}</label>
                         <input type="number" id="set-shipping-offset" value="${settings3.shippingPanelTopOffset}" style="width:100%">
                         <div class="jp-settings-field-hint">${t("lblShippingOffsetHint")}</div>
+                    </div>
+                    <div>
+                        <label>${t("lblDealDateCustom")}</label>
+                        <input type="text" id="set-deal-date-custom" value="${settings3.dealDateCustom || ""}" placeholder="DD.MM.YYYY lub DD.MM.YYYY HH:MM" style="width:100%">
+                        <div class="jp-settings-field-hint">${t("lblDealDateCustomHint")}</div>
                     </div>
                 </div>
 
@@ -8009,6 +9238,7 @@
           enableMessageTemplates: document.getElementById("set-templates").checked,
           enableFloatingButton: document.getElementById("set-floating-btn").checked,
           customFloatingText: document.getElementById("set-floating-text").value,
+          floatingButtonExpiryPreset: document.getElementById("set-floating-expiry").value,
           floatingButtonAutoFreeDelivery: document.getElementById("set-floating-freedel").checked,
           enableMoveApproveBtn: document.getElementById("set-move-approve").checked,
           enableMerchantNotes: document.getElementById("set-merchant-notes").checked,
@@ -8028,10 +9258,13 @@
           enableExactTimestamps: document.getElementById("set-exact-timestamps").checked,
           enableUserAdminLinks: document.getElementById("set-user-admin-links").checked,
           enableReportedReason: document.getElementById("set-reported-reason").checked,
+          enableShopInfo: document.getElementById("set-shop-info").checked,
           enableSessionHistory: document.getElementById("set-session-history").checked,
           enableSnippets: document.getElementById("set-snippets").checked,
           enableCheatsheet: document.getElementById("set-cheatsheet").checked,
-          enableDealChangelog: document.getElementById("set-deal-changelog").checked
+          enableDealChangelog: document.getElementById("set-deal-changelog").checked,
+          enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
+          dealDateCustom: document.getElementById("set-deal-date-custom").value.trim()
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -8060,10 +9293,11 @@
         .fake-promo-alert {
             background-color: var(--jp-fake-alert-bg); color: white; padding: 15px; text-align: center;
             font-size: 18px; font-weight: bold; border-radius: 5px; margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 9999;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .mod-tools-container {
-            margin: 10px 0; background: var(--jp-bg); padding: 15px; border-radius: 6px; border: 1px solid var(--jp-border);
+            margin: 10px 0; background: var(--jp-bg); padding: 12px 14px; border-radius: 6px;
+            border: 1px solid var(--jp-border); border-left: 3px solid #c0392b;
             display: flex; justify-content: space-between; gap: 20px; align-items: stretch; color: var(--jp-text);
         }
 
@@ -8078,6 +9312,178 @@
             font-weight: bold;
         }
         .fake-promo-btn:hover { background-color: var(--jp-fake-btn-hover); }
+
+        .jp-lock-buttons-container {
+            width: 100% !important;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 11px;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 8px;
+            align-items: stretch;
+        }
+        .jp-lock-btn-header {
+            font-weight: 700;
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 14px;
+            width: 14px;
+        }
+        .jp-lock-btn-grid-wrap {
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+            overflow: hidden;
+            width: 0;
+        }
+        .jp-lock-btn-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 4px;
+            width: 100%;
+            min-width: 0;
+        }
+        .jp-lock-btn-group {
+            display: grid;
+            grid-template-columns: 42px minmax(0,1fr) minmax(0,1fr);
+            row-gap: 4px;
+            column-gap: 8px;
+            align-items: center;
+            min-width: 0;
+        }
+        .jp-lock-btn-group-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--jp-text-muted, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        .jp-lock-buttons-container .jp-edit-lock-btn,
+        .jp-lock-buttons-container .jp-edit-unlock-btn,
+        .jp-lock-buttons-container .jp-expire-lock-btn,
+        .jp-lock-buttons-container .jp-expire-unlock-btn {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            padding: 4px 6px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            background: var(--jp-btn-bg, #3b3d41) !important;
+            color: var(--jp-text) !important;
+            border: 1px solid var(--jp-border) !important;
+            border-radius: 4px !important;
+            cursor: pointer !important;
+            text-align: center !important;
+            white-space: nowrap !important;
+            transition: background 0.15s, color 0.15s, border-color 0.15s !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            box-shadow: none !important;
+            overflow: hidden !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            line-height: normal !important;
+        }
+        .jp-lock-buttons-container .jp-edit-lock-btn:hover:not(:disabled),
+        .jp-lock-buttons-container .jp-expire-lock-btn:hover:not(:disabled) {
+            background: #c0392b !important;
+            color: #fff !important;
+            border-color: #c0392b !important;
+        }
+        .jp-lock-buttons-container .jp-edit-unlock-btn:hover:not(:disabled),
+        .jp-lock-buttons-container .jp-expire-unlock-btn:hover:not(:disabled) {
+            background: #2e7d32 !important;
+            color: #fff !important;
+            border-color: #2e7d32 !important;
+        }
+        .jp-lock-buttons-container .jp-edit-lock-btn:disabled,
+        .jp-lock-buttons-container .jp-edit-unlock-btn:disabled,
+        .jp-lock-buttons-container .jp-expire-lock-btn:disabled,
+        .jp-lock-buttons-container .jp-expire-unlock-btn:disabled {
+            opacity: 0.4 !important;
+            cursor: not-allowed !important;
+        }
+
+        .jp-merchant-note-alert {
+            width: 100% !important;
+            background: var(--jp-bg) !important;
+            border: 1px solid var(--jp-border) !important;
+            border-left: 3px solid #c0392b !important;
+            border-radius: 6px !important;
+            padding: 8px 10px !important;
+            font-size: 11px !important;
+            box-sizing: border-box !important;
+            color: var(--jp-text) !important;
+        }
+        .jp-mn-header {
+            font-weight: 600;
+            color: #c0392b;
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+        .jp-mn-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 7px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border-left: 2px solid #c0392b;
+            background: rgba(192, 57, 43, 0.06);
+        }
+        .jp-mn-text {
+            color: var(--jp-text);
+            font-size: 11px;
+            word-break: break-word;
+            flex: 1;
+        }
+        .jp-mn-meta {
+            font-size: 9px;
+            color: var(--jp-text-muted, #888);
+            white-space: nowrap;
+        }
+        .jp-merchant-note-delete-single {
+            padding: 2px 6px;
+            font-size: 10px;
+            flex-shrink: 0;
+            background: var(--jp-btn-bg, #3b3d41);
+            color: var(--jp-text);
+            border: 1px solid var(--jp-border);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .jp-merchant-note-delete-single:hover {
+            background: #c62828;
+            color: #fff;
+            border-color: #c62828;
+        }
+        .jp-merchant-note-edit-btn {
+            width: 100%;
+            background: #4a7a59;
+            color: #fff;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: background 0.15s;
+        }
+        .jp-merchant-note-edit-btn:hover {
+            background: #2e7d32;
+        }
 
         .mod-left-col { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 280px; }
         .mod-right-col { flex-grow: 1; border-left: 1px dashed var(--jp-border); padding-left: 20px; }
@@ -8151,6 +9557,7 @@
         .jp-settings-group {
             background: var(--jp-row-bg);
             border: 1px solid var(--jp-row-border);
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
             padding: 12px 14px;
         }
@@ -8266,11 +9673,11 @@
             align-items: flex-start;
             gap: 12px 20px;
             margin-bottom: 16px;
-            padding: 14px 16px;
-            background: var(--jp-btn-bg);
+            padding: 12px 16px;
+            background: var(--jp-bg);
             border: 1px solid var(--jp-border);
-            border-left: 4px solid var(--jp-stat-del-co);
-            border-radius: 8px;
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
         }
         .jp-offline-deals-home {
             display: inline-flex;
@@ -8415,10 +9822,10 @@
         }
         .jp-offline-filter-empty {
             padding: 20px 16px;
-            border: 1px dashed var(--jp-border);
-            border-left: 4px solid var(--jp-stat-del-co);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
-            background: var(--jp-btn-bg);
+            background: var(--jp-bg);
             color: var(--jp-text-muted);
             font-size: 13px;
             text-align: center;
@@ -8435,17 +9842,18 @@
         .jp-user-admin-links--v2 {
             margin: 0 0 16px 0;
             padding: 10px 12px;
-            background: var(--jp-btn-bg);
+            background: var(--jp-bg);
             border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
         }
         .jp-user-admin-inspector-panel {
             margin: 12px 0 0;
-            padding: 10px 12px;
-            border: 1px solid var(--jp-border, rgba(0, 0, 0, 0.12));
-            border-left: 3px solid #e65100;
-            border-radius: 4px;
-            background: var(--jp-btn-bg, rgba(0, 0, 0, 0.03));
+            padding: 8px 10px;
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            background: var(--jp-bg);
             clear: both;
         }
         .jp-user-admin-inspector-head {
@@ -8484,14 +9892,14 @@
             border-color: var(--jp-link);
             color: var(--jp-link);
         }
-        .jp-user-admin-btn--metabase { border-color: #e65100; color: #e65100; }
+        .jp-user-admin-btn--metabase { border-color: #c0392b; color: #c0392b; }
         .jp-user-admin-btn--metabase:hover { background: rgba(230, 81, 0, 0.08); }
         .jp-user-ips-panel {
             margin: 0 0 16px 0;
-            padding: 10px 12px;
+            padding: 8px 10px;
             background: var(--jp-bg);
             border: 1px solid var(--jp-border);
-            border-left: 3px solid #d84315;
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
             overflow-x: auto;
         }
@@ -8545,12 +9953,12 @@
             border: 1px solid var(--jp-btn-border);
             border-radius: 4px;
             background: var(--jp-btn-bg);
-            color: #d84315;
+            color: #c0392b;
             cursor: pointer;
         }
         .jp-user-ips-open-all:hover {
-            background: rgba(216, 67, 21, 0.1);
-            border-color: #d84315;
+            background: rgba(192, 57, 43, 0.1);
+            border-color: #c0392b;
         }
         .jp-user-ip-link {
             text-decoration: none !important;
@@ -8562,13 +9970,13 @@
             border-radius: 4px;
             background: var(--jp-input-bg);
             border: 1px solid var(--jp-border);
-            color: #d84315 !important;
+            color: #c0392b !important;
             cursor: pointer;
             transition: background 0.15s, border-color 0.15s;
         }
         .jp-user-ip-link:hover code {
-            background: rgba(216, 67, 21, 0.12);
-            border-color: #d84315;
+            background: rgba(192, 57, 43, 0.12);
+            border-color: #c0392b;
             text-decoration: none;
         }
 
@@ -8598,8 +10006,9 @@
                 width: 100%;
                 background: var(--jp-bg);
                 border: 1px solid var(--jp-border);
+                border-left: 3px solid #c0392b;
                 border-radius: 6px;
-                padding: 15px;
+                padding: 10px 12px;
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
@@ -8629,8 +10038,9 @@
         .jp-inspector-panel {
             background: var(--jp-bg);
             border: 1px solid var(--jp-border);
-            border-radius: 4px;
-            padding: 8px;
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            padding: 8px 10px;
             font-size: 11px;
             color: var(--jp-text);
         }
@@ -8694,6 +10104,7 @@
             width: 260px;
             background: var(--jp-bg);
             border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
             border-radius: 6px;
             padding: 10px;
             position: absolute;
@@ -8908,6 +10319,123 @@
             font-style: italic;
         }
 
+        /* WELCOME SPLASH */
+        #jp-welcome-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99998;
+            background: rgba(0,0,0,0.45);
+            opacity: 0;
+            animation: jp-overlay-in 0.35s ease 0.1s both;
+            transition: opacity 0.4s ease;
+            cursor: default;
+        }
+        #jp-welcome-overlay.jp-splash-out { opacity: 0; }
+        #jp-welcome-splash {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            z-index: 99999;
+            width: 480px;
+            background: var(--jp-modal-bg, #fff);
+            border-radius: 18px;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.38), 0 0 0 1px rgba(192,57,43,0.12);
+            overflow: hidden;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.88);
+            animation: jp-splash-in 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s both;
+            transition: opacity 0.38s ease, transform 0.38s ease;
+        }
+        #jp-welcome-splash.jp-splash-out {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.94);
+        }
+        #jp-welcome-splash-accent {
+            height: 5px;
+            background: linear-gradient(90deg, #c0392b 0%, #e74c3c 50%, #f39c12 100%);
+        }
+        #jp-welcome-splash-body {
+            padding: 48px 60px 36px;
+            text-align: center;
+        }
+        #jp-welcome-splash-emoji {
+            display: block;
+            font-size: 68px;
+            line-height: 1;
+            margin-bottom: 22px;
+            transform-origin: 50% 80%;
+            animation: jp-wave 0.65s ease 0.75s 2 both;
+        }
+        #jp-welcome-splash-title {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--jp-text, #1a1a1a);
+            line-height: 1.15;
+            margin-bottom: 14px;
+            letter-spacing: -0.02em;
+        }
+        #jp-welcome-splash-title strong {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        #jp-welcome-splash-sub {
+            font-size: 14px;
+            color: var(--jp-text-muted, #888);
+            letter-spacing: 0.01em;
+            line-height: 1.5;
+        }
+        #jp-welcome-splash-sub strong {
+            color: #c0392b;
+            font-weight: 600;
+            -webkit-text-fill-color: initial;
+        }
+        #jp-welcome-splash-ver {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 3px 10px;
+            border: 1px solid var(--jp-border, #e0e0e0);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--jp-text-muted, #aaa);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        #jp-welcome-splash-bar {
+            height: 3px;
+            background: rgba(192,57,43,0.15);
+            margin-top: 28px;
+            border-radius: 0 0 18px 18px;
+            overflow: hidden;
+        }
+        #jp-welcome-splash-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #c0392b, #e74c3c);
+            transform-origin: left;
+            animation: jp-bar-drain 3.4s linear 0.3s both;
+        }
+        @keyframes jp-splash-in {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.88); }
+            to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+        @keyframes jp-overlay-in {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        @keyframes jp-wave {
+            0%, 100% { transform: rotate(0deg); }
+            30%      { transform: rotate(22deg); }
+            70%      { transform: rotate(-10deg); }
+        }
+        @keyframes jp-bar-drain {
+            from { transform: scaleX(1); }
+            to   { transform: scaleX(0); }
+        }
+
     `);
     function fetchExchangeRates(callback) {
       if (exchangeRates) return callback(exchangeRates);
@@ -8970,7 +10498,6 @@
       });
     }
     function showWarning(note, dbPrice, currentPrice, matchedBy) {
-      let container = document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.body;
       if (document.querySelector(".fake-promo-alert")) return;
       increment("fakePromoWarningsShown");
       let alertBox = document.createElement("div");
@@ -8979,7 +10506,9 @@
                               <strong>${t("alertStdPrice")} ${dbPrice} zł </strong> (${t("alertCurrent")} ${currentPrice} zł)<br>
                               <strong>${t("alertEntry")}</strong> ${note} <br>
                               <span style="font-size: 11px; opacity: 0.8;">${t("alertPattern")} ${matchedBy}</span>`;
-      container.prepend(alertBox);
+      const ref = document.getElementById("jp-tools-box");
+      if (ref && ref.parentNode) ref.parentNode.insertBefore(alertBox, ref);
+      else document.body.prepend(alertBox);
     }
     function checkFakePromoWarning() {
       let urlTextarea = document.querySelector('textarea[name="mainUrl"]');
@@ -9271,13 +10800,13 @@
       let lastIndex = notesList.length - 1;
       let dateStr = new Date(lastNote.savedAt).toLocaleDateString("pl-PL");
       noteBox.innerHTML = `
-            <div style="background-color: var(--jp-template-btn-bg); border-left: 3px solid #ff9800; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 12px;">
-                <div style="font-weight: 500; color: #ff9800; margin-bottom: 4px;"> ${t("lblMerchantNotes")}</div>
-                <div style="color: var(--jp-text); word-break: break-word; margin-bottom: 4px;">${lastNote.text}</div>
-                <div style="font-size: 10px; color: #bbb; margin-bottom: 4px;">${lastNote.savedBy} • ${dateStr}</div>
-                <button class="jp-merchant-note-delete-btn" data-index="${lastIndex}" title="Usuń notatkę">🗑️ ${t("btnRemoveMerchantNote")}</button>
-            </div>
-        `;
+            <div class="jp-merchant-note-alert" style="margin: 8px 0;">
+                <div class="jp-mn-header"> ${t("lblMerchantNotes")}</div>
+                <div class="jp-mn-item"><div class="jp-mn-text">${lastNote.text}</div></div>
+                <div class="jp-mn-meta" style="margin-bottom: 4px;">${lastNote.savedBy} • ${dateStr}</div>
+                <button class="jp-merchant-note-delete-btn" data-index="${lastIndex}" title="Usuń notatkę" style="width:100%;background:#7b1a1a;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:500;">🗑️ ${t("btnRemoveMerchantNote")}</button>
+        </div>
+        `;
       noteBox.querySelector(".jp-merchant-note-delete-btn").addEventListener("click", (e) => {
         let index = parseInt(e.currentTarget.getAttribute("data-index"));
         if (confirm("⚠️ Czy na pewno chcesz trwale usunąć tę notatkę?")) {
@@ -9696,20 +11225,85 @@
         if (!btn || !btn.classList.contains("primary")) return;
         const btnText = btn.textContent || "";
         if (!btnText.includes("Delete") || !btnText.includes("Ban")) return;
+        console.log("[JP autopromo] primary Delete+Ban button clicked:", btnText.trim());
         const modal = document.querySelector(".v-dialog--active") || document.querySelector('[role="dialog"]');
-        if (!modal) return;
-        const banTabActive = Array.from(modal.querySelectorAll(".v-tabs__item--active")).some((el) => el.textContent.includes("BAN") || el.getAttribute("href") === "#ban");
+        if (!modal) {
+          console.log("[JP autopromo] ✗ brak aktywnego modala");
+          return;
+        }
+        const activeTabs = Array.from(modal.querySelectorAll(".v-tabs__item--active, .v-tab--active"));
+        const banTabActive = activeTabs.some((el) => el.textContent.includes("BAN") || el.getAttribute("href") === "#ban");
+        console.log("[JP autopromo] aktywne zakładki:", activeTabs.map((el) => el.textContent.trim()), "→ banTabActive:", banTabActive);
         if (!banTabActive) return;
-        const reasonText = (modal.querySelector(".v-select__selection")?.textContent || "").trim();
-        if (!reasonText.toLowerCase().includes("autopromoc")) return;
-        const merchantInput = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
-        const merchantName = merchantInput?.value?.trim();
-        if (!merchantName) return;
+        let reasonText = "";
+        for (const span of modal.querySelectorAll(".v-select__selection, .v-select__selection--comma")) {
+          const t2 = span.textContent.trim();
+          if (t2.toLowerCase().includes("autopromo")) {
+            reasonText = t2;
+            break;
+          }
+          if (!reasonText) reasonText = t2;
+        }
+        if (!reasonText.toLowerCase().includes("autopromo")) {
+          for (const el of modal.querySelectorAll(".v-select, .v-autocomplete")) {
+            const vComp = el.__vue__;
+            if (!vComp) continue;
+            const val = vComp.value ?? vComp.lazyValue ?? vComp.internalValue;
+            if (!val) continue;
+            const t2 = String(typeof val === "object" ? val.name || val.text || val.label || val.value || JSON.stringify(val) : val).trim();
+            if (t2.toLowerCase().includes("autopromo")) {
+              reasonText = t2;
+              break;
+            }
+            if (!reasonText) reasonText = t2;
+          }
+        }
+        if (!reasonText.toLowerCase().includes("autopromo")) {
+          for (const input of modal.querySelectorAll('.v-select input[type="text"], .v-autocomplete input[type="text"]')) {
+            const t2 = input.value.trim();
+            if (t2.toLowerCase().includes("autopromo")) {
+              reasonText = t2;
+              break;
+            }
+            if (!reasonText) reasonText = t2;
+          }
+        }
+        console.log(
+          "[JP autopromo] powód bana:",
+          reasonText || "(pusty)",
+          "| selekcje:",
+          Array.from(modal.querySelectorAll(".v-select__selection, .v-select__selection--comma")).map((e2) => e2.textContent.trim()),
+          "| v-selecty:",
+          modal.querySelectorAll(".v-select, .v-autocomplete").length
+        );
+        if (!reasonText.toLowerCase().includes("autopromo")) {
+          console.log('[JP autopromo] ✗ powód nie zawiera "autopromo" — notka pomięta');
+          return;
+        }
+        const dealUrlTextarea = document.querySelector('textarea[name="mainUrl"]');
+        const dealMainUrl = dealUrlTextarea?.value?.trim() || "";
+        let merchantName = "";
+        if (dealMainUrl) {
+          try {
+            merchantName = new URL(dealMainUrl).hostname.replace(/^www\./, "");
+          } catch (e2) {
+          }
+        }
+        if (!merchantName) {
+          const merchantEl = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
+          merchantName = merchantEl?.value?.trim() || "";
+        }
+        console.log("[JP autopromo] merchant:", merchantName || "(pusty)", "| dealMainUrl:", dealMainUrl || "(brak)");
+        if (!merchantName) {
+          console.log("[JP autopromo] ✗ brak merchantName — notka pomięta");
+          return;
+        }
         const noteInput = modal.querySelector('input[placeholder="Leave a note for moderators"]');
         const adminNote = noteInput?.value?.trim() || "";
         const date = (/* @__PURE__ */ new Date()).toLocaleDateString("pl-PL");
         const dealUrl = window.location.href;
         const noteText = adminNote ? `🚫 Autopromo ${date} — ${dealUrl} · ${adminNote}` : `🚫 Autopromo ${date} — ${dealUrl}`;
+        console.log("[JP autopromo] ✓ zapisuję notatkę:", noteText);
         saveMerchantNote(merchantName, noteText);
         increment("autoMerchantNotesInserted");
         showToast(`📋 Notatka autopromo zapisana dla: ${merchantName}`);
@@ -9807,14 +11401,14 @@
                     position: fixed;
                     top: 85px;
                     right: 20px;
-                    background-color: #e65100;
+                    background-color: #c0392b;
                     color: white;
                     padding: 15px 35px 15px 15px;
                     border-radius: 6px;
                     font-weight: bold;
                     font-size: 14px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-                    border: 2px solid #ff9800;
+                    border: 2px solid #992d22;
                     z-index: 10000;
                     transition: opacity 0.3s ease, transform 0.3s ease;
                     transform: translateX(100%);
@@ -9948,6 +11542,7 @@
         window.jpDealCheckersAttached = true;
         increment("totalPageChecks");
         if (settings3.enableSessionHistory) recordDeal(currentTitle, location.href);
+        if (settings3.enableShopInfo) initShopInfo(urlTextarea);
         const triggerVueInput = async (element, value) => {
           if (!element) return;
           element.focus();
@@ -9964,6 +11559,7 @@
           element.blur();
         };
         let toolsBox = document.createElement("div");
+        toolsBox.id = "jp-tools-box";
         toolsBox.className = "mod-tools-container";
         toolsBox.style.position = "relative";
         let settingsBtn = document.createElement("button");
@@ -9977,13 +11573,13 @@
         toolsBox.appendChild(settingsBtn);
         let leftCol = document.createElement("div");
         leftCol.className = "mod-left-col";
-        const debounce = (func, delay2) => {
+        const debounce = (func, delay3) => {
           let timeoutId;
           return (...args) => {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
               func.apply(null, args);
-            }, delay2);
+            }, delay3);
           };
         };
         if (settings3.enableFakePromo) {
@@ -10194,6 +11790,10 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               await triggerVueInput(titleInput, currentVal + settings3.customFloatingText);
             }
           }
+          if (settings3.floatingButtonExpiryPreset) {
+            const preset = buildPresetFromKey(settings3.floatingButtonExpiryPreset, settings3.dealDateCustom);
+            if (preset) await applyPreset(preset);
+          }
           floatBtn.innerHTML = `✅ ${t("mFloatingBtnDone")}`;
           setTimeout(() => {
             floatBtn.innerHTML = `✨ ${t("mFloatingBtnShort")}`;
@@ -10393,6 +11993,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               const _clThreadId = (window.location.pathname.match(/\/thread\/(\d+)/) || [])[1];
               initDealChangelog(shippingStack, _clThreadId);
             }
+            if (settings3.enableDealDateTools) {
+              initDealDateTools(shippingStack, settings3);
+            }
           } else if (settings3.enableFloatingButton && !document.querySelector("#jp-shipping-stack .mod-floating-btn")) {
             let shippingStack = document.getElementById("jp-shipping-stack");
             let floatBtn = document.createElement("button");
@@ -10428,6 +12031,11 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           }
         }
         let merchantNoteAlert = null;
+        const insertBeforeToolsBox = (el) => {
+          const ref = document.getElementById("jp-tools-box");
+          if (ref && ref.parentNode) ref.parentNode.insertBefore(el, ref);
+          else document.body.prepend(el);
+        };
         const getMerchantNameForNotes = () => {
           const mainUrlNode = document.querySelector('textarea[name="mainUrl"]');
           const canonicalUrlNode = document.querySelector('textarea[name="canonicalUrl"]');
@@ -10467,7 +12075,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           let editContainer = document.createElement("div");
           editContainer.className = "jp-merchant-note-edit-container";
           editContainer.innerHTML = `
-                    <div style="font-weight: 500; color: #ff9800; margin-bottom: 8px; font-size: 12px;">📝 Nowa notatka dla ${merchantName}</div>
+                    <div style="font-weight: 500; color: #c0392b; margin-bottom: 8px; font-size: 12px;">📝 Nowa notatka dla ${merchantName}</div>
                     <input type="text" class="jp-merchant-note-edit-input" placeholder="${t("placeholderMerchantNote")}" value="">
                     <div class="jp-merchant-note-button-group">
                         <button class="jp-merchant-note-save-edit">💾 ${t("btnAddMerchantNote")}</button>
@@ -10482,13 +12090,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           if (standaloneLock && standaloneLock.parentNode) {
             standaloneLock.parentNode.removeChild(standaloneLock);
           }
-          let fakePromoAlert = document.querySelector(".fake-promo-alert");
-          if (fakePromoAlert && fakePromoAlert.parentNode) {
-            fakePromoAlert.parentNode.insertBefore(editContainer, fakePromoAlert.nextSibling);
-          } else {
-            let container = document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.body;
-            container.prepend(editContainer);
-          }
+          insertBeforeToolsBox(editContainer);
           let input = editContainer.querySelector(".jp-merchant-note-edit-input");
           input.focus();
           let saveBtn = editContainer.querySelector(".jp-merchant-note-save-edit");
@@ -10512,7 +12114,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           let freeDeliveryValue = currentCosts ? currentCosts.freeDeliveryFrom : "";
           let noteValue = currentCosts ? currentCosts.note : "";
           targetContainer.innerHTML = `
-                    <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 12px;">🚚 Edycja: ${merchantName}</div>
+                    <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 12px;">🚚 Edycja: ${merchantName}</div>
                     <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
                         <div>
                             <label style="font-size: 11px; color: var(--jp-text-muted); font-weight: bold;">Koszt dostawy (PLN):</label>
@@ -10572,10 +12174,10 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           let shippingCosts = getShippingCostsList(merchantName);
           if (!shippingCosts) {
             targetContainer.innerHTML = `
-                        <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
+                        <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
                         <div style="font-size: 12px; color: var(--jp-text-muted); margin-bottom: 12px; line-height: 1.4;">Brak zapisanych kosztów dostawy dla tego sklepu.</div>
-                        <button class="jp-shipping-cost-pull-btn" style="width: 100%; background-color: #ff9800; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s;">📥 Pobierz z formularza obok</button>
-                        <button class="jp-shipping-cost-add-btn" style="width: 100%; background-color: #2196f3; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;">➕ Wpisz ręcznie</button>
+                        <button class="jp-shipping-cost-pull-btn" style="width: 100%; background-color: #c0392b; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s;">📥 Pobierz z formularza obok</button>
+                        <button class="jp-shipping-cost-add-btn" style="width: 100%; background-color: #e68a00; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;">➕ Wpisz ręcznie</button>
                     `;
             targetContainer.querySelector(".jp-shipping-cost-pull-btn").addEventListener("click", () => {
               let nativeInput2 = document.querySelector('input[placeholder="Shipping costs"], input[data-jp-shipping="true"]');
@@ -10626,8 +12228,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           }
           let applyBtnHtml = needsUpdate ? `<button class="jp-shipping-apply-btn" style="width: 100%; background-color: #4caf50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 5px rgba(76, 175, 80, 0.4);">🚀 Zastosuj koszty w okazji</button>` : "";
           targetContainer.innerHTML = `
-                    <div style="font-weight: bold; color: #4fc3f7; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
-                    <div style="background: var(--jp-input-bg); border: 1px solid #4fc3f7; border-left: 4px solid #4fc3f7; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 13px; color: var(--jp-text); line-height: 1.6;">
+                    <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
+                    <div style="background: var(--jp-input-bg); border: 1px solid #e68a00; border-left: 4px solid #e68a00; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 13px; color: var(--jp-text); line-height: 1.6;">
                         <div style="margin-bottom: 4px;">💵 <b>Koszt:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.cost} PLN</span></div>
                         ${shippingCosts.freeDeliveryFrom > 0 ? `<div style="margin-bottom: 4px;">🎁 <b>Darmowa od:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.freeDeliveryFrom} PLN</span></div>` : ""}
                         ${shippingCosts.note ? `<div>📌 <b>Info:</b> ${shippingCosts.note}</div>` : ""}
@@ -10689,22 +12291,22 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           let notesList = getMerchantNotesList(merchantName);
           merchantNoteAlert = document.createElement("div");
           merchantNoteAlert.className = "jp-merchant-note-alert";
-          let alertHTML = `<div style="font-weight: 500; color: #ff9800; margin-bottom: 6px; font-size: 11px;">📝 ${merchantName}</div>`;
+          let alertHTML = `<div class="jp-mn-header">📝 ${merchantName}</div>`;
           if (notesList.length > 0) {
             notesList.forEach((note, index) => {
               let dateObj = new Date(note.savedAt);
               let dateStr = dateObj.toLocaleDateString("pl-PL") + " " + dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
               alertHTML += `
-                            <div style="display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 3px; margin-bottom: 6px; border-left: 2px solid #ff9800; background-color: rgba(255,255,255,0.05);">
-                                <div style="color: var(--jp-text); font-size: 11px; word-break: break-word; flex: 1;">${note.text}</div>
-                                <span style="font-size: 9px; color: #888; white-space: nowrap;">${note.savedBy} • ${dateStr}</span>
-                                <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę" style="padding: 2px 6px; font-size: 10px; flex-shrink: 0;">🗑️</button>
+                            <div class="jp-mn-item">
+                                <div class="jp-mn-text">${note.text}</div>
+                                <span class="jp-mn-meta">${note.savedBy} • ${dateStr}</span>
+                                <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę">🗑️</button>
                             </div>
                         `;
             });
           }
           alertHTML += `
-                    <button class="jp-merchant-note-edit-btn" style="width: 100%; background-color: #4a7a59; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 500; transition: all 0.2s ease;">+ ${t("btnAddMerchantNote")}</button>
+                    <button class="jp-merchant-note-edit-btn">+ ${t("btnAddMerchantNote")}</button>
                 `;
           merchantNoteAlert.innerHTML = alertHTML;
           let deleteButtons = merchantNoteAlert.querySelectorAll(".jp-merchant-note-delete-single");
@@ -10742,20 +12344,25 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           }
           let lockButtonsContainer = document.createElement("div");
           lockButtonsContainer.className = "jp-lock-buttons-standalone jp-lock-buttons-container";
-          lockButtonsContainer.style.cssText = "margin-bottom: 10px;";
+          lockButtonsContainer.style.marginBottom = "10px";
           lockButtonsContainer.innerHTML = `
-                    <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Edit Lock</button>
-                    <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Edit Unlock</button>
-                    <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Expire Lock</button>
-                    <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Expire Unlock</button>
+                    <div class="jp-lock-btn-header">Blokady</div>
+                    <div class="jp-lock-btn-grid-wrap">
+                        <div class="jp-lock-btn-grid">
+                            <div class="jp-lock-btn-group">
+                                <div class="jp-lock-btn-group-label">Edit</div>
+                                <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Lock</button>
+                                <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Unlock</button>
+                            </div>
+                            <div class="jp-lock-btn-group">
+                                <div class="jp-lock-btn-group-label">Expire</div>
+                                <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Lock</button>
+                                <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Unlock</button>
+                            </div>
+                        </div>
+                    </div>
                 `;
-          let fakePromoAlert = document.querySelector(".fake-promo-alert");
-          if (fakePromoAlert && fakePromoAlert.parentNode) {
-            fakePromoAlert.parentNode.insertBefore(lockButtonsContainer, fakePromoAlert.nextSibling);
-          } else {
-            let container = document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.body;
-            container.prepend(lockButtonsContainer);
-          }
+          insertBeforeToolsBox(lockButtonsContainer);
           attachLockButtonEvents(lockButtonsContainer);
         };
         const rebuildNoteButtonsWrapper = (noteAlertElement) => {
@@ -10788,28 +12395,27 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             lockButtonsContainer.className = "jp-lock-buttons-container";
             lockButtonsContainer.style.flex = "1";
             lockButtonsContainer.innerHTML = `
-                        <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Edit Lock</button>
-                        <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Edit Unlock</button>
-                        <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Expire Lock</button>
-                        <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Expire Unlock</button>
+                        <div class="jp-lock-btn-header">Blokady</div>
+                        <div class="jp-lock-btn-grid-wrap">
+                            <div class="jp-lock-btn-grid">
+                                <div class="jp-lock-btn-group">
+                                    <div class="jp-lock-btn-group-label">Edit</div>
+                                    <button class="jp-edit-lock-btn" title="Zablokuj edycję">🔒 Lock</button>
+                                    <button class="jp-edit-unlock-btn" title="Odblokuj edycję">🔓 Unlock</button>
+                                </div>
+                                <div class="jp-lock-btn-group">
+                                    <div class="jp-lock-btn-group-label">Expire</div>
+                                    <button class="jp-expire-lock-btn" title="Zablokuj ważność">⏰ Lock</button>
+                                    <button class="jp-expire-unlock-btn" title="Odblokuj ważność">⏳ Unlock</button>
+                                </div>
+                            </div>
+                        </div>
                     `;
             wrapperContainer.appendChild(lockButtonsContainer);
-            let fakePromoAlert = document.querySelector(".fake-promo-alert");
-            if (fakePromoAlert && fakePromoAlert.parentNode) {
-              fakePromoAlert.parentNode.insertBefore(wrapperContainer, fakePromoAlert.nextSibling);
-            } else {
-              let container = document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.body;
-              container.prepend(wrapperContainer);
-            }
+            insertBeforeToolsBox(wrapperContainer);
             attachLockButtonEvents(wrapperContainer);
           } else {
-            let fakePromoAlert = document.querySelector(".fake-promo-alert");
-            if (fakePromoAlert && fakePromoAlert.parentNode) {
-              fakePromoAlert.parentNode.insertBefore(noteAlertElement, fakePromoAlert.nextSibling);
-            } else {
-              let container = document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.body;
-              container.prepend(noteAlertElement);
-            }
+            insertBeforeToolsBox(noteAlertElement);
           }
         };
         const attachLockButtonEvents = (container) => {
@@ -11303,6 +12909,56 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
     let lastUpdateSaveBtn = 0;
     let lastBannedHighlightCheck = 0;
     const RARE_FUNCTION_INTERVAL = 1500;
+    function injectToolbarSettingsBtn() {
+      if (document.getElementById("jp-toolbar-settings-btn")) return;
+      const toolbar = document.querySelector(".v-toolbar__items.hidden-sm-and-down");
+      if (!toolbar) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.id = "jp-toolbar-settings-btn";
+      btn.className = "v-btn v-btn--flat v-btn--icon theme--dark";
+      btn.title = "Jalapeño — ustawienia skryptu";
+      btn.innerHTML = '<div class="v-btn__content" style="font-size:17px;line-height:1;">🌶️</div>';
+      btn.onclick = (e) => {
+        e.preventDefault();
+        openSettings();
+      };
+      const nativeSettings = toolbar.querySelector('a[href*="settings"]');
+      if (nativeSettings) toolbar.insertBefore(btn, nativeSettings);
+      else toolbar.appendChild(btn);
+      _maybeShowWelcomeGreeting();
+    }
+    function _maybeShowWelcomeGreeting() {
+      if (sessionStorage.getItem("jpWelcomeSeen")) return;
+      sessionStorage.setItem("jpWelcomeSeen", "1");
+      const name = getModeratorName();
+      const overlay = document.createElement("div");
+      overlay.id = "jp-welcome-overlay";
+      const splash = document.createElement("div");
+      splash.id = "jp-welcome-splash";
+      splash.innerHTML = `
+            <div id="jp-welcome-splash-accent"></div>
+            <div id="jp-welcome-splash-body">
+                <span id="jp-welcome-splash-emoji">👋</span>
+                <div id="jp-welcome-splash-title">Cześć, <strong>${name}</strong>!</div>
+                <div id="jp-welcome-splash-sub">Spokojnej pracy &nbsp;·&nbsp; powered by <strong>Jalapeño 🌶️</strong></div>
+                <div id="jp-welcome-splash-ver">v${GM_info.script.version}</div>
+            </div>
+            <div id="jp-welcome-splash-bar"><div id="jp-welcome-splash-bar-fill"></div></div>
+        `;
+      document.body.appendChild(overlay);
+      document.body.appendChild(splash);
+      function dismiss() {
+        overlay.classList.add("jp-splash-out");
+        splash.classList.add("jp-splash-out");
+        setTimeout(() => {
+          overlay.remove();
+          splash.remove();
+        }, 420);
+      }
+      overlay.addEventListener("click", dismiss);
+      setTimeout(dismiss, 3600);
+    }
     let lastKnownHref = "";
     setInterval(() => {
       let currentHref = window.location.href;
@@ -11326,11 +12982,13 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           resetUserAdminLinks();
         }
         if (settings3.enableSessionHistory) refreshSessionHistoryHighlight();
+        if (settings3.enableShopInfo) resetShopInfo();
         let oldWarningBox = document.querySelector(".jp-price-warning-toast");
         if (oldWarningBox) oldWarningBox.remove();
       }
       let isModeration = currentHref.includes("/admin-v2/moderation/");
       let isInspector = currentHref.includes("/admin/inspector/");
+      injectToolbarSettingsBtn();
       if (!isModeration && !isInspector) return;
       let titleInput = document.querySelector('input[placeholder="Thread title"]');
       let isAlreadyInjected = document.querySelector(".mod-tools-container");
