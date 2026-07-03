@@ -2,7 +2,7 @@
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
 // @version      5.0
-// @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
+// @description  Skrypt optymalizujący pracę moderatorów z ponad 19 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
