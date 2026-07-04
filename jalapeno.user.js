@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0
-// @description  Skrypt optymalizujący pracę moderatorów z ponad 19 funkcjonalnościami.
+// @version      5.0.1
+// @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
 // @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
@@ -12929,8 +12929,10 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       _maybeShowWelcomeGreeting();
     }
     function _maybeShowWelcomeGreeting() {
-      if (sessionStorage.getItem("jpWelcomeSeen")) return;
-      sessionStorage.setItem("jpWelcomeSeen", "1");
+      const COOLDOWN_MS = 12 * 60 * 60 * 1e3;
+      const last = parseInt(localStorage.getItem("jpWelcomeSeenAt") || "0", 10);
+      if (Date.now() - last < COOLDOWN_MS) return;
+      localStorage.setItem("jpWelcomeSeenAt", String(Date.now()));
       const name = getModeratorName();
       const overlay = document.createElement("div");
       overlay.id = "jp-welcome-overlay";
