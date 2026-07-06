@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.1
+// @version      5.0.2
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -8289,12 +8289,14 @@
         return;
       }
       if (!j["allegro.showoffer.seller.summary"]?.offer) {
-        if (status === 403) {
-          Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: `Captcha?<br><a target="_blank" href="${_esc(j.url || url)}">Kliknij</a>` });
+        if (status === 403 || typeof res === "string" && res.toLowerCase().includes("captcha")) {
+          Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "" });
+          _showResult();
+          _showAllegroRefreshBtn(url);
         } else {
           Object.assign(_daneFirmy, { shopID: "-", nazwa: "-", dane: "Oferta niedostępna" });
+          _showResult();
         }
-        _showResult();
         return;
       }
       const offer = j["allegro.showoffer.seller.summary"].offer;
@@ -8336,14 +8338,42 @@
       _showResult();
     });
   }
+  function _showAllegroRefreshBtn(offerUrl) {
+    const body = document.getElementById("jp-shopinfo-body");
+    if (!body) return;
+    const msg = document.createElement("div");
+    msg.style.cssText = "font-size:11px;color:var(--jp-text-muted,#888);margin-bottom:6px";
+    msg.textContent = "Captcha Allegro. Odśwież sesję:";
+    const btn = document.createElement("button");
+    btn.className = "jp-shopinfo-add-btn";
+    btn.textContent = "🔄 Odśwież i ponów";
+    btn.addEventListener("click", () => {
+      btn.disabled = true;
+      btn.textContent = "Otwieranie…";
+      const tab = GM_openInTab("https://www.allegro.pl/", false);
+      let retried = false;
+      const retry = () => {
+        if (retried) return;
+        retried = true;
+        body.innerHTML = '<span class="jp-shopinfo-muted">Ponawiam…</span>';
+        setTimeout(() => _fetchAllegroOffer(offerUrl), 1500);
+      };
+      if (tab && typeof tab.onclose !== "undefined") {
+        tab.onclose = retry;
+      } else {
+        setTimeout(retry, 5e3);
+      }
+    });
+    body.innerHTML = "";
+    body.append(msg, btn);
+  }
   function _fetchAllegro(url, extraHeaders, cb) {
     GM_xmlhttpRequest({
       method: "GET",
       url,
-      nocache: true,
-      fetch: true,
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
         ...extraHeaders
       },
       onload(res) {
