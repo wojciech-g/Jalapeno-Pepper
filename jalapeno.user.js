@@ -9325,6 +9325,11 @@
             font-size: 18px; font-weight: bold; border-radius: 5px; margin-bottom: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
+        .jp-local-store-warn {
+            background-color: #fff3cd; color: #856404; padding: 10px 14px; font-size: 13px;
+            font-weight: 600; border-radius: 5px; margin-bottom: 10px;
+            border: 1px solid #ffc107; border-left: 4px solid #e68a00;
+        }
         .mod-tools-container {
             margin: 10px 0; background: var(--jp-bg); padding: 12px 14px; border-radius: 6px;
             border: 1px solid var(--jp-border); border-left: 3px solid #c0392b;
@@ -11847,6 +11852,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
             window.jpDealCheckersAttached = false;
             window.jpAutoLocalStoreCounted = null;
+            window.jpLocalCheckboxDone = null;
+            document.getElementById("jp-local-store-warn")?.remove();
           }
           let linkToCheck = getAutomationLink(urlTextarea2.value, canonicalUrlNode?.value);
           if (settings3.enableAutoAmazonShipping && !skipAutoShippingRules() && shouldApplyAmazonPlShipping(urlTextarea2.value, canonicalUrlNode?.value)) {
@@ -11949,19 +11956,32 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               { keys: ["selgros"], url: "https://www.selgros.pl/", local: true },
               { keys: ["lewiatan"], url: "https://lewiatan.pl/", local: true },
               { keys: ["topaz", "topaz24"], url: "https://topaz24.pl/", local: true },
-              { keys: ["Leroy Merlin"], url: "https://www.leroymerlin.pl/", local: false },
-              { keys: ["Castorama"], url: "https://www.castorama.pl/", local: false },
-              { keys: ["Obi"], url: "https://www.obi.pl/", local: false },
+              { keys: ["leroy merlin"], url: "https://www.leroymerlin.pl/", local: false },
+              { keys: ["castorama"], url: "https://www.castorama.pl/", local: false },
+              { keys: ["obi"], url: "https://www.obi.pl/", local: false },
               { keys: ["sinsay"], url: "https://www.sinsay.com/pl/pl/", local: false },
               { keys: ["ikea"], url: "https://www.ikea.com/pl/pl/", local: false },
               { keys: ["zabka", "żabka", "zabce", "zappsy", "zappsów"], url: "https://www.zabka.pl/", local: true },
               { keys: ["half price", "halfprice"], url: "https://www.halfprice.eu/en", local: true }
             ];
             matchedStore = marketDB.find((store) => {
-              let isMatched = store.keys.some((key) => new RegExp("\\b" + key + "\\b").test(titleStr));
+              let isMatched = store.keys.some((key) => new RegExp("\\b" + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(titleStr));
               let isExcluded = store.exclude ? store.exclude.some((ex) => titleStr.includes(ex)) : false;
               return isMatched && !isExcluded;
             });
+            if (!matchedStore) {
+              const currentUrl = urlTextarea2.value.trim().toLowerCase();
+              if (currentUrl) {
+                matchedStore = marketDB.find((store) => {
+                  try {
+                    const host = new URL(store.url).hostname.replace(/^www\./, "");
+                    return currentUrl.includes(host);
+                  } catch {
+                    return false;
+                  }
+                });
+              }
+            }
             if (matchedStore) {
               if (urlTextarea2.value.trim() === "") {
                 urlTextarea2.value = matchedStore.url;
@@ -11971,11 +11991,45 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 window.jpAutoLocalStoreCounted = matchedStore.url;
                 increment("autoShippingFilled");
               }
-              if (matchedStore.local) {
-                setTimeout(() => {
+              if (matchedStore.local && !window.jpLocalCheckboxDone) {
+                window.jpLocalCheckboxDone = true;
+                const _isLocalChecked = () => {
+                  for (const lbl of ["Local offer", "Okazja stacjonarna"]) {
+                    const el = Array.from(document.querySelectorAll("div,span,p,label")).find(
+                      (e) => Array.from(e.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim().includes(lbl))
+                    );
+                    if (!el) continue;
+                    const row = el.closest(".layout.align-center") || el.parentElement;
+                    let wrap = row?.querySelector(".v-input--selection-controls");
+                    if (!wrap) wrap = row?.parentElement?.querySelector(".v-input--selection-controls");
+                    if (!wrap) continue;
+                    const inp = wrap.querySelector('input[type="checkbox"]');
+                    const checked = inp ? inp.checked || inp.getAttribute("aria-checked") === "true" : wrap.classList.contains("v-input--is-label-active") || wrap.classList.contains("v-input--is-dirty");
+                    if (checked) return true;
+                  }
+                  return false;
+                };
+                const trySet = (attemptsLeft) => {
                   setVuetifyCheckbox("Local offer", true, true);
                   setVuetifyCheckbox("Okazja stacjonarna", true, true);
-                }, 200);
+                  setTimeout(() => {
+                    if (_isLocalChecked()) {
+                      document.getElementById("jp-local-store-warn")?.remove();
+                    } else if (attemptsLeft > 0) {
+                      trySet(attemptsLeft - 1);
+                    } else {
+                      if (!document.getElementById("jp-local-store-warn")) {
+                        const warn = document.createElement("div");
+                        warn.id = "jp-local-store-warn";
+                        warn.className = "jp-local-store-warn";
+                        const storeName = matchedStore.keys[0];
+                        warn.innerHTML = `⚠️ Wykryto market stacjonarny (<b>${storeName}</b>) — zaznacz <b>Okazja stacjonarna</b>! <span style="cursor:pointer;float:right;opacity:.6" onclick="this.parentElement.remove()">✕</span>`;
+                        insertBeforeToolsBox(warn);
+                      }
+                    }
+                  }, 500);
+                };
+                setTimeout(() => trySet(3), 300);
               }
             }
           }
