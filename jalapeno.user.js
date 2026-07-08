@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.2
+// @version      5.0.5
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -7373,6 +7373,27 @@
     { key: "coupon", label: "Kupon", sel: 'input[placeholder="Coupon name"]' },
     { key: "nbp", label: "NBP", sel: 'input[placeholder="NBP"]' }
   ];
+  var _autoKeys = /* @__PURE__ */ new Set();
+  var _pendingBeforeSnapshot = /* @__PURE__ */ new Map();
+  var _snapshotTaken = false;
+  var _renderRef = null;
+  function markAutoChange(fieldKey) {
+    _autoKeys.add(fieldKey);
+    if (!_snapshotTaken && !_pendingBeforeSnapshot.has(fieldKey)) {
+      const field = FIELDS.find((f) => f.key === fieldKey);
+      if (field) {
+        const v = getFieldValue(field);
+        if (v !== null) _pendingBeforeSnapshot.set(fieldKey, v);
+      } else if (fieldKey === "freeDelivery") {
+        const v = getFreeDelivery();
+        if (v !== null) _pendingBeforeSnapshot.set(fieldKey, v);
+      } else if (fieldKey === "localOffer") {
+        const v = getLocalOffer();
+        if (v !== null) _pendingBeforeSnapshot.set(fieldKey, v);
+      }
+    }
+    if (_renderRef) _renderRef();
+  }
   function injectStyles2() {
     if (_stylesInjected2) return;
     _stylesInjected2 = true;
@@ -7432,6 +7453,13 @@
             word-break: break-all;
             font-size: 10px;
         }
+        .jp-dc-auto-badge {
+            font-size: 9px;
+            opacity: 0.75;
+            margin-left: 2px;
+            cursor: default;
+            vertical-align: middle;
+        }
         .jp-dc-empty-hint {
             color: var(--jp-text-muted, #aaa);
             font-size: 10px;
@@ -7458,6 +7486,21 @@
     if (cb) return cb.checked || cb.getAttribute("aria-checked") === "true";
     return wrapper.classList.contains("v-input--is-dirty") || wrapper.classList.contains("v-input--is-label-active");
   }
+  function getLocalOffer() {
+    for (const lbl of ["Local offer", "Okazja stacjonarna"]) {
+      const el = Array.from(document.querySelectorAll("label,div,span")).find(
+        (e) => Array.from(e.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim() === lbl)
+      );
+      if (!el) continue;
+      const row = el.closest(".layout.align-center") || el.parentElement;
+      const wrap = row?.querySelector(".v-input--selection-controls") || row?.parentElement?.querySelector(".v-input--selection-controls");
+      if (!wrap) continue;
+      const cb = wrap.querySelector('input[type="checkbox"]');
+      if (cb) return cb.checked || cb.getAttribute("aria-checked") === "true";
+      return wrap.classList.contains("v-input--is-dirty") || wrap.classList.contains("v-input--is-label-active");
+    }
+    return null;
+  }
   function initDealChangelog(stackEl, threadId) {
     if (!stackEl || !threadId) return;
     if (document.getElementById("jp-deal-changelog")) return;
@@ -7473,12 +7516,21 @@
     }
     const snapshot = {};
     function takeSnapshot() {
+      _snapshotTaken = true;
       for (const f of FIELDS) {
         const v = getFieldValue(f);
-        if (v !== null) snapshot[f.key] = v;
+        if (v !== null) {
+          snapshot[f.key] = _pendingBeforeSnapshot.has(f.key) ? _pendingBeforeSnapshot.get(f.key) : v;
+        }
       }
       const fd = getFreeDelivery();
-      if (fd !== null) snapshot.freeDelivery = fd;
+      if (fd !== null) {
+        snapshot.freeDelivery = _pendingBeforeSnapshot.has("freeDelivery") ? _pendingBeforeSnapshot.get("freeDelivery") : fd;
+      }
+      const lo = getLocalOffer();
+      if (lo !== null) {
+        snapshot.localOffer = _pendingBeforeSnapshot.has("localOffer") ? _pendingBeforeSnapshot.get("localOffer") : lo;
+      }
     }
     function getChanges() {
       const changes = [];
@@ -7486,15 +7538,27 @@
         if (!(f.key in snapshot)) continue;
         const cur = getFieldValue(f);
         if (cur !== null && cur !== snapshot[f.key]) {
-          changes.push({ label: f.label, from: snapshot[f.key], to: cur });
+          changes.push({ key: f.key, label: f.label, from: snapshot[f.key], to: cur });
         }
       }
       if ("freeDelivery" in snapshot) {
         const cur = getFreeDelivery();
         if (cur !== null && cur !== snapshot.freeDelivery) {
           changes.push({
+            key: "freeDelivery",
             label: "Darmowa dostawa",
             from: snapshot.freeDelivery ? "Tak" : "Nie",
+            to: cur ? "Tak" : "Nie"
+          });
+        }
+      }
+      if ("localOffer" in snapshot) {
+        const cur = getLocalOffer();
+        if (cur !== null && cur !== snapshot.localOffer) {
+          changes.push({
+            key: "localOffer",
+            label: "Okazja stacjonarna",
+            from: snapshot.localOffer ? "Tak" : "Nie",
             to: cur ? "Tak" : "Nie"
           });
         }
@@ -7509,13 +7573,15 @@
       }
       panel.style.display = "";
       const maxUrl = 36, maxOther = 42;
+      const hasAutoChanges = changes.some((c) => _autoKeys.has(c.key));
       panel.innerHTML = `
-            <div id="jp-dc-header">📝 Zmiany w tej sesji</div>
+            <div id="jp-dc-header">📝 Zmiany w tej sesji${hasAutoChanges ? ' <span style="font-weight:400;opacity:0.6;font-size:9px;margin-left:4px">🤖 = auto</span>' : ""}</div>
             ${changes.map((c) => {
         const isUrl = c.label.startsWith("URL");
         const max = isUrl ? maxUrl : maxOther;
+        const isAuto = _autoKeys.has(c.key);
         return `<div class="jp-dc-item">
-                    <span class="jp-dc-label">${c.label}</span>
+                    <span class="jp-dc-label">${c.label}${isAuto ? ' <span class="jp-dc-auto-badge" title="Zmiana automatyczna (skrypt)">🤖</span>' : ""}</span>
                     <span class="jp-dc-from" title="${c.from}">${trunc(c.from, max)}</span>
                     <span class="jp-dc-arrow">→</span>
                     <span class="jp-dc-to" title="${c.to}">${trunc(c.to, max)}</span>
@@ -7527,6 +7593,7 @@
       } catch (_) {
       }
     }
+    _renderRef = renderChanges;
     function setupListeners() {
       for (const f of FIELDS) {
         const el = document.querySelector(f.sel);
@@ -7544,6 +7611,7 @@
     setTimeout(() => {
       takeSnapshot();
       setupListeners();
+      renderChanges();
     }, 80);
   }
 
@@ -11877,6 +11945,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 }
                 window.jpAutoShippingSet = false;
                 if (!skipAutoShippingRules()) {
+                  markAutoChange("freeDelivery");
                   setVuetifyCheckbox("Free Delivery", true, true);
                 }
               } else if (price > 0 && price < 65) {
@@ -11900,10 +11969,12 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                   (async () => {
                     if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
                     if (skipAutoShippingRules()) return;
+                    markAutoChange("freeDelivery");
                     setVuetifyCheckbox("Free Delivery", false, true);
                     await afterVueUpdate(getShippingInput());
                     if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
                     if (skipAutoShippingRules()) return;
+                    markAutoChange("shipping");
                     await setShippingCost("8,99");
                   })();
                 }
@@ -11918,6 +11989,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               setTimeout(() => {
                 if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
                 if (!skipAutoShippingRules()) {
+                  markAutoChange("shipping");
                   setShippingCost("10,49");
                 }
               }, 150);
@@ -11931,6 +12003,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               setTimeout(() => {
                 if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
                 if (!skipAutoShippingRules()) {
+                  markAutoChange("shipping");
                   setShippingCost("9,95");
                 }
               }, 150);
@@ -11984,6 +12057,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             }
             if (matchedStore) {
               if (urlTextarea2.value.trim() === "") {
+                markAutoChange("mainUrl");
                 urlTextarea2.value = matchedStore.url;
                 urlTextarea2.dispatchEvent(new Event("input", { bubbles: true }));
               }
@@ -12010,6 +12084,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                   return false;
                 };
                 const trySet = (attemptsLeft) => {
+                  markAutoChange("localOffer");
                   setVuetifyCheckbox("Local offer", true, true);
                   setVuetifyCheckbox("Okazja stacjonarna", true, true);
                   setTimeout(() => {
