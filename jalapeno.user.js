@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.5
+// @version      5.0.6
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -941,6 +941,91 @@
     GM_addStyle(css);
   }
 
+  // src/data/marketDB.js
+  var MARKET_DB_SHEET_URL = "https://docs.google.com/spreadsheets/d/1CG-qs2BTE_ZpcA5HwxWyhRsKGicrPU9OeUeuJVTuOIA/export?format=tsv&gid=0";
+  var marketDB = [
+    { keys: ["biedronka", "biedronki", "biedronce"], url: "https://www.biedronka.pl", local: true },
+    { keys: ["dino"], url: "https://marketdino.pl", local: true },
+    { keys: ["kaufland", "kauflandzie"], url: "https://www.kaufland.pl", local: true },
+    { keys: ["auchan", "auchanie"], url: "https://www.auchan.pl", local: true },
+    { keys: ["carrefour", "kerfur", "carrefourze"], url: "https://www.carrefour.pl", local: true },
+    { keys: ["aldi"], url: "https://www.aldi.pl", local: true },
+    { keys: ["netto"], url: "https://netto.pl", local: true },
+    { keys: ["polomarket", "polo market", "polomarkecie"], url: "https://www.polomarket.pl", local: true },
+    { keys: ["leclerc", "eleclerc", "e.leclerc"], url: "https://leclerc.pl", local: true },
+    { keys: ["lidl", "lidlu"], url: "https://www.lidl.pl", local: false },
+    { keys: ["action"], url: "https://www.action.com/pl-pl/", local: true },
+    { keys: ["stokrotka", "stokrotce"], url: "https://stokrotka.pl/", local: true },
+    { keys: ["intermarche"], url: "https://intermarche.pl/", local: true },
+    { keys: ["selgros"], url: "https://www.selgros.pl/", local: true },
+    { keys: ["lewiatan"], url: "https://lewiatan.pl/", local: true },
+    { keys: ["topaz", "topaz24"], url: "https://topaz24.pl/", local: true },
+    { keys: ["leroy merlin"], url: "https://www.leroymerlin.pl/", local: false },
+    { keys: ["castorama"], url: "https://www.castorama.pl/", local: false },
+    { keys: ["obi"], url: "https://www.obi.pl/", local: false },
+    { keys: ["sinsay"], url: "https://www.sinsay.com/pl/pl/", local: false },
+    { keys: ["ikea"], url: "https://www.ikea.com/pl/pl/", local: false },
+    { keys: ["zabka", "żabka", "zabce", "zappsy", "zappsów"], url: "https://www.zabka.pl/", local: true },
+    { keys: ["half price", "halfprice"], url: "https://www.halfprice.eu/en", local: true }
+  ];
+  var CACHE_KEY = "jp_market_db_cache";
+  var CACHE_TTL = 60 * 60 * 1e3;
+  var _resolved = marketDB;
+  function getMarketDB() {
+    return _resolved;
+  }
+  function loadMarketDB() {
+    if (!MARKET_DB_SHEET_URL) return;
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      if (cached && Date.now() - cached.ts < CACHE_TTL && Array.isArray(cached.data) && cached.data.length > 0) {
+        _resolved = cached.data;
+        return;
+      }
+    } catch (_) {
+    }
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: MARKET_DB_SHEET_URL,
+      onload(res) {
+        if (res.status !== 200) return;
+        try {
+          const parsed = _parseTSV(res.responseText);
+          if (parsed.length > 0) {
+            _resolved = parsed;
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ data: parsed, ts: Date.now() }));
+          }
+        } catch (_) {
+        }
+      },
+      onerror() {
+      }
+    });
+  }
+  function _parseTSV(text) {
+    const lines = text.trim().split("\n").filter((l) => l.trim());
+    if (!lines.length) return [];
+    const firstCell = lines[0].split("	")[0].trim().toLowerCase();
+    const startLine = firstCell === "keys" || firstCell === "słowa kluczowe" ? 1 : 0;
+    const result = [];
+    for (let i = startLine; i < lines.length; i++) {
+      const cols = lines[i].split("	");
+      const keysRaw = (cols[0] || "").trim();
+      const url = (cols[1] || "").trim();
+      const localRaw = (cols[2] || "").trim().toUpperCase();
+      const exclRaw = (cols[3] || "").trim();
+      if (!keysRaw || !url) continue;
+      const keys = keysRaw.split("|").map((k) => k.trim().toLowerCase()).filter(Boolean);
+      const local = localRaw === "TRUE" || localRaw === "TAK" || localRaw === "1";
+      const exclude = exclRaw ? exclRaw.split("|").map((e) => e.trim().toLowerCase()).filter(Boolean) : void 0;
+      if (!keys.length) continue;
+      const entry = { keys, url, local };
+      if (exclude && exclude.length) entry.exclude = exclude;
+      result.push(entry);
+    }
+    return result;
+  }
+
   // src/utils/text.js
   var settings = {};
   function initTextUtils(currentSettings) {
@@ -1588,8 +1673,12 @@
       lblShippingCosts: "Baza kosztów dostawy",
       mDealChangelog: "Tracker zmian w formularzu deala",
       mDealChangelogHint: "Nad panelem dostawy pokazuje które pola zostały zmienione od momentu otwarcia strony (tytuł, URL, cena, sklep, dostawa).",
+      mGeekStats: "GeekStats — licznik akcji zmiany",
+      mGeekStatsHint: "Floating widget (lewy dół) liczący kliknięcia DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE od godziny 2:00 w nocy. Resetuje się codziennie o 2:00.",
       mDealDateTools: "Narzędzia daty wygaśnięcia",
       mDealDateToolsHint: "Nad panelem dostawy pokazuje aktualną datę/czas wygaśnięcia i pozwala ustawić je jednym kliknięciem (Dziś 23:59, +7 dni, +30 dni, +90 dni).",
+      mMultipack: "Multipack — wstawianie frazy do tytułu",
+      mMultipackHint: 'Dodaje panel 📦 Multipack przy edycji okazji. Wpisz liczbę sztuk i kliknij "Wstaw do tytułu" aby dodać frazę (cena za sztukę przy zakupie X).',
       lblShippingCost: "Koszt dostawy (PLN)",
       lblFreeDeliveryFrom: "Darmowa dostawa od (PLN)",
       lblShippingNote: "Notatka (opcjonalna)",
@@ -1902,8 +1991,12 @@
       lblShippingCosts: "Shipping cost database",
       mDealChangelog: "Deal form change tracker",
       mDealChangelogHint: "Above the shipping panel, shows which fields were changed since opening the page (title, URL, price, merchant, delivery).",
+      mGeekStats: "GeekStats — shift action counter",
+      mGeekStatsHint: "Floating widget (bottom-left) counting DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE clicks since 2:00 AM. Resets daily at 2:00.",
       mDealDateTools: "Expiry date tools",
       mDealDateToolsHint: "Above the shipping panel, shows the current expiry date/time and lets you set it with one click (Today 23:59, +7 days, +30 days, +90 days).",
+      mMultipack: "Multipack — title phrase inserter",
+      mMultipackHint: 'Adds a 📦 Multipack panel on the deal edit page. Enter the quantity and click "Insert into title" to add the phrase (cena za sztukę przy zakupie X).',
       lblShippingCost: "Shipping cost (PLN)",
       lblFreeDeliveryFrom: "Free delivery from (PLN)",
       lblShippingNote: "Note (optional)",
@@ -4803,9 +4896,18 @@
         view.meta.sharedIgnores = getSharedIgnoreWords();
         return view;
       }
+      function getFixedCategoryWarning(title) {
+        if (!title) return "";
+        const tl = title.toLowerCase();
+        if (tl.includes("listwa") || tl.includes("przedłużacz") || tl.includes("przedluzacz")) {
+          return `<div class="jp-cat-fixed-warning">⚠️ <strong>Listwa zasilająca / przedłużacz</strong> → zawsze <strong>Ogród</strong></div>`;
+        }
+        return "";
+      }
       function renderAuto(rewardsSuggestions, pepperData, loadingPepper, title) {
+        const warning = getFixedCategoryWarning(title);
         if (!rewardsSuggestions?.length && !pepperData && !loadingPepper) {
-          autoResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
+          autoResults.innerHTML = warning + `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
           return;
         }
         const view = enrichView(
@@ -4813,10 +4915,10 @@
           title
         );
         if (!view.merged?.length && !view.rewards.length && !view.pepper.length && !loadingPepper) {
-          autoResults.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
+          autoResults.innerHTML = warning + `<span class="jp-inspector-empty">${t("mCatAdvisorNoData")}</span>`;
           return;
         }
-        autoResults.innerHTML = renderCategorySuggestionView(view, catLabels());
+        autoResults.innerHTML = warning + renderCategorySuggestionView(view, catLabels());
         increment("categoryAdvisorAutoShown");
       }
       function updateAuto() {
@@ -4888,7 +4990,7 @@
   // src/features/offlineDealsFilter.js
   var OFFLINE_QP = "jp-offline";
   var OFFLINE_HISTORY_STATE = { jpOfflinePanel: true };
-  var CACHE_KEY = "jpOfflineDealsCacheV3";
+  var CACHE_KEY2 = "jpOfflineDealsCacheV3";
   var CACHE_TTL_MS = 3 * 60 * 1e3;
   var AUTO_REFRESH_MS = 90 * 1e3;
   var MIN_REFRESH_GAP_MS = 8e3;
@@ -4954,7 +5056,7 @@
   function loadCache() {
     if (_cache) return _cache;
     try {
-      const raw = sessionStorage.getItem(CACHE_KEY);
+      const raw = sessionStorage.getItem(CACHE_KEY2);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (Date.now() - parsed.scannedAt < CACHE_TTL_MS && parsed.queuePath === getQueuePath()) {
@@ -4968,7 +5070,7 @@
   function saveCache(items, queuePath) {
     _cache = { items, queuePath, scannedAt: Date.now() };
     try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify(_cache));
+      sessionStorage.setItem(CACHE_KEY2, JSON.stringify(_cache));
     } catch (_) {
     }
   }
@@ -5437,7 +5539,7 @@
     if (_scanPromise && !force) return _scanPromise;
     if (force) {
       _scanGeneration++;
-      sessionStorage.removeItem(CACHE_KEY);
+      sessionStorage.removeItem(CACHE_KEY2);
       _cache = null;
     }
     const cachedCount = loadCache()?.items?.length ?? 0;
@@ -7557,7 +7659,7 @@
         if (cur !== null && cur !== snapshot.localOffer) {
           changes.push({
             key: "localOffer",
-            label: "Okazja stacjonarna",
+            label: "Lokalna",
             from: snapshot.localOffer ? "Tak" : "Nie",
             to: cur ? "Tak" : "Nie"
           });
@@ -8895,6 +8997,449 @@
     `);
   }
 
+  // src/features/geekStats.js
+  var STORAGE_KEY3 = "jp_geekstats";
+  var STORAGE_KEY_START = "jp_geekstats_start";
+  var DEBOUNCE_MS = 4e3;
+  var CATEGORIES = {
+    deal: { label: "Okazje/Dyskusje", icon: "🏷️" },
+    comment: { label: "Komentarze", icon: "📝" },
+    inbox: { label: "Inbox", icon: "📬" }
+  };
+  var _widget = null;
+  var _collapsed = true;
+  var _injected4 = false;
+  var _lastTs = {};
+  function getDailyCutoff() {
+    const now = /* @__PURE__ */ new Date();
+    const cutoff = new Date(now);
+    cutoff.setHours(4, 0, 0, 0);
+    if (now.getTime() < cutoff.getTime()) cutoff.setDate(cutoff.getDate() - 1);
+    return cutoff.getTime();
+  }
+  function getShiftStart() {
+    const cutoff = getDailyCutoff();
+    const stored = GM_getValue(STORAGE_KEY_START, null);
+    if (!stored || stored < cutoff) {
+      GM_setValue(STORAGE_KEY_START, cutoff);
+      return cutoff;
+    }
+    return stored;
+  }
+  function startNewShift() {
+    GM_setValue(STORAGE_KEY_START, Date.now());
+    renderWidget();
+  }
+  function formatElapsed(ms) {
+    const h = Math.floor(ms / 36e5);
+    const m = Math.floor(ms % 36e5 / 6e4);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  function loadAllEvents() {
+    return GM_getValue(STORAGE_KEY3, { events: [] }).events || [];
+  }
+  function saveAllEvents(events) {
+    const cutoff = Date.now() - 48 * 36e5;
+    GM_setValue(STORAGE_KEY3, { events: events.filter((e) => e.ts > cutoff) });
+  }
+  function recordEvent(category) {
+    const now = Date.now();
+    if (_lastTs[category] && now - _lastTs[category] < DEBOUNCE_MS) return;
+    _lastTs[category] = now;
+    const events = loadAllEvents();
+    events.push({ type: category, ts: now });
+    saveAllEvents(events);
+    renderWidget();
+  }
+  function getShiftEvents() {
+    const shiftStart = getShiftStart();
+    return loadAllEvents().filter((e) => e.ts >= shiftStart);
+  }
+  function detectCategory(btn) {
+    const path = window.location.pathname;
+    const text = (btn.innerText || btn.textContent || "").trim().toUpperCase().replace(/\s+/g, " ");
+    if (path.includes("/inbox/")) {
+      return text.includes("REPLY") || text.includes("RESOLVED") || text.includes("MARK") || text.includes("APPLY") ? "inbox" : null;
+    }
+    if (path.includes("/comments/")) {
+      if (text.includes("RESOLVE")) return "comment";
+      if (text.includes("EDIT")) return null;
+      if (text.includes("DELETE") || text.includes("APPROVE")) {
+        return btn.closest('.v-dialog, [role="dialog"]') ? "comment" : null;
+      }
+      return null;
+    }
+    if (path.includes("/discussions")) {
+      return _isMainFormBtn(text) ? "deal" : null;
+    }
+    if (path.includes("/deals/reported")) {
+      return text.includes("DELETE") || text.includes("RESOLVE") ? "deal" : null;
+    }
+    if (path.includes("/deals/") || path.includes("/moderation/")) {
+      return _isMainFormBtn(text) ? "deal" : null;
+    }
+    return null;
+  }
+  function _isMainFormBtn(text) {
+    if (text.includes("SAVE") && text.includes("APPROVE")) return true;
+    if (text.includes("APPROVE") && text.includes("SEND")) return true;
+    if (text.includes("APPROVE")) return true;
+    if (text.includes("DELETE") && !text.includes("BAN")) return true;
+    if (text.includes("HOLD") && text.length < 20) return true;
+    if (text.includes("SAVE") && !text.includes("APPROVE") && text.length < 20) return true;
+    return false;
+  }
+  function injectStyles4() {
+    if (_injected4) return;
+    _injected4 = true;
+    GM_addStyle(`
+        #jp-geekstats-widget {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            z-index: 9990;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            font-size: 11px;
+            line-height: 1.4;
+            color: var(--jp-text);
+            min-width: 160px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            user-select: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        #jp-gs-header {
+            padding: 7px 10px 6px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 11px;
+            color: #c0392b;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        #jp-gs-header-total {
+            margin-left: auto;
+            background: #c0392b;
+            color: #fff;
+            border-radius: 10px;
+            padding: 0 6px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 16px;
+            display: none;
+        }
+        #jp-gs-header-total.jp-gs-visible { display: inline-block; }
+        #jp-gs-body {
+            padding: 4px 10px 8px;
+            border-top: 1px solid var(--jp-border);
+        }
+        .jp-gs-row {
+            display: grid;
+            grid-template-columns: 16px 1fr 22px;
+            gap: 0 5px;
+            align-items: center;
+            padding: 2px 0;
+        }
+        .jp-gs-icon  { font-size: 11px; line-height: 1; }
+        .jp-gs-label {
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            font-weight: 600;
+        }
+        .jp-gs-count {
+            font-weight: 700;
+            font-size: 11px;
+            text-align: right;
+            color: var(--jp-text-muted, #bbb);
+        }
+        .jp-gs-count.jp-gs-active { color: #c0392b; }
+        .jp-gs-divider {
+            border: none;
+            border-top: 1px solid var(--jp-border);
+            margin: 4px 0;
+        }
+        .jp-gs-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 0 0;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--jp-text-muted, #888);
+        }
+        .jp-gs-total-row strong {
+            font-size: 12px;
+            font-weight: 700;
+            color: #c0392b;
+        }
+        .jp-gs-meta {
+            font-size: 9px;
+            font-weight: 400;
+            opacity: 0.6;
+            margin-left: 4px;
+        }
+        #jp-gs-new-shift {
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            padding: 4px 0;
+            background: none;
+            border: 1px solid var(--jp-border);
+            border-radius: 4px;
+            color: var(--jp-text-muted, #888);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            font-family: inherit;
+        }
+        #jp-gs-new-shift:hover {
+            border-color: #c0392b;
+            color: #c0392b;
+        }
+    `);
+  }
+  function renderWidget() {
+    if (!_widget) return;
+    const events = getShiftEvents();
+    const shiftStart = getShiftStart();
+    const d = new Date(shiftStart);
+    const timeStr = d.getHours().toString().padStart(2, "0") + ":" + d.getMinutes().toString().padStart(2, "0");
+    const elapsed = formatElapsed(Date.now() - shiftStart);
+    const total = events.length;
+    const counts = Object.fromEntries(Object.keys(CATEGORIES).map((k) => [k, 0]));
+    for (const e of events) {
+      if (counts[e.type] !== void 0) counts[e.type]++;
+    }
+    const header = _widget.querySelector("#jp-gs-header");
+    const badge = _widget.querySelector("#jp-gs-header-total");
+    if (header) {
+      header.querySelector(".jp-gs-title").textContent = "📊 GeekStats";
+      header.querySelector(".jp-gs-meta").textContent = `od ${timeStr} · ${elapsed}`;
+    }
+    if (badge) {
+      badge.textContent = total;
+      badge.classList.toggle("jp-gs-visible", _collapsed && total > 0);
+    }
+    const body = _widget.querySelector("#jp-gs-body");
+    if (!body) return;
+    if (_collapsed) {
+      body.style.display = "none";
+      return;
+    }
+    body.style.display = "";
+    body.innerHTML = Object.entries(CATEGORIES).map(([key, meta]) => {
+      const n = counts[key];
+      return `<div class="jp-gs-row">
+            <span class="jp-gs-icon">${meta.icon}</span>
+            <span class="jp-gs-label">${meta.label}</span>
+            <span class="jp-gs-count${n > 0 ? " jp-gs-active" : ""}">${n}</span>
+        </div>`;
+    }).join("") + `
+        <hr class="jp-gs-divider">
+        <div class="jp-gs-total-row">
+            <span>Łącznie</span>
+            <strong>${total}</strong>
+        </div>
+        <button id="jp-gs-new-shift">🔄 Nowa zmiana</button>`;
+  }
+  function initGeekStats() {
+    injectStyles4();
+    _widget = document.createElement("div");
+    _widget.id = "jp-geekstats-widget";
+    _widget.innerHTML = `
+        <div id="jp-gs-header">
+            <span class="jp-gs-title"></span>
+            <span class="jp-gs-meta"></span>
+            <span id="jp-gs-header-total"></span>
+        </div>
+        <div id="jp-gs-body"></div>`;
+    document.body.appendChild(_widget);
+    _widget.querySelector("#jp-gs-header").addEventListener("click", () => {
+      _collapsed = !_collapsed;
+      renderWidget();
+    });
+    _widget.addEventListener("click", (e) => {
+      if (e.target.closest("#jp-gs-new-shift")) {
+        startNewShift();
+        e.stopPropagation();
+      }
+    });
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("button.v-btn");
+      if (!btn) return;
+      const category = detectCategory(btn);
+      if (category) recordEvent(category);
+    }, true);
+    renderWidget();
+    setInterval(renderWidget, 6e4);
+  }
+
+  // src/features/multipackHelper.js
+  var _injected5 = false;
+  function injectStyles5() {
+    if (_injected5) return;
+    _injected5 = true;
+    GM_addStyle(`
+        #jp-multipack {
+            width: 100%;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #c0392b;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 11px;
+            margin-bottom: 6px;
+            box-sizing: border-box;
+        }
+        #jp-mp-header {
+            font-weight: 700;
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 7px;
+        }
+        .jp-mp-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .jp-mp-label {
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            white-space: nowrap;
+        }
+        #jp-mp-qty {
+            width: 48px;
+            padding: 3px 5px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            border: 1px solid var(--jp-border);
+            border-radius: 4px;
+            background: var(--jp-input-bg);
+            color: var(--jp-input-text);
+        }
+        #jp-mp-insert {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            background: var(--jp-btn-bg);
+            color: var(--jp-text);
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        #jp-mp-insert:hover {
+            border-color: #c0392b;
+            color: #c0392b;
+        }
+        #jp-mp-preview {
+            margin-top: 5px;
+            font-size: 9px;
+            color: var(--jp-text-muted, #888);
+            word-break: break-all;
+            min-height: 12px;
+        }
+    `);
+  }
+  var PHRASE_CANONICAL_RE = /\s*\(cena za sztukę przy zakupie \d+\)/gi;
+  var PHRASE_LOOSE_RE = /\s*cena(?: za sztukę)? przy zakupie (\d+)/gi;
+  function buildPhrase(qty) {
+    return `(cena za sztukę przy zakupie ${qty})`;
+  }
+  function detectQtyInTitle(title) {
+    const c = title.match(/\(cena za sztukę przy zakupie (\d+)\)/i);
+    if (c) return parseInt(c[1], 10);
+    const l = title.match(/cena(?: za sztukę)? przy zakupie (\d+)/i);
+    if (l) return parseInt(l[1], 10);
+    return null;
+  }
+  function stripExistingPhrases(title) {
+    return title.replace(PHRASE_CANONICAL_RE, "").replace(PHRASE_LOOSE_RE, "").trimEnd();
+  }
+  function insertPhraseIntoTitle(current, phrase) {
+    const base = stripExistingPhrases(current);
+    const atMatch = base.match(/(\s+@\S+)$/);
+    if (atMatch) {
+      const store = atMatch[1];
+      return base.slice(0, base.length - store.length) + ` ${phrase}` + store;
+    }
+    return base + ` ${phrase}`;
+  }
+  function initMultipackHelper(stackEl, triggerVueInput) {
+    if (!stackEl) return;
+    if (document.getElementById("jp-multipack")) return;
+    injectStyles5();
+    const panel = document.createElement("div");
+    panel.id = "jp-multipack";
+    panel.innerHTML = `
+        <div id="jp-mp-header">📦 Multipack</div>
+        <div class="jp-mp-row">
+            <span class="jp-mp-label">przy zakupie</span>
+            <input id="jp-mp-qty" type="number" min="2" max="99" value="4">
+            <span class="jp-mp-label">szt.</span>
+            <button id="jp-mp-insert" type="button">Wstaw do tytułu</button>
+        </div>
+        <div id="jp-mp-preview"></div>`;
+    const anchor = stackEl.querySelector(".mod-floating-btn");
+    if (anchor) stackEl.insertBefore(panel, anchor);
+    else stackEl.prepend(panel);
+    const qtyInput = panel.querySelector("#jp-mp-qty");
+    const insertBtn = panel.querySelector("#jp-mp-insert");
+    const previewEl = panel.querySelector("#jp-mp-preview");
+    function getTitleInput() {
+      return document.querySelector('input[placeholder="Thread title"]');
+    }
+    function syncQtyFromTitle(title) {
+      const detected = detectQtyInTitle(title);
+      if (detected && detected >= 2) qtyInput.value = detected;
+    }
+    function updatePreview() {
+      const titleEl2 = getTitleInput();
+      const qty = parseInt(qtyInput.value, 10);
+      if (!titleEl2 || !titleEl2.value || isNaN(qty) || qty < 2) {
+        previewEl.textContent = "";
+        return;
+      }
+      const hasLoose = PHRASE_LOOSE_RE.test(titleEl2.value);
+      PHRASE_LOOSE_RE.lastIndex = 0;
+      const result = insertPhraseIntoTitle(titleEl2.value, buildPhrase(qty));
+      previewEl.innerHTML = (hasLoose ? '<span style="color:#b7770d;">⚠️ Znaleziono wariant — zostanie zastąpiony</span><br>' : "") + result.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    qtyInput.addEventListener("input", updatePreview);
+    const titleEl = getTitleInput();
+    if (titleEl) {
+      syncQtyFromTitle(titleEl.value);
+      titleEl.addEventListener("input", (e) => {
+        syncQtyFromTitle(e.target.value);
+        updatePreview();
+      });
+    }
+    insertBtn.addEventListener("click", async () => {
+      const titleEl2 = getTitleInput();
+      if (!titleEl2) return;
+      const qty = parseInt(qtyInput.value, 10);
+      if (isNaN(qty) || qty < 2) return;
+      const newTitle = insertPhraseIntoTitle(titleEl2.value, buildPhrase(qty));
+      await triggerVueInput(titleEl2, newTitle);
+      updatePreview();
+      insertBtn.textContent = "✅ Wstawiono";
+      setTimeout(() => {
+        insertBtn.textContent = "Wstaw do tytułu";
+      }, 2e3);
+    });
+    updatePreview();
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -8962,12 +9507,15 @@
       enableReportedReason: true,
       enableDealChangelog: true,
       enableDealDateTools: true,
+      enableMultipackHelper: true,
       dealDateCustom: "",
-      enableShopInfo: true
+      enableShopInfo: true,
+      enableGeekStats: true
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
     initI18n(settings3);
+    loadMarketDB();
     const isAllegroContext = /(^|\.)allegro\.pl$/i.test(location.hostname);
     if (isGoogleLensContext) {
       initLensAiOverview(settings3);
@@ -8995,6 +9543,7 @@
     if (settings3.enableSnippets) initSnippets();
     if (settings3.enableCheatsheet) initCheatsheet(settings3);
     if (settings3.enableMerchantNotes) initAutopromoTracker();
+    if (settings3.enableGeekStats) initGeekStats();
     function settingsSectionHead(titleKey, descKey) {
       return `
             <h4 class="jp-settings-h4">${t(titleKey)}</h4>
@@ -9046,7 +9595,8 @@
           settingsModuleToggle("set-auto-local", s.enableAutoLocalStore, "mAutoLoc", "mAutoLocHint"),
           settingsModuleToggle("set-shipping-costs", s.enableShippingCosts, "lblShippingCosts", "lblShippingCostsHint"),
           settingsModuleToggle("set-deal-changelog", s.enableDealChangelog, "mDealChangelog", "mDealChangelogHint"),
-          settingsModuleToggle("set-deal-date-tools", s.enableDealDateTools, "mDealDateTools", "mDealDateToolsHint")
+          settingsModuleToggle("set-deal-date-tools", s.enableDealDateTools, "mDealDateTools", "mDealDateToolsHint"),
+          settingsModuleToggle("set-multipack", s.enableMultipackHelper, "mMultipack", "mMultipackHint")
         ]),
         settingsModuleGroup("secModMessages", "secModMessagesDesc", [
           settingsModuleToggle("set-hold-note", s.enableAutoHoldNote, "mHoldNote", "mHoldNoteHint"),
@@ -9064,7 +9614,8 @@
         settingsModuleGroup("secModSidePanels", "secModSidePanelsDesc", [
           settingsModuleToggle("set-session-history", s.enableSessionHistory, "mSessionHistory", "mSessionHistoryHint"),
           settingsModuleToggle("set-snippets", s.enableSnippets, "mSnippets", "mSnippetsHint"),
-          settingsModuleToggle("set-cheatsheet", s.enableCheatsheet, "mCheatsheet", "mCheatsheetHint")
+          settingsModuleToggle("set-cheatsheet", s.enableCheatsheet, "mCheatsheet", "mCheatsheetHint"),
+          settingsModuleToggle("set-geekstats", s.enableGeekStats, "mGeekStats", "mGeekStatsHint")
         ])
       ].join("");
     }
@@ -9362,7 +9913,9 @@
           enableCheatsheet: document.getElementById("set-cheatsheet").checked,
           enableDealChangelog: document.getElementById("set-deal-changelog").checked,
           enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
-          dealDateCustom: document.getElementById("set-deal-date-custom").value.trim()
+          enableMultipackHelper: document.getElementById("set-multipack").checked,
+          dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
+          enableGeekStats: document.getElementById("set-geekstats").checked
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -9557,6 +10110,23 @@
             color: var(--jp-text-muted, #888);
             white-space: nowrap;
         }
+        .jp-mn-ban-group {
+            margin-top: 4px;
+            border-top: 1px solid var(--jp-border);
+            padding-top: 2px;
+        }
+        .jp-mn-ban-summary {
+            font-size: 10px;
+            font-weight: 700;
+            color: #c0392b;
+            cursor: pointer;
+            padding: 3px 0;
+            list-style: none;
+            user-select: none;
+        }
+        .jp-mn-ban-summary::-webkit-details-marker { display: none; }
+        .jp-mn-ban-summary::before { content: '▸ '; }
+        details[open] .jp-mn-ban-summary::before { content: '▾ '; }
         .jp-merchant-note-delete-single {
             padding: 2px 6px;
             font-size: 10px;
@@ -10391,6 +10961,16 @@
         .jp-cat-ex-badge { flex-shrink: 0; font-size: 9px; }
         .jp-cat-empty-src { font-size: 10px; color: var(--jp-text-muted); font-style: italic; padding: 3px 0; }
         .jp-cat-merge-loading { font-style: italic; opacity: 0.85; }
+        .jp-cat-fixed-warning {
+            font-size: 10px;
+            font-weight: 600;
+            color: #b7770d;
+            background: rgba(183, 119, 13, 0.10);
+            border: 1px solid rgba(183, 119, 13, 0.35);
+            border-radius: 4px;
+            padding: 4px 7px;
+            margin-bottom: 6px;
+        }
         .jp-cat-word-block { margin-bottom: 4px; }
         .jp-cat-word-label {
             font-weight: bold;
@@ -10770,8 +11350,25 @@
           try {
             let data = JSON.parse(response.responseText);
             if (data && data.notes && typeof data.notes === "object") {
-              GM_setValue("jalapenoMerchantNotes", data.notes);
-              if (DEBUG) console.log("✅ Merchant notes updated directly from API");
+              const local = GM_getValue("jalapenoMerchantNotes", {});
+              const apiNotes = data.notes;
+              const merged = {};
+              for (const k of Object.keys(apiNotes)) {
+                merged[k] = [...apiNotes[k] || []];
+              }
+              for (const [k, localArr] of Object.entries(local)) {
+                if (!merged[k]) merged[k] = [];
+                const unsent = (localArr || []).filter(
+                  (note) => !merged[k].some((n) => n.text === note.text && n.savedAt === note.savedAt)
+                );
+                if (unsent.length > 0) {
+                  merged[k].push(...unsent);
+                  sendMerchantNoteDeltaToAPI(k, merged[k]);
+                  if (DEBUG) console.log(`✅ Retried unsent note(s) for: ${k}`);
+                }
+              }
+              GM_setValue("jalapenoMerchantNotes", merged);
+              if (DEBUG) console.log("✅ Merchant notes updated from API (with local merge)");
             }
           } catch (e) {
             if (DEBUG) console.warn("⚠️ Error parsing merchant notes from API:", e);
@@ -10884,6 +11481,25 @@
     }
     if (settings3.enableShippingCosts) {
       fetchShippingCostsFromAPI();
+    }
+    function linkifyNoteText(text) {
+      const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return esc.replace(/https?:\/\/[^\s·]+/g, (url) => {
+        const raw = url.replace(/&amp;/g, "&");
+        let label;
+        if (/\/inspector\/users\/|\/admin\/users\//.test(raw)) {
+          label = "👤 Profil";
+        } else if (/\/moderation\/thread\/|\/moderation\/discussions\/|\/moderation\/comments\//.test(raw)) {
+          label = "🔗 Okazja";
+        } else {
+          try {
+            label = new URL(raw).hostname;
+          } catch {
+            label = raw.slice(0, 30) + "…";
+          }
+        }
+        return `<a href="${url}" target="_blank" rel="noopener" style="color:#1565c0;font-weight:600;text-decoration:none;">${label}</a>`;
+      });
     }
     function displayMerchantNote(merchantName, merchantElement = null) {
       if (!settings3.enableMerchantNotes || !merchantName) return;
@@ -11319,70 +11935,98 @@
         ta.dataset.jpLastDesiredLine = desiredLine;
       }
     }
+    function showBanConfirm(merchantName, noteText) {
+      document.getElementById("jp-ban-confirm")?.remove();
+      let profileUrl = null;
+      for (const link of document.querySelectorAll('a[href*="/admin/inspector/users/"], a[href*="/admin/users/"]')) {
+        const m = link.href.match(/(?:inspector\/users|admin\/users)\/(\d+)/);
+        if (m) {
+          profileUrl = `https://www.pepper.pl/admin/inspector/users/${m[1]}`;
+          break;
+        }
+      }
+      const profileBtn = profileUrl ? `<a href="${profileUrl}" target="_blank" rel="noopener"
+                  style="flex:1;padding:6px;background:#1565c0;color:#fff;border:none;border-radius:5px;font-weight:600;cursor:pointer;font-size:12px;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+                  👤 Profil
+               </a>` : "";
+      const box = document.createElement("div");
+      box.id = "jp-ban-confirm";
+      box.style.cssText = `
+            position:fixed; top:30px; right:30px; z-index:10001;
+            background:#fff; color:#222; border:2px solid #c0392b;
+            border-radius:8px; padding:14px 18px; max-width:360px;
+            box-shadow:0 4px 16px rgba(0,0,0,.35); font-size:13px; font-family:sans-serif;
+        `;
+      box.innerHTML = `
+            <div style="font-weight:700;margin-bottom:8px;">🚫 Ban — notatka do merchantu</div>
+            <div style="margin-bottom:10px;font-size:12px;opacity:.85;">Merchant: <b>${merchantName}</b><br>Czy powód to <b>autopromocja</b>? Dodać notatkę?</div>
+            <div style="display:flex;gap:8px;">
+                <button id="jp-ban-yes" style="flex:1;padding:6px;background:#c0392b;color:#fff;border:none;border-radius:5px;font-weight:700;cursor:pointer;font-size:12px;">✅ Tak – dodaj</button>
+                ${profileBtn}
+                <button id="jp-ban-no"  style="flex:1;padding:6px;background:#eee;color:#444;border:none;border-radius:5px;font-weight:600;cursor:pointer;font-size:12px;">❌ Nie / pomiń</button>
+            </div>`;
+      document.body.appendChild(box);
+      const remove = () => box.remove();
+      box.querySelector("#jp-ban-yes").addEventListener("click", () => {
+        const finalNote = profileUrl ? `${noteText} · ${profileUrl}` : noteText;
+        saveMerchantNote(merchantName, finalNote);
+        increment("autoMerchantNotesInserted");
+        showToast(`📋 Notatka autopromo zapisana dla: ${merchantName}`);
+        remove();
+      });
+      box.querySelector("#jp-ban-no").addEventListener("click", remove);
+      setTimeout(remove, 3e4);
+    }
     var _autopromoTrackerInit = false;
     function initAutopromoTracker() {
       if (_autopromoTrackerInit) return;
       _autopromoTrackerInit = true;
       document.addEventListener("click", function(e) {
         const btn = e.target.closest("button");
-        if (!btn || !btn.classList.contains("primary")) return;
+        if (!btn) return;
         const btnText = btn.textContent || "";
         if (!btnText.includes("Delete") || !btnText.includes("Ban")) return;
-        console.log("[JP autopromo] primary Delete+Ban button clicked:", btnText.trim());
+        console.log("[JP ban] Delete+Ban button clicked:", btnText.trim());
         const modal = document.querySelector(".v-dialog--active") || document.querySelector('[role="dialog"]');
         if (!modal) {
-          console.log("[JP autopromo] ✗ brak aktywnego modala");
+          console.log("[JP ban] ✗ brak aktywnego modala");
           return;
         }
         const activeTabs = Array.from(modal.querySelectorAll(".v-tabs__item--active, .v-tab--active"));
         const banTabActive = activeTabs.some((el) => el.textContent.includes("BAN") || el.getAttribute("href") === "#ban");
-        console.log("[JP autopromo] aktywne zakładki:", activeTabs.map((el) => el.textContent.trim()), "→ banTabActive:", banTabActive);
+        console.log("[JP ban] aktywne zakładki:", activeTabs.map((el) => el.textContent.trim()), "→ banTabActive:", banTabActive);
         if (!banTabActive) return;
         let reasonText = "";
         for (const span of modal.querySelectorAll(".v-select__selection, .v-select__selection--comma")) {
           const t2 = span.textContent.trim();
-          if (t2.toLowerCase().includes("autopromo")) {
+          if (t2) {
             reasonText = t2;
             break;
           }
-          if (!reasonText) reasonText = t2;
         }
-        if (!reasonText.toLowerCase().includes("autopromo")) {
+        if (!reasonText) {
           for (const el of modal.querySelectorAll(".v-select, .v-autocomplete")) {
             const vComp = el.__vue__;
             if (!vComp) continue;
             const val = vComp.value ?? vComp.lazyValue ?? vComp.internalValue;
             if (!val) continue;
             const t2 = String(typeof val === "object" ? val.name || val.text || val.label || val.value || JSON.stringify(val) : val).trim();
-            if (t2.toLowerCase().includes("autopromo")) {
+            if (t2) {
               reasonText = t2;
               break;
             }
-            if (!reasonText) reasonText = t2;
           }
         }
-        if (!reasonText.toLowerCase().includes("autopromo")) {
+        if (!reasonText) {
           for (const input of modal.querySelectorAll('.v-select input[type="text"], .v-autocomplete input[type="text"]')) {
             const t2 = input.value.trim();
-            if (t2.toLowerCase().includes("autopromo")) {
+            if (t2) {
               reasonText = t2;
               break;
             }
-            if (!reasonText) reasonText = t2;
           }
         }
-        console.log(
-          "[JP autopromo] powód bana:",
-          reasonText || "(pusty)",
-          "| selekcje:",
-          Array.from(modal.querySelectorAll(".v-select__selection, .v-select__selection--comma")).map((e2) => e2.textContent.trim()),
-          "| v-selecty:",
-          modal.querySelectorAll(".v-select, .v-autocomplete").length
-        );
-        if (!reasonText.toLowerCase().includes("autopromo")) {
-          console.log('[JP autopromo] ✗ powód nie zawiera "autopromo" — notka pomięta');
-          return;
-        }
+        console.log("[JP ban] powód bana:", reasonText || "(pusty)");
         const dealUrlTextarea = document.querySelector('textarea[name="mainUrl"]');
         const dealMainUrl = dealUrlTextarea?.value?.trim() || "";
         let merchantName = "";
@@ -11396,9 +12040,9 @@
           const merchantEl = document.querySelector('input[placeholder="Merchant name"], input[placeholder="No merchant"]');
           merchantName = merchantEl?.value?.trim() || "";
         }
-        console.log("[JP autopromo] merchant:", merchantName || "(pusty)", "| dealMainUrl:", dealMainUrl || "(brak)");
+        console.log("[JP ban] merchant:", merchantName || "(pusty)", "| dealMainUrl:", dealMainUrl || "(brak)");
         if (!merchantName) {
-          console.log("[JP autopromo] ✗ brak merchantName — notka pomięta");
+          console.log("[JP ban] ✗ brak merchantName — notka pomięta");
           return;
         }
         const noteInput = modal.querySelector('input[placeholder="Leave a note for moderators"]');
@@ -11406,10 +12050,8 @@
         const date = (/* @__PURE__ */ new Date()).toLocaleDateString("pl-PL");
         const dealUrl = window.location.href;
         const noteText = adminNote ? `🚫 Autopromo ${date} — ${dealUrl} · ${adminNote}` : `🚫 Autopromo ${date} — ${dealUrl}`;
-        console.log("[JP autopromo] ✓ zapisuję notatkę:", noteText);
-        saveMerchantNote(merchantName, noteText);
-        increment("autoMerchantNotesInserted");
-        showToast(`📋 Notatka autopromo zapisana dla: ${merchantName}`);
+        console.log("[JP ban] ✓ pokazuję potwierdzenie dla:", merchantName);
+        showBanConfirm(merchantName, noteText);
       }, true);
     }
     function checkInspectorModal() {
@@ -11840,6 +12482,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             return;
           }
           if (DEBUG) console.log("🚚 Auto shipping:", value);
+          const prevActive = document.activeElement;
           input.dispatchEvent(new FocusEvent("focus", { bubbles: true, composed: true }));
           input.value = "";
           input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
@@ -11854,6 +12497,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
           input.dispatchEvent(new FocusEvent("blur", { bubbles: true, composed: true }));
           await new Promise((r) => setTimeout(r, 50));
+          if (prevActive && prevActive !== document.body && prevActive !== input) {
+            prevActive.focus();
+          }
           input.classList.remove("jp-shipping-alert");
           input.style.color = "";
           input.style.backgroundColor = "";
@@ -12012,32 +12658,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           if (settings3.enableAutoLocalStore) {
             let titleStr = getCurrentTitle().toLowerCase();
             let matchedStore = null;
-            const marketDB = [
-              { keys: ["biedronka", "biedronki", "biedronce"], url: "https://www.biedronka.pl", local: true },
-              { keys: ["dino"], url: "https://marketdino.pl", local: true },
-              { keys: ["kaufland", "kauflandzie"], url: "https://www.kaufland.pl", local: true },
-              { keys: ["auchan", "auchanie"], url: "https://www.auchan.pl", local: true },
-              { keys: ["carrefour", "kerfur", "carrefourze"], url: "https://www.carrefour.pl", local: true },
-              { keys: ["aldi"], url: "https://www.aldi.pl", local: true },
-              { keys: ["netto"], url: "https://netto.pl", local: true },
-              { keys: ["polomarket", "polo market", "polomarkecie"], url: "https://www.polomarket.pl", local: true },
-              { keys: ["leclerc", "eleclerc", "e.leclerc"], url: "https://leclerc.pl", local: true },
-              { keys: ["lidl", "lidlu"], url: "https://www.lidl.pl", local: false },
-              { keys: ["action"], url: "https://www.action.com/pl-pl/", local: true },
-              { keys: ["stokrotka", "stokrotce"], url: "https://stokrotka.pl/", local: true },
-              { keys: ["intermarche"], url: "https://intermarche.pl/", local: true },
-              { keys: ["selgros"], url: "https://www.selgros.pl/", local: true },
-              { keys: ["lewiatan"], url: "https://lewiatan.pl/", local: true },
-              { keys: ["topaz", "topaz24"], url: "https://topaz24.pl/", local: true },
-              { keys: ["leroy merlin"], url: "https://www.leroymerlin.pl/", local: false },
-              { keys: ["castorama"], url: "https://www.castorama.pl/", local: false },
-              { keys: ["obi"], url: "https://www.obi.pl/", local: false },
-              { keys: ["sinsay"], url: "https://www.sinsay.com/pl/pl/", local: false },
-              { keys: ["ikea"], url: "https://www.ikea.com/pl/pl/", local: false },
-              { keys: ["zabka", "żabka", "zabce", "zappsy", "zappsów"], url: "https://www.zabka.pl/", local: true },
-              { keys: ["half price", "halfprice"], url: "https://www.halfprice.eu/en", local: true }
-            ];
-            matchedStore = marketDB.find((store) => {
+            matchedStore = getMarketDB().find((store) => {
               let isMatched = store.keys.some((key) => new RegExp("\\b" + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(titleStr));
               let isExcluded = store.exclude ? store.exclude.some((ex) => titleStr.includes(ex)) : false;
               return isMatched && !isExcluded;
@@ -12045,7 +12666,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             if (!matchedStore) {
               const currentUrl = urlTextarea2.value.trim().toLowerCase();
               if (currentUrl) {
-                matchedStore = marketDB.find((store) => {
+                matchedStore = getMarketDB().find((store) => {
                   try {
                     const host = new URL(store.url).hostname.replace(/^www\./, "");
                     return currentUrl.includes(host);
@@ -12154,6 +12775,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             }
             if (settings3.enableDealDateTools) {
               initDealDateTools(shippingStack, settings3);
+            }
+            if (settings3.enableMultipackHelper) {
+              initMultipackHelper(shippingStack, triggerVueInput);
             }
           } else if (settings3.enableFloatingButton && !document.querySelector("#jp-shipping-stack .mod-floating-btn")) {
             let shippingStack = document.getElementById("jp-shipping-stack");
@@ -12452,17 +13076,34 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           merchantNoteAlert.className = "jp-merchant-note-alert";
           let alertHTML = `<div class="jp-mn-header">📝 ${merchantName}</div>`;
           if (notesList.length > 0) {
-            notesList.forEach((note, index) => {
+            const manualNotes = notesList.map((n, i) => ({ ...n, _i: i })).filter((n) => !n.text.startsWith("🚫"));
+            const banNotes = notesList.map((n, i) => ({ ...n, _i: i })).filter((n) => n.text.startsWith("🚫"));
+            manualNotes.forEach((note) => {
               let dateObj = new Date(note.savedAt);
               let dateStr = dateObj.toLocaleDateString("pl-PL") + " " + dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
               alertHTML += `
                             <div class="jp-mn-item">
-                                <div class="jp-mn-text">${note.text}</div>
+                                <div class="jp-mn-text">${linkifyNoteText(note.text)}</div>
                                 <span class="jp-mn-meta">${note.savedBy} • ${dateStr}</span>
-                                <button class="jp-merchant-note-delete-single" data-index="${index}" title="Usuń notatkę">🗑️</button>
-                            </div>
-                        `;
+                                <button class="jp-merchant-note-delete-single" data-index="${note._i}" title="Usuń notatkę">🗑️</button>
+                            </div>`;
             });
+            if (banNotes.length > 0) {
+              alertHTML += `
+                            <details class="jp-mn-ban-group">
+                                <summary class="jp-mn-ban-summary">🚫 Bany (${banNotes.length})</summary>`;
+              banNotes.forEach((note) => {
+                let dateObj = new Date(note.savedAt);
+                let dateStr = dateObj.toLocaleDateString("pl-PL") + " " + dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+                alertHTML += `
+                                <div class="jp-mn-item">
+                                    <div class="jp-mn-text">${linkifyNoteText(note.text)}</div>
+                                    <span class="jp-mn-meta">${note.savedBy} • ${dateStr}</span>
+                                    <button class="jp-merchant-note-delete-single" data-index="${note._i}" title="Usuń notatkę">🗑️</button>
+                                </div>`;
+              });
+              alertHTML += `</details>`;
+            }
           }
           alertHTML += `
                     <button class="jp-merchant-note-edit-btn">+ ${t("btnAddMerchantNote")}</button>
@@ -12827,6 +13468,38 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             }
           }
         }
+        (function injectCouponCopyBtn() {
+          const couponInput = document.querySelector('input[placeholder="Coupon name"]');
+          if (!couponInput || document.getElementById("jp-coupon-copy")) return;
+          const btn = document.createElement("button");
+          btn.id = "jp-coupon-copy";
+          btn.type = "button";
+          btn.title = "Kopiuj kod kuponu";
+          btn.textContent = "📋";
+          btn.style.cssText = `
+                    margin-left: 6px; padding: 0 8px; height: 100%;
+                    background: var(--jp-btn-bg); color: var(--jp-text);
+                    border: 1px solid var(--jp-btn-border); border-radius: 4px;
+                    cursor: pointer; font-size: 14px; flex-shrink: 0;
+                    align-self: center;
+                `;
+          btn.addEventListener("click", () => {
+            const code = couponInput.value.trim();
+            if (!code) return;
+            navigator.clipboard.writeText(code).then(() => {
+              btn.textContent = "✅";
+              setTimeout(() => {
+                btn.textContent = "📋";
+              }, 1500);
+            });
+          });
+          const row = couponInput.closest(".flex") || couponInput.parentElement;
+          if (row) {
+            row.style.display = row.style.display || "flex";
+            row.style.alignItems = "center";
+            row.appendChild(btn);
+          }
+        })();
         let titleInputField = document.querySelector('input[placeholder="Thread title"]');
         if (titleInputField) {
           titleInputField.addEventListener("input", debounce((e) => {
