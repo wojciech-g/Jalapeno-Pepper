@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.8
+// @version      5.0.9
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1809,7 +1809,46 @@
       statTotalWarnings: "Łącznie ostrzeżeń",
       statManualActionsAvoided: "Uniknięte czynności ręczne",
       btnResetStats: "Resetuj statystyki",
-      confirmResetStats: "Czy na pewno chcesz zresetować wszystkie statystyki? Tej operacji nie można cofnąć."
+      confirmResetStats: "Czy na pewno chcesz zresetować wszystkie statystyki? Tej operacji nie można cofnąć.",
+      gsTitle: "📊 GeekStats",
+      gsSince: "od",
+      gsTotal: "Łącznie",
+      gsNewShift: "🔄 Nowa zmiana",
+      mpHeader: "📦 Multipack",
+      mpLabelBuy: "przy zakupie",
+      mpLabelPcs: "szt.",
+      mpInsert: "Wstaw do tytułu",
+      mpInserted: "✅ Wstawiono",
+      mpLooseWarning: "⚠️ Znaleziono wariant — zostanie zastąpiony",
+      btnUrlExpand: "🔗 Rozwiń",
+      btnUrlExpandTitle: "Rozwiń link — podążaj za przekierowaniami",
+      btnUrlExpanded: "✅ Rozwinięto",
+      btnUrlAlreadyDirect: "— Już bezpośredni",
+      btnUrlError: "❌ Błąd",
+      btnUrlTimeout: "❌ Timeout",
+      btnCouponCopyTitle: "Kopiuj kod kuponu",
+      eyeBreakTitle: "Czas na przerwę dla oczu!",
+      eyeBreakBody: "Oderwij wzrok od ekranu na <strong>5 minut</strong> — popatrz w dal lub zamknij oczy.",
+      eyeBreakDismiss: "Odsuń ×",
+      dcPanelTitle: "Zmiany w tej sesji",
+      dcAutoChange: "Zmiana automatyczna (skrypt)",
+      dcFieldTitle: "Tytuł",
+      dcFieldUrl: "URL",
+      dcFieldUrl2: "URL 2",
+      dcFieldPrice: "Cena",
+      dcFieldShipping: "Dostawa",
+      dcFieldMerchant: "Sklep",
+      dcFieldCoupon: "Kupon",
+      dcFieldNbp: "NBP",
+      dtHeader: "Data wygaśnięcia",
+      dtPresetToday: "Dziś 23:59",
+      dtPreset7: "+7 dni",
+      dtPreset30: "+30 dni",
+      csExpandTitle: "Rozwiń FAQ i moduły",
+      csHeaderTitle: "FAQ / Moduły",
+      csActive: "aktywnych",
+      csExpand: "Rozwiń",
+      csCollapse: "Zwiń"
     },
     en: {
       titleSettings: "⚙️ Jalapeño Settings",
@@ -2131,7 +2170,46 @@
       statTotalWarnings: "Total warnings shown",
       statManualActionsAvoided: "Manual actions avoided",
       btnResetStats: "Reset Statistics",
-      confirmResetStats: "Are you sure you want to reset all statistics? This cannot be undone."
+      confirmResetStats: "Are you sure you want to reset all statistics? This cannot be undone.",
+      gsTitle: "📊 GeekStats",
+      gsSince: "since",
+      gsTotal: "Total",
+      gsNewShift: "🔄 New shift",
+      mpHeader: "📦 Multipack",
+      mpLabelBuy: "when buying",
+      mpLabelPcs: "pcs.",
+      mpInsert: "Insert into title",
+      mpInserted: "✅ Inserted",
+      mpLooseWarning: "⚠️ Variant found — will be replaced",
+      btnUrlExpand: "🔗 Expand",
+      btnUrlExpandTitle: "Expand link — follow redirects",
+      btnUrlExpanded: "✅ Expanded",
+      btnUrlAlreadyDirect: "— Already direct",
+      btnUrlError: "❌ Error",
+      btnUrlTimeout: "❌ Timeout",
+      btnCouponCopyTitle: "Copy coupon code",
+      eyeBreakTitle: "Time for an eye break!",
+      eyeBreakBody: "Look away from the screen for <strong>5 minutes</strong> — focus on something distant or close your eyes.",
+      eyeBreakDismiss: "Dismiss ×",
+      dcPanelTitle: "Session changes",
+      dcAutoChange: "Automatic change (script)",
+      dcFieldTitle: "Title",
+      dcFieldUrl: "URL",
+      dcFieldUrl2: "URL 2",
+      dcFieldPrice: "Price",
+      dcFieldShipping: "Shipping",
+      dcFieldMerchant: "Store",
+      dcFieldCoupon: "Coupon",
+      dcFieldNbp: "NBP",
+      dtHeader: "Expiry date",
+      dtPresetToday: "Today 23:59",
+      dtPreset7: "+7 days",
+      dtPreset30: "+30 days",
+      csExpandTitle: "Expand FAQ & modules",
+      csHeaderTitle: "FAQ / Modules",
+      csActive: "active",
+      csExpand: "Expand",
+      csCollapse: "Collapse"
     }
   };
   var t = (key) => i18n[settings2.language][key] || key;
@@ -7408,12 +7486,12 @@
     );
     const totalCount = SECTIONS.reduce((n, s) => n + s.items.length, 0);
     wrapper.innerHTML = `
-        <button id="jp-cs-tab" title="Rozwiń FAQ i moduły">FAQ</button>
+        <button id="jp-cs-tab" title="${t("csExpandTitle")}">FAQ</button>
         <div id="jp-cs-inner">
             <div id="jp-cs-header">
-                <span id="jp-cs-header-title">FAQ / Moduły</span>
-                <span style="font-size:10px;opacity:.8;font-weight:normal">${activeCount}/${totalCount} aktywnych</span>
-                <button id="jp-cs-collapse-btn" title="Zwiń">◀</button>
+                <span id="jp-cs-header-title">${t("csHeaderTitle")}</span>
+                <span style="font-size:10px;opacity:.8;font-weight:normal">${activeCount}/${totalCount} ${t("csActive")}</span>
+                <button id="jp-cs-collapse-btn" title="${t("csCollapse")}">◀</button>
             </div>
             <div id="jp-cs-body"></div>
         </div>
@@ -7461,7 +7539,7 @@
     const setCollapsed = (collapsed) => {
       wrapper.classList.toggle("jp-cs-collapsed", collapsed);
       collapseBtn.textContent = collapsed ? "▶" : "◀";
-      collapseBtn.title = collapsed ? "Rozwiń" : "Zwiń";
+      collapseBtn.title = collapsed ? t("csExpand") : t("csCollapse");
     };
     tab.addEventListener("click", () => setCollapsed(!wrapper.classList.contains("jp-cs-collapsed")));
     collapseBtn.addEventListener("click", (e) => {
@@ -7474,14 +7552,14 @@
   var _stylesInjected2 = false;
   var STORAGE_KEY_PREFIX = "jalapeno_changelog_";
   var FIELDS = [
-    { key: "title", label: "Tytuł", sel: 'input[placeholder="Thread title"]' },
-    { key: "mainUrl", label: "URL", sel: 'textarea[name="mainUrl"]' },
-    { key: "canonUrl", label: "URL 2", sel: 'textarea[name="canonicalUrl"]' },
-    { key: "price", label: "Cena", sel: 'input[placeholder="Price"]' },
-    { key: "shipping", label: "Dostawa", sel: 'input[placeholder="Shipping costs"]' },
-    { key: "merchant", label: "Sklep", sel: 'input[placeholder="Merchant name"],input[placeholder="No merchant"]' },
-    { key: "coupon", label: "Kupon", sel: 'input[placeholder="Coupon name"]' },
-    { key: "nbp", label: "NBP", sel: 'input[placeholder="NBP"]' }
+    { key: "title", labelKey: "dcFieldTitle", sel: 'input[placeholder="Thread title"]' },
+    { key: "mainUrl", labelKey: "dcFieldUrl", sel: 'textarea[name="mainUrl"]' },
+    { key: "canonUrl", labelKey: "dcFieldUrl2", sel: 'textarea[name="canonicalUrl"]' },
+    { key: "price", labelKey: "dcFieldPrice", sel: 'input[placeholder="Price"]' },
+    { key: "shipping", labelKey: "dcFieldShipping", sel: 'input[placeholder="Shipping costs"]' },
+    { key: "merchant", labelKey: "dcFieldMerchant", sel: 'input[placeholder="Merchant name"],input[placeholder="No merchant"]' },
+    { key: "coupon", labelKey: "dcFieldCoupon", sel: 'input[placeholder="Coupon name"]' },
+    { key: "nbp", labelKey: "dcFieldNbp", sel: 'input[placeholder="NBP"]' }
   ];
   var _autoKeys = /* @__PURE__ */ new Set();
   var _pendingBeforeSnapshot = /* @__PURE__ */ new Map();
@@ -7648,7 +7726,7 @@
         if (!(f.key in snapshot)) continue;
         const cur = getFieldValue(f);
         if (cur !== null && cur !== snapshot[f.key]) {
-          changes.push({ key: f.key, label: f.label, from: snapshot[f.key], to: cur });
+          changes.push({ key: f.key, label: t(f.labelKey), from: snapshot[f.key], to: cur });
         }
       }
       if ("freeDelivery" in snapshot) {
@@ -7685,13 +7763,13 @@
       const maxUrl = 36, maxOther = 42;
       const hasAutoChanges = changes.some((c) => _autoKeys.has(c.key));
       panel.innerHTML = `
-            <div id="jp-dc-header">📝 Zmiany w tej sesji${hasAutoChanges ? ' <span style="font-weight:400;opacity:0.6;font-size:9px;margin-left:4px">🤖 = auto</span>' : ""}</div>
+            <div id="jp-dc-header">📝 ${t("dcPanelTitle")}${hasAutoChanges ? ` <span style="font-weight:400;opacity:0.6;font-size:9px;margin-left:4px">🤖 = auto</span>` : ""}</div>
             ${changes.map((c) => {
-        const isUrl = c.label.startsWith("URL");
+        const isUrl = c.key === "mainUrl" || c.key === "canonUrl";
         const max = isUrl ? maxUrl : maxOther;
         const isAuto = _autoKeys.has(c.key);
         return `<div class="jp-dc-item">
-                    <span class="jp-dc-label">${c.label}${isAuto ? ' <span class="jp-dc-auto-badge" title="Zmiana automatyczna (skrypt)">🤖</span>' : ""}</span>
+                    <span class="jp-dc-label">${c.label}${isAuto ? ` <span class="jp-dc-auto-badge" title="${t("dcAutoChange")}">🤖</span>` : ""}</span>
                     <span class="jp-dc-from" title="${c.from}">${trunc(c.from, max)}</span>
                     <span class="jp-dc-arrow">→</span>
                     <span class="jp-dc-to" title="${c.to}">${trunc(c.to, max)}</span>
@@ -8039,9 +8117,9 @@
     if (anchor) stackEl.insertBefore(panel, anchor);
     else stackEl.prepend(panel);
     const PRESETS = [
-      { label: "Dziś 23:59", days: 0, h: 23, m: 59 },
-      { label: "+7 dni", days: 7, h: 23, m: 59 },
-      { label: "+30 dni", days: 30, h: 23, m: 59 }
+      { label: t("dtPresetToday"), days: 0, h: 23, m: 59 },
+      { label: t("dtPreset7"), days: 7, h: 23, m: 59 },
+      { label: t("dtPreset30"), days: 30, h: 23, m: 59 }
     ];
     const customAbs = parseCustomPresetString(settings3 && settings3.dealDateCustom);
     if (customAbs) {
@@ -8061,7 +8139,7 @@
         (p, i) => `<button class="jp-dt-preset" data-idx="${i}">${p.label}</button>`
       ).join("");
       panel.innerHTML = `
-            <div id="jp-dt-header">⏰ Data wygaśnięcia</div>
+            <div id="jp-dt-header">⏰ ${t("dtHeader")}</div>
             <div id="jp-dt-current">${display}</div>
             <div id="jp-dt-buttons">${btns}</div>
         `;
@@ -9228,8 +9306,8 @@
     const header = _widget.querySelector("#jp-gs-header");
     const badge = _widget.querySelector("#jp-gs-header-total");
     if (header) {
-      header.querySelector(".jp-gs-title").textContent = "📊 GeekStats";
-      header.querySelector(".jp-gs-meta").textContent = `od ${timeStr} · ${elapsed}`;
+      header.querySelector(".jp-gs-title").textContent = t("gsTitle");
+      header.querySelector(".jp-gs-meta").textContent = `${t("gsSince")} ${timeStr} · ${elapsed}`;
     }
     if (badge) {
       badge.textContent = total;
@@ -9252,10 +9330,10 @@
     }).join("") + `
         <hr class="jp-gs-divider">
         <div class="jp-gs-total-row">
-            <span>Łącznie</span>
+            <span>${t("gsTotal")}</span>
             <strong>${total}</strong>
         </div>
-        <button id="jp-gs-new-shift">🔄 Nowa zmiana</button>`;
+        <button id="jp-gs-new-shift">${t("gsNewShift")}</button>`;
   }
   function initGeekStats() {
     injectStyles4();
@@ -9391,12 +9469,12 @@
     const panel = document.createElement("div");
     panel.id = "jp-multipack";
     panel.innerHTML = `
-        <div id="jp-mp-header">📦 Multipack</div>
+        <div id="jp-mp-header">${t("mpHeader")}</div>
         <div class="jp-mp-row">
-            <span class="jp-mp-label">przy zakupie</span>
+            <span class="jp-mp-label">${t("mpLabelBuy")}</span>
             <input id="jp-mp-qty" type="number" min="2" max="99" value="4">
-            <span class="jp-mp-label">szt.</span>
-            <button id="jp-mp-insert" type="button">Wstaw do tytułu</button>
+            <span class="jp-mp-label">${t("mpLabelPcs")}</span>
+            <button id="jp-mp-insert" type="button">${t("mpInsert")}</button>
         </div>
         <div id="jp-mp-preview"></div>`;
     const anchor = stackEl.querySelector(".mod-floating-btn");
@@ -9422,7 +9500,7 @@
       const hasLoose = PHRASE_LOOSE_RE.test(titleEl2.value);
       PHRASE_LOOSE_RE.lastIndex = 0;
       const result = insertPhraseIntoTitle(titleEl2.value, buildPhrase(qty));
-      previewEl.innerHTML = (hasLoose ? '<span style="color:#b7770d;">⚠️ Znaleziono wariant — zostanie zastąpiony</span><br>' : "") + result.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      previewEl.innerHTML = (hasLoose ? `<span style="color:#b7770d;">${t("mpLooseWarning")}</span><br>` : "") + result.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
     qtyInput.addEventListener("input", updatePreview);
     const titleEl = getTitleInput();
@@ -9441,9 +9519,9 @@
       const newTitle = insertPhraseIntoTitle(titleEl2.value, buildPhrase(qty));
       await triggerVueInput(titleEl2, newTitle);
       updatePreview();
-      insertBtn.textContent = "✅ Wstawiono";
+      insertBtn.textContent = t("mpInserted");
       setTimeout(() => {
-        insertBtn.textContent = "Wstaw do tytułu";
+        insertBtn.textContent = t("mpInsert");
       }, 2e3);
     });
     updatePreview();
@@ -9583,15 +9661,15 @@
         el.innerHTML = `
                 <span style="font-size:24px;">👁️</span>
                 <div style="flex:1">
-                    <strong style="font-size:15px;">Czas na przerwę dla oczu!</strong>
-                    <div style="font-size:12px;opacity:.85;margin-top:2px;">Oderwij wzrok od ekranu na <strong>5 minut</strong> — popatrz w dal lub zamknij oczy.</div>
+                    <strong style="font-size:15px;">${t("eyeBreakTitle")}</strong>
+                    <div style="font-size:12px;opacity:.85;margin-top:2px;">${t("eyeBreakBody")}</div>
                 </div>
                 <span id="jp-eye-break-timer" style="font-weight:700;font-size:13px;min-width:40px;text-align:right;opacity:.85;">5:00</span>
                 <button id="jp-eye-break-close" style="
                     background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.4);
                     color:#fff; border-radius:5px; padding:5px 12px; cursor:pointer;
                     font-size:12px; font-weight:700; flex-shrink:0;
-                ">Odsuń ×</button>
+                ">${t("eyeBreakDismiss")}</button>
             `;
         document.body.prepend(el);
         const timerEl = document.getElementById("jp-eye-break-timer");
@@ -13554,7 +13632,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           const btn = document.createElement("button");
           btn.id = "jp-coupon-copy";
           btn.type = "button";
-          btn.title = "Kopiuj kod kuponu";
+          btn.title = t("btnCouponCopyTitle");
           btn.textContent = "📋";
           btn.style.cssText = `
                     margin-left: 6px; padding: 0 8px; height: 100%;
@@ -13586,8 +13664,8 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           const btn = document.createElement("button");
           btn.id = "jp-url-expand";
           btn.type = "button";
-          btn.title = "Rozwiń link — podążaj za przekierowaniami";
-          btn.textContent = "🔗 Rozwiń";
+          btn.title = t("btnUrlExpandTitle");
+          btn.textContent = t("btnUrlExpand");
           btn.style.cssText = `
                     padding: 2px 9px; font-size: 10px; font-weight: 700;
                     background: var(--jp-btn-bg); color: var(--jp-text);
@@ -13626,26 +13704,26 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 const finalUrl = cleanResolvedUrl(raw);
                 if (finalUrl !== url) {
                   triggerVueInput(urlTextarea2, finalUrl);
-                  btn.textContent = "✅ Rozwinięto";
+                  btn.textContent = t("btnUrlExpanded");
                 } else {
-                  btn.textContent = "— Już bezpośredni";
+                  btn.textContent = t("btnUrlAlreadyDirect");
                 }
                 setTimeout(() => {
-                  btn.textContent = "🔗 Rozwiń";
+                  btn.textContent = t("btnUrlExpand");
                 }, 2500);
               },
               onerror() {
                 btn.disabled = false;
-                btn.textContent = "❌ Błąd";
+                btn.textContent = t("btnUrlError");
                 setTimeout(() => {
-                  btn.textContent = "🔗 Rozwiń";
+                  btn.textContent = t("btnUrlExpand");
                 }, 2e3);
               },
               ontimeout() {
                 btn.disabled = false;
-                btn.textContent = "❌ Timeout";
+                btn.textContent = t("btnUrlTimeout");
                 setTimeout(() => {
-                  btn.textContent = "🔗 Rozwiń";
+                  btn.textContent = t("btnUrlExpand");
                 }, 2e3);
               }
             });
