@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.7
+// @version      5.0.8
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1675,6 +1675,8 @@
       mDealChangelogHint: "Nad panelem dostawy pokazuje które pola zostały zmienione od momentu otwarcia strony (tytuł, URL, cena, sklep, dostawa).",
       mGeekStats: "GeekStats — licznik akcji zmiany",
       mGeekStatsHint: "Floating widget (lewy dół) liczący kliknięcia DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE od godziny 2:00 w nocy. Resetuje się codziennie o 2:00.",
+      mEyeBreak: "Przypomnienie o przerwie dla oczu",
+      mEyeBreakHint: "Co godzinę przypomni o 5-minutowej przerwie wzrokowej. Minutę w godzinie ustawia się poniżej.",
       mDealDateTools: "Narzędzia daty wygaśnięcia",
       mDealDateToolsHint: "Nad panelem dostawy pokazuje aktualną datę/czas wygaśnięcia i pozwala ustawić je jednym kliknięciem (Dziś 23:59, +7 dni, +30 dni, +90 dni).",
       mMultipack: "Multipack — wstawianie frazy do tytułu",
@@ -1694,6 +1696,8 @@
       lblShippingOffsetHint: "Odstęp od góry formularza — dotyczy przycisku ✨ i panelu dostawy po prawej.",
       lblDealDateCustom: "Własna data wygaśnięcia:",
       lblDealDateCustomHint: "Dodaje własny przycisk w panelu daty. Format: DD.MM.YYYY lub DD.MM.YYYY HH:MM (np. 31.12.2026 23:59).",
+      lblEyeBreakMinute: "Minuta przerwy wzrokowej (0–59):",
+      lblEyeBreakMinuteHint: "O której minucie każdej godziny wyświetlić przypomnienie. Np. 50 = zawsze o XX:50.",
       mPriceWarning: "Alert wzrostu ceny na liście",
       mImageSearch: "Wyszukiwanie obrazem (Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
@@ -1993,6 +1997,8 @@
       mDealChangelogHint: "Above the shipping panel, shows which fields were changed since opening the page (title, URL, price, merchant, delivery).",
       mGeekStats: "GeekStats — shift action counter",
       mGeekStatsHint: "Floating widget (bottom-left) counting DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE clicks since 2:00 AM. Resets daily at 2:00.",
+      mEyeBreak: "Eye break reminder",
+      mEyeBreakHint: "Reminds you to take a 5-minute eye break once per hour. Configure the minute offset below.",
       mDealDateTools: "Expiry date tools",
       mDealDateToolsHint: "Above the shipping panel, shows the current expiry date/time and lets you set it with one click (Today 23:59, +7 days, +30 days, +90 days).",
       mMultipack: "Multipack — title phrase inserter",
@@ -2012,6 +2018,8 @@
       lblShippingOffsetHint: "Distance from top of the form — applies to ✨ button and shipping panel on the right.",
       lblDealDateCustom: "Custom expiry date:",
       lblDealDateCustomHint: "Adds a custom button to the date panel. Format: DD.MM.YYYY or DD.MM.YYYY HH:MM (e.g. 31.12.2026 23:59).",
+      lblEyeBreakMinute: "Eye break minute (0–59):",
+      lblEyeBreakMinuteHint: "Which minute of every hour to show the reminder. E.g. 50 = always at XX:50.",
       mPriceWarning: "Price rise alert on queue list",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
@@ -8100,6 +8108,7 @@
   var _KEY_EMP = "jalapenoShopEmpik";
   var _KEY_EMP_NONCE = "jalapenoShopEmpikNonce";
   var _NONCE_PARAM = "_jp";
+  var _BLACKLIST_URL = "https://grudzinski.net/pepper/shops.php?user=wglad";
   var _styleInjected = false;
   var _daneFirmy = null;
   var _aliListener = null;
@@ -8323,7 +8332,7 @@
     statusEl.innerHTML = '<span class="jp-shopinfo-muted">Sprawdzanie bazy…</span>';
     GM_xmlhttpRequest({
       method: "GET",
-      url: `https://pepper.spamowisko.ovh/shops.php?merchant=${encodeURIComponent(data.merchant)}&shop=${encodeURIComponent(data.shopID)}`,
+      url: `${_BLACKLIST_URL}&merchant=${encodeURIComponent(data.merchant)}&shop=${encodeURIComponent(data.shopID)}`,
       onload(res) {
         try {
           _renderBlacklist(JSON.parse(res.responseText), data, statusEl);
@@ -8399,9 +8408,9 @@
     feedback.textContent = "Zapisywanie…";
     GM_xmlhttpRequest({
       method: "POST",
-      url: "https://pepper.spamowisko.ovh/shops.php",
+      url: _BLACKLIST_URL,
       data: `addShop=1&merchant=${encodeURIComponent(merchant)}&shopID=${encodeURIComponent(shopID)}&shopName=${encodeURIComponent(shopName)}&shopReason=${encodeURIComponent(shopReason)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Cookie": "user=g0ds" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       onload(res) {
         try {
           const resp = JSON.parse(res.responseText);
@@ -9510,7 +9519,9 @@
       enableMultipackHelper: true,
       dealDateCustom: "",
       enableShopInfo: true,
-      enableGeekStats: true
+      enableGeekStats: true,
+      enableEyeBreak: false,
+      eyeBreakMinute: 50
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -9544,6 +9555,67 @@
     if (settings3.enableCheatsheet) initCheatsheet(settings3);
     if (settings3.enableMerchantNotes) initAutopromoTracker();
     if (settings3.enableGeekStats) initGeekStats();
+    if (settings3.enableEyeBreak) initEyeBreak(settings3.eyeBreakMinute ?? 50);
+    function initEyeBreak(targetMinute) {
+      let lastShownHour = -1;
+      function check() {
+        const now = /* @__PURE__ */ new Date();
+        const h = now.getHours();
+        const m = now.getMinutes();
+        if (m === targetMinute && h !== lastShownHour) {
+          lastShownHour = h;
+          showEyeBreakReminder();
+        }
+      }
+      function showEyeBreakReminder() {
+        if (document.getElementById("jp-eye-break")) return;
+        const el = document.createElement("div");
+        el.id = "jp-eye-break";
+        el.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+                background: linear-gradient(135deg, #1a5276, #2e86c1);
+                color: #fff; padding: 14px 20px;
+                display: flex; align-items: center; gap: 14px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+            `;
+        let secs = 0;
+        el.innerHTML = `
+                <span style="font-size:24px;">👁️</span>
+                <div style="flex:1">
+                    <strong style="font-size:15px;">Czas na przerwę dla oczu!</strong>
+                    <div style="font-size:12px;opacity:.85;margin-top:2px;">Oderwij wzrok od ekranu na <strong>5 minut</strong> — popatrz w dal lub zamknij oczy.</div>
+                </div>
+                <span id="jp-eye-break-timer" style="font-weight:700;font-size:13px;min-width:40px;text-align:right;opacity:.85;">5:00</span>
+                <button id="jp-eye-break-close" style="
+                    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.4);
+                    color:#fff; border-radius:5px; padding:5px 12px; cursor:pointer;
+                    font-size:12px; font-weight:700; flex-shrink:0;
+                ">Odsuń ×</button>
+            `;
+        document.body.prepend(el);
+        const timerEl = document.getElementById("jp-eye-break-timer");
+        const total = 5 * 60;
+        const iv = setInterval(() => {
+          secs++;
+          const left = total - secs;
+          if (left <= 0) {
+            clearInterval(iv);
+            el.remove();
+            return;
+          }
+          const mm = Math.floor(left / 60).toString().padStart(1, "0");
+          const ss = (left % 60).toString().padStart(2, "0");
+          if (timerEl) timerEl.textContent = `${mm}:${ss}`;
+        }, 1e3);
+        document.getElementById("jp-eye-break-close").addEventListener("click", () => {
+          clearInterval(iv);
+          el.remove();
+        });
+      }
+      setInterval(check, 15e3);
+      check();
+    }
     function settingsSectionHead(titleKey, descKey) {
       return `
             <h4 class="jp-settings-h4">${t(titleKey)}</h4>
@@ -9615,7 +9687,8 @@
           settingsModuleToggle("set-session-history", s.enableSessionHistory, "mSessionHistory", "mSessionHistoryHint"),
           settingsModuleToggle("set-snippets", s.enableSnippets, "mSnippets", "mSnippetsHint"),
           settingsModuleToggle("set-cheatsheet", s.enableCheatsheet, "mCheatsheet", "mCheatsheetHint"),
-          settingsModuleToggle("set-geekstats", s.enableGeekStats, "mGeekStats", "mGeekStatsHint")
+          settingsModuleToggle("set-geekstats", s.enableGeekStats, "mGeekStats", "mGeekStatsHint"),
+          settingsModuleToggle("set-eye-break", s.enableEyeBreak, "mEyeBreak", "mEyeBreakHint")
         ])
       ].join("");
     }
@@ -9722,6 +9795,11 @@
                         <label>${t("lblDealDateCustom")}</label>
                         <input type="text" id="set-deal-date-custom" value="${settings3.dealDateCustom || ""}" placeholder="DD.MM.YYYY lub DD.MM.YYYY HH:MM" style="width:100%">
                         <div class="jp-settings-field-hint">${t("lblDealDateCustomHint")}</div>
+                    </div>
+                    <div>
+                        <label>${t("lblEyeBreakMinute")}</label>
+                        <input type="number" id="set-eye-break-minute" min="0" max="59" value="${settings3.eyeBreakMinute ?? 50}" style="width:100%">
+                        <div class="jp-settings-field-hint">${t("lblEyeBreakMinuteHint")}</div>
                     </div>
                 </div>
 
@@ -9915,7 +9993,9 @@
           enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
           enableMultipackHelper: document.getElementById("set-multipack").checked,
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
-          enableGeekStats: document.getElementById("set-geekstats").checked
+          enableGeekStats: document.getElementById("set-geekstats").checked,
+          enableEyeBreak: document.getElementById("set-eye-break").checked,
+          eyeBreakMinute: parseInt(document.getElementById("set-eye-break-minute").value) || 50
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
