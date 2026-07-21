@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.11
+// @version      5.0.12
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -12611,6 +12611,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               window.jpUserEditedShipping = true;
               e.target.style.backgroundColor = "";
               e.target.style.color = "";
+              e.target.style.outline = "";
               e.target.title = "";
               if (settings3.enableShippingCosts) setTimeout(updateShippingCostAlert, 200);
             }
@@ -12804,8 +12805,17 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 }
                 window.jpAutoShippingSet = false;
                 if (!skipAutoShippingRules()) {
-                  markAutoChange("freeDelivery");
-                  setVuetifyCheckbox("Free Delivery", true, true);
+                  const existingShipping = shipInput ? shipInput.value.trim() : "";
+                  if (existingShipping) {
+                    if (shipInput) {
+                      shipInput.style.backgroundColor = "#fffde7";
+                      shipInput.style.outline = "2px solid #f9a825";
+                      shipInput.title = "Amazon ≥ 65 zł — zwykle darmowa dostawa, zweryfikuj";
+                    }
+                  } else {
+                    markAutoChange("freeDelivery");
+                    setVuetifyCheckbox("Free Delivery", true, true);
+                  }
                 }
               } else if (price > 0 && price < 65) {
                 if (!skipAutoShippingRules() && isChecked) {
@@ -12824,18 +12834,28 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                 if (!skipAutoShippingRules() && !window.jpAutoShippingSet) {
                   window.jpAutoShippingSet = true;
                   const runGen = window.jpAutoShippingAbortGen || 0;
-                  increment("autoShippingFilled");
-                  (async () => {
-                    if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
-                    if (skipAutoShippingRules()) return;
-                    markAutoChange("freeDelivery");
-                    setVuetifyCheckbox("Free Delivery", false, true);
-                    await afterVueUpdate(getShippingInput());
-                    if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
-                    if (skipAutoShippingRules()) return;
-                    markAutoChange("shipping");
-                    await setShippingCost("8,99");
-                  })();
+                  const shipInputNow = getShippingInput();
+                  const existingShipping = shipInputNow ? shipInputNow.value.trim() : "";
+                  if (existingShipping && existingShipping !== "8,99" && existingShipping !== "8.99") {
+                    if (shipInputNow) {
+                      shipInputNow.style.backgroundColor = "#fffde7";
+                      shipInputNow.style.outline = "2px solid #f9a825";
+                      shipInputNow.title = "Amazon < 65 zł — domyślnie 8,99 zł, zweryfikuj";
+                    }
+                  } else {
+                    increment("autoShippingFilled");
+                    (async () => {
+                      if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                      if (skipAutoShippingRules()) return;
+                      markAutoChange("freeDelivery");
+                      setVuetifyCheckbox("Free Delivery", false, true);
+                      await afterVueUpdate(getShippingInput());
+                      if ((window.jpAutoShippingAbortGen || 0) !== runGen) return;
+                      if (skipAutoShippingRules()) return;
+                      markAutoChange("shipping");
+                      await setShippingCost("8,99");
+                    })();
+                  }
                 }
               }
             }
