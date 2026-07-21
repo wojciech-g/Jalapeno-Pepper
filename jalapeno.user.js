@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.10
+// @version      5.0.11
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -6452,6 +6452,8 @@
       const item = document.createElement("a");
       item.className = "jp-hist-item" + (entry.threadId === currentThreadId ? " jp-hist-item-current" : "");
       item.href = entry.url;
+      item.target = "_blank";
+      item.rel = "noopener";
       const title = document.createElement("span");
       title.className = "jp-hist-title";
       title.appendChild(highlightMatch(entry.title || `Deal #${entry.threadId}`, query));
@@ -9087,6 +9089,7 @@
   // src/features/geekStats.js
   var STORAGE_KEY3 = "jp_geekstats";
   var STORAGE_KEY_START = "jp_geekstats_start";
+  var STORAGE_KEY_POS = "jp_geekstats_pos";
   var DEBOUNCE_MS = 4e3;
   var CATEGORIES = {
     deal: { label: "Okazje/Dyskusje", icon: "🏷️" },
@@ -9182,8 +9185,6 @@
     GM_addStyle(`
         #jp-geekstats-widget {
             position: fixed;
-            bottom: 16px;
-            left: 16px;
             z-index: 9990;
             background: var(--jp-bg);
             border: 1px solid var(--jp-border);
@@ -9199,7 +9200,7 @@
         }
         #jp-gs-header {
             padding: 7px 10px 6px;
-            cursor: pointer;
+            cursor: grab;
             font-weight: 700;
             font-size: 11px;
             color: #c0392b;
@@ -9347,7 +9348,49 @@
         </div>
         <div id="jp-gs-body"></div>`;
     document.body.appendChild(_widget);
-    _widget.querySelector("#jp-gs-header").addEventListener("click", () => {
+    const savedPos = GM_getValue(STORAGE_KEY_POS, null);
+    if (savedPos) {
+      _widget.style.left = savedPos.x + "px";
+      _widget.style.top = savedPos.y + "px";
+    } else {
+      _widget.style.left = "16px";
+      _widget.style.top = window.innerHeight - 220 + "px";
+    }
+    const header = _widget.querySelector("#jp-gs-header");
+    let _dragging = false, _ox = 0, _oy = 0, _didMove = false;
+    header.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      _dragging = true;
+      _didMove = false;
+      _ox = e.clientX - _widget.getBoundingClientRect().left;
+      _oy = e.clientY - _widget.getBoundingClientRect().top;
+      header.style.cursor = "grabbing";
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!_dragging) return;
+      _didMove = true;
+      const x = Math.max(0, Math.min(window.innerWidth - _widget.offsetWidth, e.clientX - _ox));
+      const y = Math.max(0, Math.min(window.innerHeight - _widget.offsetHeight, e.clientY - _oy));
+      _widget.style.left = x + "px";
+      _widget.style.top = y + "px";
+    });
+    document.addEventListener("mouseup", () => {
+      if (!_dragging) return;
+      _dragging = false;
+      header.style.cursor = "grab";
+      if (_didMove) {
+        GM_setValue(STORAGE_KEY_POS, {
+          x: parseInt(_widget.style.left),
+          y: parseInt(_widget.style.top)
+        });
+      }
+    });
+    header.addEventListener("click", (e) => {
+      if (_didMove) {
+        e.stopImmediatePropagation();
+        return;
+      }
       _collapsed = !_collapsed;
       renderWidget();
     });
@@ -9633,15 +9676,27 @@
     if (settings3.enableCheatsheet) initCheatsheet(settings3);
     if (settings3.enableMerchantNotes) initAutopromoTracker();
     if (settings3.enableGeekStats) initGeekStats();
-    if (settings3.enableEyeBreak) initEyeBreak(settings3.eyeBreakMinute ?? 50);
+    if (settings3.enableEyeBreak && location.pathname.includes("/deals/new")) initEyeBreak(settings3.eyeBreakMinute ?? 50);
     function initEyeBreak(targetMinute) {
-      let lastShownHour = -1;
+      const STORAGE_KEY_EYE = "jp_eye_break_shown";
+      function wasShownThisHour() {
+        const stored = GM_getValue(STORAGE_KEY_EYE, 0);
+        if (!stored) return false;
+        const now = /* @__PURE__ */ new Date(), d = new Date(stored);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && d.getHours() === now.getHours();
+      }
+      function markShown() {
+        GM_setValue(STORAGE_KEY_EYE, Date.now());
+      }
+      const _now2 = /* @__PURE__ */ new Date();
+      if (_now2.getMinutes() >= targetMinute && !wasShownThisHour()) {
+        markShown();
+        showEyeBreakReminder();
+      }
       function check() {
         const now = /* @__PURE__ */ new Date();
-        const h = now.getHours();
-        const m = now.getMinutes();
-        if (m === targetMinute && h !== lastShownHour) {
-          lastShownHour = h;
+        if (now.getMinutes() === targetMinute && !wasShownThisHour()) {
+          markShown();
           showEyeBreakReminder();
         }
       }
