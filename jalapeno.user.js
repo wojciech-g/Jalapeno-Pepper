@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.13
+// @version      5.0.14
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -11732,21 +11732,6 @@
             z-index: 9990 !important;
         }` : ""}
 
-        ${settings3.shippingStackPosition === "bottom" ? `
-        .jp-shipping-stack {
-            position: fixed !important;
-            bottom: 8px;
-            left: ${settings3.shippingStackPosOffset ?? 300}px !important;
-            right: auto !important;
-            margin: 0 !important;
-            z-index: 9990 !important;
-            flex-direction: row !important;
-            flex-wrap: wrap !important;
-            align-items: flex-start !important;
-        }
-        .jp-shipping-stack > * { flex: 0 0 auto; width: 260px !important; }
-        .jp-shipping-stack .mod-floating-btn { width: auto !important; min-width: 120px !important; flex: 0 0 auto !important; }
-        .jp-shipping-stack .jp-mp-cl-col { width: 260px !important; }` : ""}
 
     `);
     function fetchExchangeRates(callback) {
@@ -13426,6 +13411,11 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               if (_catPanel) _catPanel.insertAdjacentElement("afterend", shippingStack);
               else if (mainFormPanel.parentNode) mainFormPanel.parentNode.insertBefore(shippingStack, mainFormPanel);
               else mainFormPanel.appendChild(shippingStack);
+            } else if (settings3.shippingStackPosition === "bottom") {
+              shippingStack.classList.add("jp-pos-top");
+              const _disclaimersEl = document.querySelector('input[placeholder="Assign disclaimers manually"]')?.closest(".pa-4");
+              if (_disclaimersEl) _disclaimersEl.insertAdjacentElement("afterend", shippingStack);
+              else mainFormPanel.insertAdjacentElement("afterend", shippingStack);
             } else {
               mainFormPanel.appendChild(shippingStack);
             }
@@ -13466,7 +13456,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             let catSidePanel = document.createElement("div");
             catSidePanel.id = "jp-cat-side-panel";
             catSidePanel.className = "jp-cat-side-panel";
-            if (settings3.catAdvisorPosition === "top") {
+            if (settings3.catAdvisorPosition === "top" || settings3.shippingStackPosition === "bottom") {
               catSidePanel.classList.add("jp-pos-top");
               const _shippingStackEl = document.getElementById("jp-shipping-stack");
               if (_shippingStackEl) _shippingStackEl.prepend(catSidePanel);
@@ -13476,7 +13466,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               mainFormPanel.appendChild(catSidePanel);
             }
             initCategoryAdvisor(catSidePanel, settings3);
-            if (settings3.catAdvisorPosition === "top" || settings3.catAdvisorPosition === "bottom") {
+            if (settings3.catAdvisorPosition === "top" || settings3.catAdvisorPosition === "bottom" || settings3.shippingStackPosition === "bottom") {
               catSidePanel.querySelector(".jp-cat-toggle")?.click();
             }
           }
