@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.14
+// @version      5.0.15
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -3818,27 +3818,17 @@
   }
 
   // src/ui/updateBanner.js
-  var DISMISS_KEY = "jpUpdateDismissedVersion";
   var BANNER_ID = "jp-update-banner";
-  var AUTO_DISMISS_MS = 15e3;
-  var _autoDismissTimer = null;
+  var _sessionDismissedVersion = null;
   function isUpdateDismissed(version) {
-    return GM_getValue(DISMISS_KEY) === version;
-  }
-  function dismissUpdateNotice(version) {
-    GM_setValue(DISMISS_KEY, version);
-    removeUpdateBanner();
+    return _sessionDismissedVersion === version;
   }
   function removeUpdateBanner() {
-    if (_autoDismissTimer) {
-      clearTimeout(_autoDismissTimer);
-      _autoDismissTimer = null;
-    }
     document.getElementById(BANNER_ID)?.remove();
   }
   function showUpdateBanner(version, downloadUrl) {
     if (isUpdateDismissed(version)) return;
-    removeUpdateBanner();
+    if (document.getElementById(BANNER_ID)) return;
     const banner = document.createElement("div");
     banner.id = BANNER_ID;
     banner.className = "jp-update-banner";
@@ -3858,18 +3848,17 @@
         </div>
     `;
     banner.querySelector(".jp-update-banner-dismiss")?.addEventListener("click", () => {
-      dismissUpdateNotice(version);
+      _sessionDismissedVersion = version;
+      removeUpdateBanner();
     });
     document.body.appendChild(banner);
     requestAnimationFrame(() => banner.classList.add("jp-update-banner--visible"));
-    _autoDismissTimer = setTimeout(() => {
-      removeUpdateBanner();
-    }, AUTO_DISMISS_MS);
   }
 
   // src/features/updateCheck.js
   var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js";
   var LAST_CHECK_KEY = "jpLastUpdateCheck";
+  var CHECK_INTERVAL_MS = 60 * 60 * 1e3;
   function isNewerVersion(remote, local) {
     const r = remote.split(".").map((n) => parseInt(n, 10) || 0);
     const l = local.split(".").map((n) => parseInt(n, 10) || 0);
@@ -3882,22 +3871,18 @@
   function checkForScriptUpdate() {
     const localVersion = typeof GM_info !== "undefined" && GM_info.script ? GM_info.script.version : null;
     if (!localVersion) return;
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const alreadyCheckedToday = GM_getValue(LAST_CHECK_KEY) === today;
-    if (alreadyCheckedToday) {
-      return;
-    }
+    const lastCheck = GM_getValue(LAST_CHECK_KEY, 0);
+    if (Date.now() - lastCheck < CHECK_INTERVAL_MS) return;
     GM_xmlhttpRequest({
       method: "GET",
       url: UPDATE_CHECK_URL,
       timeout: 12e3,
       onload(res) {
-        GM_setValue(LAST_CHECK_KEY, today);
+        GM_setValue(LAST_CHECK_KEY, Date.now());
         const match = res.responseText.match(/@version\s+([\d.]+)/);
         if (!match) return;
         const remoteVersion = match[1];
         if (!isNewerVersion(remoteVersion, localVersion)) return;
-        if (isUpdateDismissed(remoteVersion)) return;
         showUpdateBanner(remoteVersion, UPDATE_CHECK_URL);
       },
       onerror() {
@@ -11931,7 +11916,14 @@
           try {
             let data = JSON.parse(response.responseText);
             if (data && data.notes && typeof data.notes === "object") {
-              GM_setValue("jalapenoMerchantNotes", data.notes);
+              const merged = Object.assign({}, data.notes);
+              const currentLocal = getMerchantNotes();
+              if (currentLocal[merchantKey] && currentLocal[merchantKey].length > 0) {
+                merged[merchantKey] = currentLocal[merchantKey];
+              } else {
+                delete merged[merchantKey];
+              }
+              GM_setValue("jalapenoMerchantNotes", merged);
               if (DEBUG) console.log("✅ Merchant notes synchronized (Delta)");
             }
           } catch (e) {
@@ -11964,25 +11956,8 @@
           try {
             let data = JSON.parse(response.responseText);
             if (data && data.notes && typeof data.notes === "object") {
-              const local = GM_getValue("jalapenoMerchantNotes", {});
-              const apiNotes = data.notes;
-              const merged = {};
-              for (const k of Object.keys(apiNotes)) {
-                merged[k] = [...apiNotes[k] || []];
-              }
-              for (const [k, localArr] of Object.entries(local)) {
-                if (!merged[k]) merged[k] = [];
-                const unsent = (localArr || []).filter(
-                  (note) => !merged[k].some((n) => n.text === note.text && n.savedAt === note.savedAt)
-                );
-                if (unsent.length > 0) {
-                  merged[k].push(...unsent);
-                  sendMerchantNoteDeltaToAPI(k, merged[k]);
-                  if (DEBUG) console.log(`✅ Retried unsent note(s) for: ${k}`);
-                }
-              }
-              GM_setValue("jalapenoMerchantNotes", merged);
-              if (DEBUG) console.log("✅ Merchant notes updated from API (with local merge)");
+              GM_setValue("jalapenoMerchantNotes", data.notes);
+              if (DEBUG) console.log("✅ Merchant notes updated from API");
             }
           } catch (e) {
             if (DEBUG) console.warn("⚠️ Error parsing merchant notes from API:", e);
