@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.12
+// @version      5.0.13
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1694,6 +1694,17 @@
       mBannedHighlight: "Podświetlenie „banned”",
       lblShippingOffset: "Wysokość panelu dostawy (px):",
       lblShippingOffsetHint: "Odstęp od góry formularza — dotyczy przycisku ✨ i panelu dostawy po prawej.",
+      lblWidgetLayout: "Pozycja widgetów bocznych",
+      lblCatPosition: "Asystent Kategorii:",
+      lblCatPosOffset: "Offset X (px od lewej):",
+      lblCatPosOffsetHint: "Pozycja pozioma gdy widget jest u góry lub na dole ekranu.",
+      lblShipPosition: "Panel Dostawy / Multipack / Daty:",
+      lblShipPosOffset: "Offset X (px od lewej):",
+      lblShipPosOffsetHint: "Pozycja pozioma gdy widget jest u góry lub na dole ekranu.",
+      posLeft: "Lewa strona (domyślnie)",
+      posRight: "Prawa strona (domyślnie)",
+      posTop: "Góra ekranu",
+      posBottom: "Dół ekranu",
       lblDealDateCustom: "Własna data wygaśnięcia:",
       lblDealDateCustomHint: "Dodaje własny przycisk w panelu daty. Format: DD.MM.YYYY lub DD.MM.YYYY HH:MM (np. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Minuta przerwy wzrokowej (0–59):",
@@ -1831,6 +1842,7 @@
       eyeBreakBody: "Oderwij wzrok od ekranu na <strong>5 minut</strong> — popatrz w dal lub zamknij oczy.",
       eyeBreakDismiss: "Odsuń ×",
       dcPanelTitle: "Zmiany w tej sesji",
+      dcNoChanges: "Brak zmian",
       dcAutoChange: "Zmiana automatyczna (skrypt)",
       dcFieldTitle: "Tytuł",
       dcFieldUrl: "URL",
@@ -2055,6 +2067,17 @@
       mBannedHighlight: "Highlight “banned”",
       lblShippingOffset: "Shipping panel top offset (px):",
       lblShippingOffsetHint: "Distance from top of the form — applies to ✨ button and shipping panel on the right.",
+      lblWidgetLayout: "Side widget positions",
+      lblCatPosition: "Category Advisor:",
+      lblCatPosOffset: "X offset (px from left):",
+      lblCatPosOffsetHint: "Horizontal position when widget is pinned to top or bottom.",
+      lblShipPosition: "Shipping / Multipack / Date panel:",
+      lblShipPosOffset: "X offset (px from left):",
+      lblShipPosOffsetHint: "Horizontal position when widget is pinned to top or bottom.",
+      posLeft: "Left side (default)",
+      posRight: "Right side (default)",
+      posTop: "Top of screen",
+      posBottom: "Bottom of screen",
       lblDealDateCustom: "Custom expiry date:",
       lblDealDateCustomHint: "Adds a custom button to the date panel. Format: DD.MM.YYYY or DD.MM.YYYY HH:MM (e.g. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Eye break minute (0–59):",
@@ -2192,6 +2215,7 @@
       eyeBreakBody: "Look away from the screen for <strong>5 minutes</strong> — focus on something distant or close your eyes.",
       eyeBreakDismiss: "Dismiss ×",
       dcPanelTitle: "Session changes",
+      dcNoChanges: "No changes",
       dcAutoChange: "Automatic change (script)",
       dcFieldTitle: "Title",
       dcFieldUrl: "URL",
@@ -7691,13 +7715,13 @@
     }
     return null;
   }
-  function initDealChangelog(stackEl, threadId) {
+  function initDealChangelog(stackEl, threadId, { alwaysVisible = false } = {}) {
     if (!stackEl || !threadId) return;
     if (document.getElementById("jp-deal-changelog")) return;
     injectStyles2();
     const panel = document.createElement("div");
     panel.id = "jp-deal-changelog";
-    panel.style.display = "none";
+    if (!alwaysVisible) panel.style.display = "none";
     const shippingPanel = stackEl.querySelector("#jp-shipping-side-panel");
     if (shippingPanel) {
       stackEl.insertBefore(panel, shippingPanel);
@@ -7758,7 +7782,12 @@
     function renderChanges() {
       const changes = getChanges();
       if (!changes.length) {
-        panel.style.display = "none";
+        if (alwaysVisible) {
+          panel.style.display = "";
+          panel.innerHTML = `<div id="jp-dc-header">📝 ${t("dcPanelTitle")}</div><div class="jp-dc-empty-hint">${t("dcNoChanges")}</div>`;
+        } else {
+          panel.style.display = "none";
+        }
         return;
       }
       panel.style.display = "";
@@ -8107,12 +8136,13 @@
     }
     return null;
   }
-  function initDealDateTools(stackEl, settings3) {
+  function initDealDateTools(stackEl, settings3, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-date-tools")) return;
     injectStyles3();
     const panel = document.createElement("div");
     panel.id = "jp-date-tools";
+    if (compact) panel.classList.add("jp-dt-compact");
     const changelogEl = stackEl.querySelector("#jp-deal-changelog");
     const shippingEl = stackEl.querySelector("#jp-shipping-side-panel");
     const anchor = changelogEl || shippingEl;
@@ -8140,11 +8170,18 @@
       const btns = PRESETS.map(
         (p, i) => `<button class="jp-dt-preset" data-idx="${i}">${p.label}</button>`
       ).join("");
-      panel.innerHTML = `
-            <div id="jp-dt-header">⏰ ${t("dtHeader")}</div>
-            <div id="jp-dt-current">${display}</div>
-            <div id="jp-dt-buttons">${btns}</div>
-        `;
+      if (compact) {
+        panel.innerHTML = `
+                <div id="jp-dt-current"><span style="opacity:.6;margin-right:3px">⏰</span>${display}</div>
+                <div id="jp-dt-buttons">${btns}</div>
+            `;
+      } else {
+        panel.innerHTML = `
+                <div id="jp-dt-header">⏰ ${t("dtHeader")}</div>
+                <div id="jp-dt-current">${display}</div>
+                <div id="jp-dt-buttons">${btns}</div>
+            `;
+      }
     }
     let _busy = false;
     panel.addEventListener("click", async (e) => {
@@ -9505,24 +9542,39 @@
     }
     return base + ` ${phrase}`;
   }
-  function initMultipackHelper(stackEl, triggerVueInput) {
+  function initMultipackHelper(stackEl, triggerVueInput, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-multipack")) return;
     injectStyles5();
     const panel = document.createElement("div");
     panel.id = "jp-multipack";
-    panel.innerHTML = `
-        <div id="jp-mp-header">${t("mpHeader")}</div>
-        <div class="jp-mp-row">
-            <span class="jp-mp-label">${t("mpLabelBuy")}</span>
-            <input id="jp-mp-qty" type="number" min="2" max="99" value="4">
-            <span class="jp-mp-label">${t("mpLabelPcs")}</span>
-            <button id="jp-mp-insert" type="button">${t("mpInsert")}</button>
-        </div>
-        <div id="jp-mp-preview"></div>`;
-    const anchor = stackEl.querySelector(".mod-floating-btn");
-    if (anchor) stackEl.insertBefore(panel, anchor);
-    else stackEl.prepend(panel);
+    if (compact) panel.classList.add("jp-mp-compact-mode");
+    if (compact) {
+      panel.innerHTML = `
+            <div class="jp-mp-row">
+                <input id="jp-mp-qty" type="number" min="2" max="99" value="4">
+                <span class="jp-mp-label">${t("mpLabelPcs")}</span>
+                <button id="jp-mp-insert" type="button" style="flex:1">${t("mpInsert")}</button>
+            </div>
+            <div id="jp-mp-preview"></div>`;
+    } else {
+      panel.innerHTML = `
+            <div id="jp-mp-header">${t("mpHeader")}</div>
+            <div class="jp-mp-row">
+                <span class="jp-mp-label">${t("mpLabelBuy")}</span>
+                <input id="jp-mp-qty" type="number" min="2" max="99" value="4">
+                <span class="jp-mp-label">${t("mpLabelPcs")}</span>
+                <button id="jp-mp-insert" type="button">${t("mpInsert")}</button>
+            </div>
+            <div id="jp-mp-preview"></div>`;
+    }
+    const dateTools = stackEl.querySelector("#jp-date-tools");
+    if (dateTools) dateTools.insertAdjacentElement("afterend", panel);
+    else {
+      const anchor = stackEl.querySelector(".mod-floating-btn");
+      if (anchor) stackEl.insertBefore(panel, anchor);
+      else stackEl.prepend(panel);
+    }
     const qtyInput = panel.querySelector("#jp-mp-qty");
     const insertBtn = panel.querySelector("#jp-mp-insert");
     const previewEl = panel.querySelector("#jp-mp-preview");
@@ -9568,6 +9620,142 @@
       }, 2e3);
     });
     updatePreview();
+  }
+
+  // src/features/voteRowEnhancer.js
+  var _stylesInjected4 = false;
+  function injectStyles6() {
+    if (_stylesInjected4) return;
+    _stylesInjected4 = true;
+    GM_addStyle(`
+        .jp-vote-td-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .jp-vote-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        .jp-vm-copy {
+            font-family: monospace;
+            font-size: 11px;
+            color: #777;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+            transition: color 0.15s;
+        }
+        .jp-vm-copy:hover { color: #c0392b; }
+        .jp-vm-copy.jp-vm-copied { color: #27ae60 !important; }
+        .jp-vm-user-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .jp-vm-open {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            line-height: 1;
+            color: #777;
+            text-decoration: none;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .jp-vm-open:hover { color: #c0392b; border-color: #c0392b; }
+    `);
+  }
+  function getAngular() {
+    try {
+      return typeof unsafeWindow !== "undefined" && unsafeWindow.angular || window.angular;
+    } catch (_) {
+      return window.angular;
+    }
+  }
+  function threadIdFromHref(row) {
+    const link = row.querySelector('a.btn[href*="/promocje/"]');
+    if (!link) return null;
+    const m = link.href.match(/(\d+)(?:\/[^/]*)?$/);
+    return m ? m[1] : null;
+  }
+  function makeCopyEl(text, title) {
+    const el = document.createElement("span");
+    el.className = "jp-vm-copy";
+    el.textContent = text;
+    if (title) el.title = title;
+    el.addEventListener("click", () => {
+      navigator.clipboard.writeText(text).then(() => {
+        el.classList.add("jp-vm-copied");
+        setTimeout(() => el.classList.remove("jp-vm-copied"), 1200);
+      });
+    });
+    return el;
+  }
+  function initVoteRowEnhancer() {
+    if (!/\/admin\/inspector\/users\/\d+/.test(window.location.pathname)) return;
+    injectStyles6();
+    const ng = getAngular();
+    const rows = document.querySelectorAll('tr[ng-repeat="vote in user.votes"]');
+    for (const row of rows) {
+      if (row.dataset.jpVoteMeta) continue;
+      const scope = ng ? ng.element(row).scope?.() : null;
+      const vote = scope?.vote;
+      const threadId = String(vote?.thread_id ?? threadIdFromHref(row) ?? "");
+      const authorId = String(vote?.thread?.user_id ?? "");
+      row.dataset.jpVoteMeta = "1";
+      if (!threadId && !authorId) continue;
+      const lastTd = row.querySelector("td:last-child");
+      if (!lastTd) continue;
+      const existingBtn = lastTd.querySelector("a.btn");
+      if (!existingBtn) continue;
+      const wrap = document.createElement("div");
+      wrap.className = "jp-vote-td-wrap";
+      const meta = document.createElement("div");
+      meta.className = "jp-vote-meta";
+      if (threadId) {
+        meta.appendChild(makeCopyEl(threadId, "Skopiuj ID okazji"));
+      }
+      if (authorId) {
+        const userRow = document.createElement("div");
+        userRow.className = "jp-vm-user-row";
+        userRow.appendChild(makeCopyEl(authorId, "Skopiuj ID profilu"));
+        const openLink = document.createElement("a");
+        openLink.className = "jp-vm-open";
+        openLink.href = `/admin/inspector/users/${authorId}`;
+        openLink.target = "_blank";
+        openLink.rel = "noopener";
+        openLink.title = "Otwórz profil";
+        openLink.textContent = "↗";
+        userRow.appendChild(openLink);
+        meta.appendChild(userRow);
+      }
+      lastTd.innerHTML = "";
+      wrap.appendChild(existingBtn);
+      wrap.appendChild(meta);
+      lastTd.appendChild(wrap);
+    }
+  }
+  function resetVoteRowEnhancer() {
+    document.querySelectorAll("tr[data-jp-vote-meta]").forEach((row) => {
+      delete row.dataset.jpVoteMeta;
+      const wrap = row.querySelector(".jp-vote-td-wrap");
+      if (!wrap) return;
+      const btn = wrap.querySelector("a.btn");
+      const td = wrap.closest("td");
+      if (btn && td) {
+        td.innerHTML = "";
+        td.appendChild(btn);
+      }
+    });
   }
 
   // src/main.js
@@ -9642,7 +9830,11 @@
       enableShopInfo: true,
       enableGeekStats: true,
       enableEyeBreak: false,
-      eyeBreakMinute: 50
+      eyeBreakMinute: 50,
+      catAdvisorPosition: "left",
+      catAdvisorPosOffset: 16,
+      shippingStackPosition: "right",
+      shippingStackPosOffset: 300
     };
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
@@ -9936,6 +10128,36 @@
                     </div>
                 </div>
 
+                <div class="settings-row jp-settings-grid-2" style="margin-top: 12px;">
+                    <div style="grid-column: 1 / -1; font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--jp-text-muted);">${t("lblWidgetLayout")}</div>
+                    <div>
+                        <label>${t("lblCatPosition")}</label>
+                        <select id="set-cat-position" style="width:100%">
+                            <option value="left"   ${settings3.catAdvisorPosition === "left" ? "selected" : ""}>${t("posLeft")}</option>
+                            <option value="top"    ${settings3.catAdvisorPosition === "top" ? "selected" : ""}>${t("posTop")}</option>
+                            <option value="bottom" ${settings3.catAdvisorPosition === "bottom" ? "selected" : ""}>${t("posBottom")}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>${t("lblCatPosOffset")}</label>
+                        <input type="number" id="set-cat-pos-offset" min="0" value="${settings3.catAdvisorPosOffset ?? 16}" style="width:100%">
+                        <div class="jp-settings-field-hint">${t("lblCatPosOffsetHint")}</div>
+                    </div>
+                    <div>
+                        <label>${t("lblShipPosition")}</label>
+                        <select id="set-ship-position" style="width:100%">
+                            <option value="right"  ${settings3.shippingStackPosition === "right" ? "selected" : ""}>${t("posRight")}</option>
+                            <option value="top"    ${settings3.shippingStackPosition === "top" ? "selected" : ""}>${t("posTop")}</option>
+                            <option value="bottom" ${settings3.shippingStackPosition === "bottom" ? "selected" : ""}>${t("posBottom")}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>${t("lblShipPosOffset")}</label>
+                        <input type="number" id="set-ship-pos-offset" min="0" value="${settings3.shippingStackPosOffset ?? 300}" style="width:100%">
+                        <div class="jp-settings-field-hint">${t("lblShipPosOffsetHint")}</div>
+                    </div>
+                </div>
+
                 <div class="settings-row" style="margin-top: 15px;">
                     <label>${t("stopWords")}</label>
                     <textarea id="set-stopwords" style="width: 100%; min-height: 50px;" placeholder="np. fryer, cheap, now">${settings3.customStopWords}</textarea>
@@ -10128,7 +10350,11 @@
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
           enableGeekStats: document.getElementById("set-geekstats").checked,
           enableEyeBreak: document.getElementById("set-eye-break").checked,
-          eyeBreakMinute: parseInt(document.getElementById("set-eye-break-minute").value) || 50
+          eyeBreakMinute: parseInt(document.getElementById("set-eye-break-minute").value) || 50,
+          catAdvisorPosition: document.getElementById("set-cat-position").value,
+          catAdvisorPosOffset: parseInt(document.getElementById("set-cat-pos-offset").value) || 16,
+          shippingStackPosition: document.getElementById("set-ship-position").value,
+          shippingStackPosOffset: parseInt(document.getElementById("set-ship-pos-offset").value) || 300
         });
       };
       document.getElementById("btn-reset-stats").onclick = () => {
@@ -10901,6 +11127,113 @@
                 position: static;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             }
+        .jp-shipping-side-panel.jp-shipping-compact {
+            padding: 7px 10px;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .jp-shp-cmp-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+            min-height: 22px;
+        }
+        .jp-shp-cmp-name {
+            font-weight: 700;
+            color: #e68a00;
+            flex-shrink: 0;
+            font-size: 11px;
+        }
+        .jp-shp-cmp-cost {
+            font-weight: bold;
+            color: var(--jp-text);
+            font-size: 11px;
+        }
+        .jp-shp-cmp-free {
+            font-size: 10px;
+            color: var(--jp-text-muted);
+        }
+        .jp-shp-cmp-muted {
+            font-size: 10px;
+            color: var(--jp-text-muted);
+            font-style: italic;
+        }
+        .jp-shp-cmp-btn {
+            background: var(--jp-btn-bg);
+            border: 1px solid var(--jp-btn-border);
+            border-radius: 3px;
+            cursor: pointer;
+            color: var(--jp-text);
+            padding: 2px 6px;
+            font-size: 11px;
+            line-height: 1.4;
+            font-family: inherit;
+        }
+        .jp-shp-cmp-btn:hover { background: var(--jp-btn-hover); }
+        .jp-shp-apply-mini {
+            background: #4caf50 !important;
+            color: white !important;
+            border-color: #388e3c !important;
+            font-size: 11px;
+            padding: 2px 7px;
+        }
+        .jp-shp-more {
+            position: relative;
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+        }
+        .jp-shp-info-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 0 2px;
+            line-height: 1;
+            color: var(--jp-text-muted);
+            font-family: inherit;
+        }
+        .jp-shp-info-btn:hover { color: var(--jp-text); }
+        .jp-shp-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            right: 0;
+            background: var(--jp-bg);
+            border: 1px solid var(--jp-border);
+            border-left: 3px solid #e68a00;
+            border-radius: 6px;
+            padding: 8px 10px;
+            min-width: 210px;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            font-size: 11px;
+            color: var(--jp-text);
+            white-space: nowrap;
+        }
+        .jp-shp-more:hover .jp-shp-tooltip { display: block; }
+        .jp-shp-tooltip-note {
+            margin-bottom: 6px;
+            color: var(--jp-text-muted);
+            font-size: 10px;
+            white-space: normal;
+        }
+        .jp-shp-tooltip-btns {
+            display: flex;
+            gap: 6px;
+        }
+        .jp-shp-tooltip-btn {
+            flex: 1;
+            padding: 5px 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            font-family: inherit;
+        }
 
         /* ===== Reverse Image Search — Lens button ===== */
         .jp-lens-btn {
@@ -11331,6 +11664,89 @@
             from { transform: scaleX(1); }
             to   { transform: scaleX(0); }
         }
+
+        .jp-cat-side-panel.jp-pos-top {
+            position: static !important;
+            right: auto !important;
+            left: auto !important;
+            top: auto !important;
+            bottom: auto !important;
+            width: 260px;
+            margin: 0 0 8px 0 !important;
+        }
+        .jp-shipping-stack.jp-pos-top {
+            position: static !important;
+            right: auto !important;
+            left: auto !important;
+            top: auto !important;
+            bottom: auto !important;
+            margin: 0 0 8px 0 !important;
+            width: 100% !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            align-items: flex-start !important;
+        }
+        .jp-shipping-stack.jp-pos-top > * {
+            flex: 0 0 auto;
+            width: 260px !important;
+        }
+        .jp-shipping-stack.jp-pos-top .mod-floating-btn {
+            width: auto !important;
+            min-width: 120px !important;
+            flex: 0 0 auto !important;
+        }
+        .jp-mp-cl-col {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 0 0 auto;
+            width: 260px;
+        }
+        .jp-mp-cl-col > * {
+            width: 100% !important;
+            margin-bottom: 0 !important;
+        }
+        #jp-date-tools.jp-dt-compact {
+            padding: 6px 8px;
+            margin-bottom: 0;
+        }
+        #jp-date-tools.jp-dt-compact #jp-dt-current {
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        #jp-date-tools.jp-dt-compact #jp-dt-buttons {
+            gap: 3px;
+        }
+        #jp-multipack.jp-mp-compact-mode {
+            padding: 6px 8px;
+            margin-bottom: 0;
+        }
+
+        ${settings3.catAdvisorPosition === "bottom" ? `
+        .jp-cat-side-panel {
+            position: fixed !important;
+            bottom: 8px; top: auto;
+            left: ${settings3.catAdvisorPosOffset ?? 16}px !important;
+            right: auto !important;
+            margin: 0 !important;
+            z-index: 9990 !important;
+        }` : ""}
+
+        ${settings3.shippingStackPosition === "bottom" ? `
+        .jp-shipping-stack {
+            position: fixed !important;
+            bottom: 8px;
+            left: ${settings3.shippingStackPosOffset ?? 300}px !important;
+            right: auto !important;
+            margin: 0 !important;
+            z-index: 9990 !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            align-items: flex-start !important;
+        }
+        .jp-shipping-stack > * { flex: 0 0 auto; width: 260px !important; }
+        .jp-shipping-stack .mod-floating-btn { width: auto !important; min-width: 120px !important; flex: 0 0 auto !important; }
+        .jp-shipping-stack .jp-mp-cl-col { width: 260px !important; }` : ""}
 
     `);
     function fetchExchangeRates(callback) {
@@ -13000,17 +13416,41 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             let sidePanel = document.createElement("div");
             sidePanel.id = "jp-shipping-side-panel";
             sidePanel.className = "jp-shipping-side-panel";
+            if (settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom") {
+              sidePanel.classList.add("jp-shipping-compact");
+            }
             shippingStack.appendChild(sidePanel);
-            mainFormPanel.appendChild(shippingStack);
+            if (settings3.shippingStackPosition === "top") {
+              shippingStack.classList.add("jp-pos-top");
+              const _catPanel = document.getElementById("jp-cat-side-panel");
+              if (_catPanel) _catPanel.insertAdjacentElement("afterend", shippingStack);
+              else if (mainFormPanel.parentNode) mainFormPanel.parentNode.insertBefore(shippingStack, mainFormPanel);
+              else mainFormPanel.appendChild(shippingStack);
+            } else {
+              mainFormPanel.appendChild(shippingStack);
+            }
             if (settings3.enableDealChangelog) {
               const _clThreadId = (window.location.pathname.match(/\/thread\/(\d+)/) || [])[1];
-              initDealChangelog(shippingStack, _clThreadId);
+              const _clAlways = settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom";
+              initDealChangelog(shippingStack, _clThreadId, { alwaysVisible: _clAlways });
             }
+            const _isHorizontal = settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom";
             if (settings3.enableDealDateTools) {
-              initDealDateTools(shippingStack, settings3);
+              initDealDateTools(shippingStack, settings3, { compact: _isHorizontal });
             }
             if (settings3.enableMultipackHelper) {
-              initMultipackHelper(shippingStack, triggerVueInput);
+              initMultipackHelper(shippingStack, triggerVueInput, { compact: _isHorizontal });
+            }
+            if (settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom") {
+              const dtEl = shippingStack.querySelector("#jp-date-tools");
+              const mpEl = shippingStack.querySelector("#jp-multipack");
+              if (dtEl && mpEl) {
+                const col = document.createElement("div");
+                col.className = "jp-mp-cl-col";
+                dtEl.replaceWith(col);
+                col.appendChild(dtEl);
+                col.appendChild(mpEl);
+              }
             }
           } else if (settings3.enableFloatingButton && !document.querySelector("#jp-shipping-stack .mod-floating-btn")) {
             let shippingStack = document.getElementById("jp-shipping-stack");
@@ -13026,8 +13466,19 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             let catSidePanel = document.createElement("div");
             catSidePanel.id = "jp-cat-side-panel";
             catSidePanel.className = "jp-cat-side-panel";
-            mainFormPanel.appendChild(catSidePanel);
+            if (settings3.catAdvisorPosition === "top") {
+              catSidePanel.classList.add("jp-pos-top");
+              const _shippingStackEl = document.getElementById("jp-shipping-stack");
+              if (_shippingStackEl) _shippingStackEl.prepend(catSidePanel);
+              else if (mainFormPanel.parentNode) mainFormPanel.parentNode.insertBefore(catSidePanel, mainFormPanel);
+              else mainFormPanel.appendChild(catSidePanel);
+            } else {
+              mainFormPanel.appendChild(catSidePanel);
+            }
             initCategoryAdvisor(catSidePanel, settings3);
+            if (settings3.catAdvisorPosition === "top" || settings3.catAdvisorPosition === "bottom") {
+              catSidePanel.querySelector(".jp-cat-toggle")?.click();
+            }
           }
         }
         let targetDiv = document.querySelector(".layout.column.mb-3.px-4");
@@ -13182,19 +13633,30 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           } else {
             targetContainer.style.display = "flex";
           }
+          const isCompact = targetContainer.classList.contains("jp-shipping-compact");
           let merchantName = getMerchantNameForNotes();
           if (!merchantName || merchantName === "---") {
-            targetContainer.innerHTML = `<div style="color:var(--jp-text-muted); font-size:12px; text-align:center;">Wybierz lub wpisz sklep, aby zobaczyć koszty dostawy...</div>`;
+            targetContainer.innerHTML = isCompact ? `<div class="jp-shp-cmp-row"><span class="jp-shp-cmp-muted">🚚 Wybierz sklep…</span></div>` : `<div style="color:var(--jp-text-muted); font-size:12px; text-align:center;">Wybierz lub wpisz sklep, aby zobaczyć koszty dostawy...</div>`;
             return;
           }
           let shippingCosts = getShippingCostsList(merchantName);
           if (!shippingCosts) {
-            targetContainer.innerHTML = `
+            if (isCompact) {
+              targetContainer.innerHTML = `
+                            <div class="jp-shp-cmp-row">
+                                <span class="jp-shp-cmp-name">🚚 ${merchantName}</span>
+                                <span class="jp-shp-cmp-muted">brak danych</span>
+                                <button class="jp-shipping-cost-pull-btn jp-shp-cmp-btn" title="Pobierz z formularza">📥</button>
+                                <button class="jp-shipping-cost-add-btn jp-shp-cmp-btn" title="Wpisz ręcznie">➕</button>
+                            </div>`;
+            } else {
+              targetContainer.innerHTML = `
                         <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
                         <div style="font-size: 12px; color: var(--jp-text-muted); margin-bottom: 12px; line-height: 1.4;">Brak zapisanych kosztów dostawy dla tego sklepu.</div>
                         <button class="jp-shipping-cost-pull-btn" style="width: 100%; background-color: #c0392b; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s;">📥 Pobierz z formularza obok</button>
                         <button class="jp-shipping-cost-add-btn" style="width: 100%; background-color: #e68a00; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;">➕ Wpisz ręcznie</button>
                     `;
+            }
             targetContainer.querySelector(".jp-shipping-cost-pull-btn").addEventListener("click", () => {
               let nativeInput2 = document.querySelector('input[placeholder="Shipping costs"], input[data-jp-shipping="true"]');
               let allLabels2 = Array.from(document.querySelectorAll("label"));
@@ -13242,20 +13704,44 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           } else {
             if (isFreeChecked || parsedNativeValue !== shippingCosts.cost) needsUpdate = true;
           }
-          let applyBtnHtml = needsUpdate ? `<button class="jp-shipping-apply-btn" style="width: 100%; background-color: #4caf50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 5px rgba(76, 175, 80, 0.4);">🚀 Zastosuj koszty w okazji</button>` : "";
-          targetContainer.innerHTML = `
-                    <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
-                    <div style="background: var(--jp-input-bg); border: 1px solid #e68a00; border-left: 4px solid #e68a00; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 13px; color: var(--jp-text); line-height: 1.6;">
-                        <div style="margin-bottom: 4px;">💵 <b>Koszt:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.cost} PLN</span></div>
-                        ${shippingCosts.freeDeliveryFrom > 0 ? `<div style="margin-bottom: 4px;">🎁 <b>Darmowa od:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.freeDeliveryFrom} PLN</span></div>` : ""}
-                        ${shippingCosts.note ? `<div>📌 <b>Info:</b> ${shippingCosts.note}</div>` : ""}
-                    </div>
-                    ${applyBtnHtml}
-                    <div style="display: flex; gap: 8px;">
-                        <button class="jp-shipping-cost-btn" title="Edytuj koszt" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">✏️ Edytuj</button>
-                        <button class="jp-shipping-cost-delete-btn" title="Usuń" style="flex: 1; background-color: #f44336; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">🗑️ Usuń</button>
-                    </div>
-                `;
+          if (isCompact) {
+            const costLabel = shippingCosts.cost === 0 ? "🎁 Darmowa" : `💵 ${shippingCosts.cost} PLN`;
+            const freeTag = shippingCosts.freeDeliveryFrom > 0 ? `<span class="jp-shp-cmp-free">🎁 od ${shippingCosts.freeDeliveryFrom} PLN</span>` : "";
+            const applyMini = needsUpdate ? `<button class="jp-shipping-apply-btn jp-shp-cmp-btn jp-shp-apply-mini" title="Zastosuj koszty">🚀 Zastosuj</button>` : "";
+            const noteHtml = shippingCosts.note ? `<div class="jp-shp-tooltip-note">📌 ${shippingCosts.note}</div>` : "";
+            targetContainer.innerHTML = `
+                        <div class="jp-shp-cmp-row">
+                            <span class="jp-shp-cmp-name">🚚 ${merchantName}</span>
+                            <span class="jp-shp-cmp-cost">${costLabel}</span>
+                            ${freeTag}
+                            ${applyMini}
+                            <div class="jp-shp-more">
+                                <button class="jp-shp-info-btn" type="button" title="Szczegóły">ℹ️</button>
+                                <div class="jp-shp-tooltip">
+                                    ${noteHtml}
+                                    <div class="jp-shp-tooltip-btns">
+                                        <button class="jp-shipping-cost-btn jp-shp-tooltip-btn" style="background:#5a5a5a;">✏️ Edytuj</button>
+                                        <button class="jp-shipping-cost-delete-btn jp-shp-tooltip-btn" style="background:#f44336;">🗑️ Usuń</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+          } else {
+            let applyBtnHtml = needsUpdate ? `<button class="jp-shipping-apply-btn" style="width: 100%; background-color: #4caf50; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-bottom: 8px; transition: 0.2s; box-shadow: 0 2px 5px rgba(76, 175, 80, 0.4);">🚀 Zastosuj koszty w okazji</button>` : "";
+            targetContainer.innerHTML = `
+                        <div style="font-weight: bold; color: #e68a00; font-size: 15px; margin-bottom: 8px;">🚚 Dostawa z ${merchantName}</div>
+                        <div style="background: var(--jp-input-bg); border: 1px solid #e68a00; border-left: 4px solid #e68a00; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 13px; color: var(--jp-text); line-height: 1.6;">
+                            <div style="margin-bottom: 4px;">💵 <b>Koszt:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.cost} PLN</span></div>
+                            ${shippingCosts.freeDeliveryFrom > 0 ? `<div style="margin-bottom: 4px;">🎁 <b>Darmowa od:</b> <span style="color:var(--jp-input-text); font-weight:bold;">${shippingCosts.freeDeliveryFrom} PLN</span></div>` : ""}
+                            ${shippingCosts.note ? `<div>📌 <b>Info:</b> ${shippingCosts.note}</div>` : ""}
+                        </div>
+                        ${applyBtnHtml}
+                        <div style="display: flex; gap: 8px;">
+                            <button class="jp-shipping-cost-btn" title="Edytuj koszt" style="flex: 1; background-color: #5a5a5a; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">✏️ Edytuj</button>
+                            <button class="jp-shipping-cost-delete-btn" title="Usuń" style="flex: 1; background-color: #f44336; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">🗑️ Usuń</button>
+                        </div>
+                    `;
+          }
           if (needsUpdate) {
             targetContainer.querySelector(".jp-shipping-apply-btn").addEventListener("click", async () => {
               if (shouldBeFree) {
@@ -14122,6 +14608,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           resetOfflineDealsFilter();
           resetExactTimestamps();
           resetUserAdminLinks();
+          resetVoteRowEnhancer();
         }
         if (settings3.enableSessionHistory) refreshSessionHistoryHighlight();
         if (settings3.enableShopInfo) resetShopInfo();
@@ -14130,7 +14617,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       }
       let isModeration = currentHref.includes("/admin-v2/moderation/");
       let isInspector = currentHref.includes("/admin/inspector/");
+      let isUserVotes = /\/admin\/inspector\/users\/\d+/.test(currentHref);
       injectToolbarSettingsBtn();
+      if (isUserVotes) initVoteRowEnhancer();
       if (!isModeration && !isInspector) return;
       let titleInput = document.querySelector('input[placeholder="Thread title"]');
       let isAlreadyInjected = document.querySelector(".mod-tools-container");
