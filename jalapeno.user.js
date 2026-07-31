@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.16
+// @version      5.0.17
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -10,6 +10,7 @@
 // @downloadURL  https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
 // @match        *://*.pepper.pl/admin-v2/moderation/*
 // @match        *://*.pepper.pl/admin/inspector/users/*
+// @match        *://*.pepper.pl/promocje/*
 // @match        *://www.google.com/*
 // @match        *://www.google.pl/*
 // @match        *://lens.google.com/*
@@ -1709,6 +1710,8 @@
       lblDealDateCustomHint: "Dodaje własny przycisk w panelu daty. Format: DD.MM.YYYY lub DD.MM.YYYY HH:MM (np. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Minuta przerwy wzrokowej (0–59):",
       lblEyeBreakMinuteHint: "O której minucie każdej godziny wyświetlić przypomnienie. Np. 50 = zawsze o XX:50.",
+      lblGeminiApiKey: "Klucz Gemini API (opcjonalny):",
+      lblGeminiApiKeyHint: "Darmowy klucz z aistudio.google.com — poprawia naturalność opisów AI Overview. Bez klucza działa standardowe tłumaczenie.",
       mPriceWarning: "Alert wzrostu ceny na liście",
       mImageSearch: "Wyszukiwanie obrazem (Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
@@ -1785,6 +1788,10 @@
       mCopiedBarcode: "📋 Barcode skopiowany jako PNG",
       mCopyBarcodeError: "❌ Nie udało się skopiować barcode: ",
       mApproveReasons: "Szablony wiadomości (Approve & Send PM)",
+      mCommentTemplates: "Szybkie odpowiedzi w komentarzach",
+      mCommentTemplatesHint: "Przycisk QR w pasku narzędzi edytora komentarzy — pozwala wstawić predefiniowane wiadomości (np. odrzucenie podbicia).",
+      mQuickReplyTitle: "Szybka odpowiedź",
+      mQuickReplyPopoverHeader: "Wybierz szablon",
       // Analytics
       secAnalytics: "📊 Statystyki Produktywności",
       statUsageHeader: "Użycie",
@@ -2082,6 +2089,8 @@
       lblDealDateCustomHint: "Adds a custom button to the date panel. Format: DD.MM.YYYY or DD.MM.YYYY HH:MM (e.g. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Eye break minute (0–59):",
       lblEyeBreakMinuteHint: "Which minute of every hour to show the reminder. E.g. 50 = always at XX:50.",
+      lblGeminiApiKey: "Gemini API key (optional):",
+      lblGeminiApiKeyHint: "Free key from aistudio.google.com — improves naturalness of AI Overview descriptions. Without the key, standard translation is used.",
       mPriceWarning: "Price rise alert on queue list",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
@@ -2158,6 +2167,10 @@
       mCopiedBarcode: "📋 Barcode copied as PNG image",
       mCopyBarcodeError: "❌ Could not copy barcode: ",
       mApproveReasons: "Message templates (Approve & Send PM)",
+      mCommentTemplates: "Quick replies in comments",
+      mCommentTemplatesHint: "QR button in the comment editor toolbar — insert predefined messages (e.g. voting rejection).",
+      mQuickReplyTitle: "Quick reply",
+      mQuickReplyPopoverHeader: "Select template",
       // Analytics
       secAnalytics: "📊 Productivity Statistics",
       statUsageHeader: "Usage",
@@ -2598,6 +2611,31 @@
     ];
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" style="background:#fff;border-radius:2px;display:block;">` + rects + texts.join("") + `</svg>`;
   }
+  function getTipTapEditorForDescription() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return null;
+    try {
+      const doc = iframe.contentDocument;
+      return doc?.querySelector('div.ProseMirror[contenteditable="true"]') || doc?.querySelector('div[contenteditable="true"]');
+    } catch (_) {
+      return null;
+    }
+  }
+  function tipTapPrepend(imgHtml) {
+    const editor = getTipTapEditorForDescription();
+    if (!editor) return false;
+    const doc = editor.ownerDocument;
+    const win = doc.defaultView;
+    editor.focus();
+    const currentHtml = editor.innerHTML;
+    const range = doc.createRange();
+    range.selectNodeContents(editor);
+    const sel = win.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("insertHTML", false, imgHtml + currentHtml);
+    return true;
+  }
   function getDescriptionEditorContext() {
     const iframe = document.querySelector('iframe[src*="description/edit"]');
     if (!iframe) return null;
@@ -2777,61 +2815,16 @@
       canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob returned null")), "image/png");
     });
   }
-  function redactorPrepend(iframeWin, editor, imgHtml) {
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      if ($textarea.length) {
-        const r = $textarea.data("redactor");
-        if (r) {
-          const existing = r.$editor ? r.$editor.html() : r.get ? r.get() : editor.innerHTML;
-          const newHtml = imgHtml + existing;
-          if (typeof r.set === "function") {
-            r.set(newHtml);
-          } else if (r.$editor) {
-            r.$editor.html(newHtml);
-            if (typeof r.sync === "function") r.sync();
-          } else {
-            editor.innerHTML = newHtml;
-          }
-          console.log("[JP Insert] Redactor jQuery API used ✅");
-          const ta = $textarea[0];
-          if (ta) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-              iframeWin.HTMLTextAreaElement.prototype,
-              "value"
-            )?.set;
-            if (nativeSetter) nativeSetter.call(ta, ta.value);
-            ta.dispatchEvent(new iframeWin.Event("input", { bubbles: true }));
-            ta.dispatchEvent(new iframeWin.Event("change", { bubbles: true }));
-            console.log("[JP Insert] Vue dirty-state events fired ✅");
-          }
-          return;
-        }
-      }
-    }
-    editor.innerHTML = imgHtml + editor.innerHTML;
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
-    console.log("[JP Insert] Direct DOM fallback used");
-  }
   async function insertBarcodeIntoDescription(svgStr, ean, btn) {
     const origLabel = btn.textContent;
     btn.disabled = true;
     try {
       btn.textContent = "⏳ Checking…";
-      const iframeEl = document.querySelector('iframe[src*="description/edit"]');
-      let editorEl = null;
-      try {
-        editorEl = iframeEl?.contentDocument?.querySelector(".redactor-editor");
-      } catch (_) {
-      }
-      if (!editorEl) {
+      const editor = getTipTapEditorForDescription();
+      if (!editor) {
         showToast(t("mInsertOpenFirst"), true);
         return;
       }
-      const iframeDoc = iframeEl.contentDocument;
-      const iframeWin = iframeEl.contentWindow;
-      const editor = editorEl;
       console.log("[JP Insert] Editor ready — content length:", editor.innerHTML.length);
       btn.textContent = "⏳ Uploading…";
       const blob = await svgToPngBlob(svgStr);
@@ -2876,7 +2869,7 @@
       });
       btn.textContent = "⏳ Inserting…";
       const imgHtml = `<img src="${rawUrl}" alt="EAN ${ean}">`;
-      redactorPrepend(iframeWin, editor, imgHtml);
+      tipTapPrepend(imgHtml);
       console.log("[JP Insert] Image prepended ✅");
       showToast(t("mInsertSuccess"));
     } catch (err) {
@@ -2944,14 +2937,24 @@
     if (ids.asin) body.appendChild(makeIdRow("ASIN", ids.asin));
     if (ids.ean) body.appendChild(makeBarcodeSection(ids.ean));
   }
-  var _watchedIframes = /* @__PURE__ */ new WeakSet();
-  function injectBarcodeToolbarBtn(targetDoc) {
-    const toolbar = targetDoc.querySelector(".toolbar");
+  function injectBarcodeToolbarBtn() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return false;
+    let iframeDoc;
+    try {
+      iframeDoc = iframe.contentDocument;
+    } catch (_) {
+      return false;
+    }
+    if (!iframeDoc?.body) return false;
+    const toolbar = iframeDoc.querySelector('[role="toolbar"]');
     if (!toolbar) return false;
-    if (toolbar.querySelector(".jp-toolbar-barcode-btn")) return true;
-    const btn = targetDoc.createElement("button");
+    const btnRow = toolbar.querySelector(".overflow--scrollX-raw .flex") || toolbar.querySelector(".flex.gap--all-2");
+    if (!btnRow) return false;
+    if (btnRow.querySelector(".jp-toolbar-barcode-btn")) return true;
+    const btn = iframeDoc.createElement("button");
     btn.type = "button";
-    btn.className = "button button--type-tag button--mode-light button--square jp-toolbar-barcode-btn";
+    btn.className = "button button--type-text button--mode-secondary button--square space--h-2 space--v-2 size--all-m bRad--a button button--type-editor jp-toolbar-barcode-btn";
     btn.title = t("mToolbarBarcodeTitle");
     btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">EAN</span>';
     btn.addEventListener("click", () => {
@@ -2962,22 +2965,14 @@
       const svgStr = generateEAN13SVG(_currentEan);
       insertBarcodeIntoDescription(svgStr, _currentEan, btn);
     });
-    toolbar.appendChild(btn);
+    btnRow.appendChild(btn);
     return true;
   }
-  function watchIframeToolbar(iframe, iframeDoc) {
-    if (_watchedIframes.has(iframe)) return;
-    _watchedIframes.add(iframe);
-    const innerObs = new MutationObserver(() => {
-      injectBarcodeToolbarBtn(iframeDoc);
-    });
-    innerObs.observe(iframeDoc.body, { childList: true, subtree: true });
-  }
   function watchForDescriptionToolbar() {
-    function checkAndInject() {
-      injectBarcodeToolbarBtn(document);
+    function tryInject() {
+      injectBarcodeToolbarBtn();
       const iframe = document.querySelector('iframe[src*="description/edit"]');
-      if (!iframe) return;
+      if (!iframe || iframe._jpEanWatching) return;
       let iframeDoc;
       try {
         iframeDoc = iframe.contentDocument;
@@ -2985,14 +2980,11 @@
         return;
       }
       if (!iframeDoc?.body) return;
-      const injected = injectBarcodeToolbarBtn(iframeDoc);
-      if (!injected) {
-        watchIframeToolbar(iframe, iframeDoc);
-      }
+      iframe._jpEanWatching = true;
+      new MutationObserver(() => injectBarcodeToolbarBtn()).observe(iframeDoc.body, { childList: true, subtree: true });
     }
-    const parentObs = new MutationObserver(checkAndInject);
-    parentObs.observe(document.body, { childList: true, subtree: true });
-    checkAndInject();
+    new MutationObserver(tryInject).observe(document.body, { childList: true, subtree: true });
+    tryInject();
   }
   function initProductInspector(leftCol) {
     if (document.getElementById("jp-inspector-panel")) return;
@@ -3070,7 +3062,6 @@
     "tiny.cc",
     "tinyurl.com"
   ]);
-  var _watchedIframes2 = /* @__PURE__ */ new WeakSet();
   var EXPAND_CONCURRENCY = 8;
   var EXPAND_TIMEOUT_MS = 8e3;
   var _initialized = false;
@@ -3224,94 +3215,56 @@
     }
     return { html: result, count, found: candidates.length };
   }
-  function getDescriptionEditor() {
+  function getTipTapEditor() {
     const iframe = document.querySelector('iframe[src*="description/edit"]');
     if (!iframe) return null;
     try {
-      const iframeDoc = iframe.contentDocument;
-      const editor = iframeDoc?.querySelector(".redactor-editor");
-      if (!iframeDoc || !editor) return null;
-      return { iframe, iframeDoc, iframeWin: iframe.contentWindow, editor };
+      const doc = iframe.contentDocument;
+      return doc?.querySelector('div.ProseMirror[contenteditable="true"]') || doc?.querySelector('div[contenteditable="true"]');
     } catch (_) {
       return null;
     }
   }
-  function getRedactorHtml2(iframeWin, editor) {
-    let html = editor.innerHTML;
-    let textareaValue = "";
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      if ($textarea.length) {
-        textareaValue = $textarea[0]?.value || "";
-        const r = $textarea.data("redactor");
-        if (r) {
-          html = r.$editor ? r.$editor.html() : r.get ? r.get() : editor.innerHTML;
-        }
-      }
-    }
-    const editorPlain = (html || "").replace(/<[^>]+>/g, "").trim();
-    if (!editorPlain && textareaValue.trim()) return textareaValue;
-    if (!html.trim() && textareaValue.trim()) return textareaValue;
-    return html;
+  function getTipTapHtml(editor) {
+    return editor.innerHTML;
   }
-  function getEditorContent(iframeWin, editor) {
-    const html = getRedactorHtml2(iframeWin, editor);
-    let textareaValue = "";
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      textareaValue = $textarea[0]?.value || "";
-    }
-    const plain = editor.textContent || "";
-    return {
-      html,
-      searchBlob: [html, textareaValue, plain].join("\n")
-    };
+  function setTipTapHtml(editor, html) {
+    const doc = editor.ownerDocument;
+    const win = doc.defaultView;
+    editor.focus();
+    const range = doc.createRange();
+    range.selectNodeContents(editor);
+    const sel = win.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("insertHTML", false, html);
   }
-  function setRedactorHtml(iframeWin, editor, html) {
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      if ($textarea.length) {
-        const r = $textarea.data("redactor");
-        if (r) {
-          if (typeof r.set === "function") {
-            r.set(html);
-          } else if (r.$editor) {
-            r.$editor.html(html);
-            if (typeof r.sync === "function") r.sync();
-          } else {
-            editor.innerHTML = html;
-          }
-          const ta = $textarea[0];
-          if (ta) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-              iframeWin.HTMLTextAreaElement.prototype,
-              "value"
-            )?.set;
-            if (nativeSetter) nativeSetter.call(ta, ta.value);
-            ta.dispatchEvent(new iframeWin.Event("input", { bubbles: true }));
-            ta.dispatchEvent(new iframeWin.Event("change", { bubbles: true }));
-          }
-          return;
-        }
-      }
+  function getToolbarBtnRow() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return null;
+    let iframeDoc;
+    try {
+      iframeDoc = iframe.contentDocument;
+    } catch (_) {
+      return null;
     }
-    editor.innerHTML = html;
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    if (!iframeDoc?.body) return null;
+    const toolbar = iframeDoc.querySelector('[role="toolbar"]');
+    if (!toolbar) return null;
+    return toolbar.querySelector(".overflow--scrollX-raw .flex") || toolbar.querySelector(".flex.gap--all-2") || null;
   }
   async function expandLinksInDescription(btn) {
     const origLabel = btn.innerHTML;
     btn.disabled = true;
     try {
-      const ctx = getDescriptionEditor();
-      if (!ctx) {
+      const editor = getTipTapEditor();
+      if (!editor) {
         showToast(t("mExpandLinksOpenFirst"), true);
         return;
       }
       btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">⏳</span>';
-      const { html: currentHtml, searchBlob } = getEditorContent(ctx.iframeWin, ctx.editor);
+      const currentHtml = getTipTapHtml(editor);
+      const searchBlob = currentHtml;
       const { html: newHtml, count, found } = await expandLinksInHtml(currentHtml, searchBlob);
       if (found === 0) {
         showToast(t("mExpandLinksNone"), true);
@@ -3322,7 +3275,7 @@
         return;
       }
       btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">✏️</span>';
-      setRedactorHtml(ctx.iframeWin, ctx.editor, newHtml);
+      setTipTapHtml(editor, newHtml);
       increment("linksExpanded", count);
       showToast(t("mExpandLinksSuccess").replace("{n}", String(count)));
     } catch (err) {
@@ -3333,32 +3286,24 @@
       btn.innerHTML = origLabel;
     }
   }
-  function injectExpandLinksToolbarBtn(targetDoc) {
-    const toolbar = targetDoc.querySelector(".toolbar");
-    if (!toolbar) return false;
-    if (toolbar.querySelector(".jp-toolbar-expand-links-btn")) return true;
-    const btn = targetDoc.createElement("button");
+  function injectExpandLinksToolbarBtn() {
+    const btnRow = getToolbarBtnRow();
+    if (!btnRow) return false;
+    if (btnRow.querySelector(".jp-toolbar-expand-links-btn")) return true;
+    const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "button button--type-tag button--mode-light button--square jp-toolbar-expand-links-btn";
+    btn.className = "button button--type-text button--mode-secondary button--square space--h-2 space--v-2 size--all-m bRad--a button button--type-editor jp-toolbar-expand-links-btn";
     btn.title = t("mToolbarExpandLinksTitle");
     btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">URL</span>';
     btn.addEventListener("click", () => expandLinksInDescription(btn));
-    toolbar.appendChild(btn);
+    btnRow.appendChild(btn);
     return true;
   }
-  function watchIframeToolbar2(iframe, iframeDoc) {
-    if (_watchedIframes2.has(iframe)) return;
-    _watchedIframes2.add(iframe);
-    const innerObs = new MutationObserver(() => {
-      injectExpandLinksToolbarBtn(iframeDoc);
-    });
-    innerObs.observe(iframeDoc.body, { childList: true, subtree: true });
-  }
   function watchForDescriptionToolbar2() {
-    function checkAndInject() {
-      injectExpandLinksToolbarBtn(document);
+    function tryInject() {
+      injectExpandLinksToolbarBtn();
       const iframe = document.querySelector('iframe[src*="description/edit"]');
-      if (!iframe) return;
+      if (!iframe || iframe._jpUrlWatching) return;
       let iframeDoc;
       try {
         iframeDoc = iframe.contentDocument;
@@ -3366,14 +3311,11 @@
         return;
       }
       if (!iframeDoc?.body) return;
-      const injected = injectExpandLinksToolbarBtn(iframeDoc);
-      if (!injected) {
-        watchIframeToolbar2(iframe, iframeDoc);
-      }
+      iframe._jpUrlWatching = true;
+      new MutationObserver(() => injectExpandLinksToolbarBtn()).observe(iframeDoc.body, { childList: true, subtree: true });
     }
-    const parentObs = new MutationObserver(checkAndInject);
-    parentObs.observe(document.body, { childList: true, subtree: true });
-    checkAndInject();
+    new MutationObserver(tryInject).observe(document.body, { childList: true, subtree: true });
+    tryInject();
   }
   function initLinkExpander() {
     if (_initialized) return;
@@ -3385,8 +3327,6 @@
   var PENDING_DESC_KEY = "jpPendingLensDescription";
   var PENDING_DESC_TS_KEY = "jpPendingLensDescriptionTs";
   var LENS_FLOW_KEY = "jpLensFlowActive";
-  var _watchedIframes3 = /* @__PURE__ */ new WeakSet();
-  var _innerObservers = /* @__PURE__ */ new WeakMap();
   var _pasteInitialized = false;
   var _googleInitialized = false;
   var _lastProcessedOverview = "";
@@ -3468,7 +3408,7 @@
         current = line;
         continue;
       }
-      const continues = !current.endsWith(".") && /^[a-ząćęłńóśźż(]/.test(line);
+      const continues = /[^.!?]$/.test(current.trimEnd()) && /^[a-ząćęłńóśźż("]/.test(line);
       if (continues) {
         current += " " + line;
       } else {
@@ -3477,7 +3417,7 @@
       }
     }
     if (current) paragraphs.push(current);
-    return paragraphs.map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => p.length >= 25 && /[.!?]$/.test(p)).slice(0, 6).join("\n\n");
+    return paragraphs.map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => p.length >= 20).slice(0, 8).join("\n\n");
   }
   function cleanAiOverviewRaw(raw) {
     const text = raw.replace(/^AI\s*Overview\s*/i, "").replace(/^Przegląd\s+AI\s*/i, "").trim();
@@ -3498,8 +3438,25 @@
     }
     return null;
   }
+  function getCleanText(el) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('.WBgIic, .NMq1me, button, a.PMDqCb, [jscontroller*="XqmSxe"]').forEach((n) => n.remove());
+    return clone.textContent.replace(/\s+/g, " ").trim();
+  }
   function collectProseParagraphs(root) {
     const lines = [];
+    const bulletItems = root.querySelectorAll("li.Z1qcYe");
+    if (bulletItems.length > 0) {
+      for (const li of bulletItems) {
+        const span = li.querySelector(".iNqyIf") || li;
+        const text = getCleanText(span);
+        if (!text || text.length < 15) continue;
+        if (shouldStopCollection(text)) break;
+        if (isNoiseLine(text) || isShoppingOrJunkLine(text)) continue;
+        lines.push(text);
+      }
+      if (lines.length > 0) return lines;
+    }
     for (const p of root.querySelectorAll("p")) {
       if (p.closest('a[href*="/shopping"]') || p.closest('[data-attrid*="product"]')) break;
       if (p.querySelector('a[href*="amazon"], a[href*="allegro"]')) break;
@@ -3525,14 +3482,26 @@
         if (cleaned) return cleaned;
       }
     }
-    for (const block of document.querySelectorAll('[data-container-id="aimc"]')) {
-      const proseLines = collectProseParagraphs(block);
-      if (proseLines.length > 0) {
-        const merged = mergeIntoParagraphs(proseLines);
-        if (merged.length >= 40) return merged;
+    const containerSelectors = [
+      '[data-subtree="aimc"]',
+      // current format (2025)
+      '[data-container-id="aimc"]',
+      // legacy fallback
+      '[data-container-id="aiml_prs_pro"]',
+      '[jsname="yEVEwb"]',
+      ".I3nEPb",
+      ".YzNkB"
+    ];
+    for (const selector of containerSelectors) {
+      for (const block of document.querySelectorAll(selector)) {
+        const proseLines = collectProseParagraphs(block);
+        if (proseLines.length > 0) {
+          const merged = mergeIntoParagraphs(proseLines);
+          if (merged.length >= 40) return merged;
+        }
+        const cleaned = cleanAiOverviewRaw(block.innerText || "");
+        if (cleaned) return cleaned;
       }
-      const cleaned = cleanAiOverviewRaw(block.innerText || "");
-      if (cleaned) return cleaned;
     }
     return null;
   }
@@ -3574,7 +3543,7 @@
       ta.remove();
     }
   }
-  function showGoogleBanner(preview) {
+  function getBanner() {
     let banner = document.getElementById("jp-lens-ai-banner");
     if (!banner) {
       banner = document.createElement("div");
@@ -3595,6 +3564,43 @@
       ].join(";");
       document.body.appendChild(banner);
     }
+    return banner;
+  }
+  function showWatchingBanner() {
+    if (document.getElementById("jp-lens-ai-banner")) return;
+    const banner = getBanner();
+    banner.replaceChildren();
+    const title = document.createElement("div");
+    title.style.cssText = "font-weight:700;color:#4fc3f7;margin-bottom:6px;";
+    title.textContent = "🌶️ Jalapeño";
+    const status = document.createElement("div");
+    status.id = "jp-lens-ai-status";
+    status.style.cssText = "font-size:12px;color:#b9bbbe;margin-bottom:10px;";
+    status.textContent = "Szukam opisu AI Overview…";
+    const captureBtn = document.createElement("button");
+    captureBtn.textContent = "📋 Przechwyć ręcznie";
+    captureBtn.style.cssText = "background:#4fc3f7;color:#1e1f22;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin-right:8px;";
+    captureBtn.addEventListener("click", async () => {
+      captureBtn.disabled = true;
+      captureBtn.textContent = "⏳";
+      const text = extractAiOverviewText() || extractAnyDescriptionText();
+      if (text) {
+        await processAiOverview(text);
+      } else {
+        const s = document.getElementById("jp-lens-ai-status");
+        if (s) s.textContent = "Nie znaleziono opisu na tej stronie.";
+      }
+      captureBtn.disabled = false;
+      captureBtn.textContent = "📋 Przechwyć ręcznie";
+    });
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "✕";
+    closeBtn.style.cssText = "background:transparent;color:#666;border:none;padding:5px 8px;cursor:pointer;font-size:13px;float:right;margin-top:-4px;";
+    closeBtn.addEventListener("click", () => banner.remove());
+    banner.append(title, status, captureBtn, closeBtn);
+  }
+  function showGoogleBanner(preview) {
+    const banner = getBanner();
     const short = preview.length > 120 ? preview.slice(0, 117) + "…" : preview;
     banner.replaceChildren();
     const title = document.createElement("div");
@@ -3608,12 +3614,80 @@
     previewEl.textContent = short;
     banner.append(title, msg, previewEl);
   }
+  function rephraseWithGemini(text) {
+    const apiKey = GM_getValue("jpGeminiApiKey", "");
+    if (!apiKey) return Promise.resolve(text);
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        headers: { "Content-Type": "application/json" },
+        data: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, płynnym językiem polskim, zachowując wszystkie fakty techniczne i parametry. Popraw styl, usuń nadmiarowe słowa i sztuczne zwroty charakterystyczne dla tłumaczenia maszynowego. Odpowiedz wyłącznie przepisanym tekstem, bez żadnych komentarzy ani wyjaśnień.
+
+${text}`
+            }]
+          }],
+          generationConfig: { maxOutputTokens: 800 }
+        }),
+        timeout: 3e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            resolve(improved && improved.length > 30 ? improved : text);
+          } catch (_) {
+            resolve(text);
+          }
+        },
+        onerror: () => resolve(text),
+        ontimeout: () => resolve(text)
+      });
+    });
+  }
+  function extractAnyDescriptionText() {
+    const candidates = [];
+    const panelSelectors = [
+      ".kno-rdesc span",
+      '[data-attrid="wa:/description"] span',
+      '[data-attrid*="description"] span',
+      ".X5LH0c",
+      ".LGOjhe",
+      ".PZPZlf"
+    ];
+    for (const sel of panelSelectors) {
+      for (const el of document.querySelectorAll(sel)) {
+        const text = (el.innerText || "").trim();
+        if (text.length >= 60 && !isNoiseLine(text) && !isShoppingOrJunkLine(text)) {
+          candidates.push(text);
+          if (candidates.length >= 3) break;
+        }
+      }
+      if (candidates.length >= 3) break;
+    }
+    if (candidates.length === 0) {
+      for (const p of document.querySelectorAll("p")) {
+        if (p.closest('nav, header, footer, [role="navigation"], [role="banner"]')) continue;
+        const text = (p.innerText || "").trim();
+        if (text.length < 80) continue;
+        if (isNoiseLine(text) || isShoppingOrJunkLine(text)) continue;
+        candidates.push(text);
+        if (candidates.length >= 5) break;
+      }
+    }
+    if (candidates.length === 0) return null;
+    const merged = mergeIntoParagraphs(candidates);
+    return merged.length >= 60 ? merged : null;
+  }
   async function processAiOverview(rawText) {
     if (!rawText || rawText === _lastProcessedOverview) return;
     _lastProcessedOverview = rawText;
     try {
       const translated = await translateToPolish(rawText);
-      const formatted = formatDescription(translated);
+      const rephrased = await rephraseWithGemini(translated);
+      const formatted = formatDescription(rephrased);
       if (!formatted) return;
       storePendingDescription(formatted);
       await copyToClipboard(formatted);
@@ -3625,12 +3699,23 @@
   }
   function watchForAiOverview() {
     let debounceTimer = null;
+    if (isLensFlowActive()) showWatchingBanner();
+    GM_addValueChangeListener(LENS_FLOW_KEY, (_key, _old, newVal) => {
+      if (newVal === "1") showWatchingBanner();
+    });
     const scan = () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
+      debounceTimer = setTimeout(async () => {
         if (!isLensFlowActive()) return;
         const text = extractAiOverviewText();
-        if (text) processAiOverview(text);
+        if (text) {
+          await processAiOverview(text);
+          return;
+        }
+        const s = document.getElementById("jp-lens-ai-status");
+        if (s && s.textContent.startsWith("Szukam")) {
+          s.textContent = "Szukam opisu AI Overview… (brak AI Overview na stronie — spróbuj ręcznie)";
+        }
       }, 1500);
     };
     const observer = new MutationObserver(scan);
@@ -3642,70 +3727,52 @@
     _googleInitialized = true;
     watchForAiOverview();
   }
-  function getDescriptionEditor2() {
+  function getTipTapEditor2() {
     const iframe = document.querySelector('iframe[src*="description/edit"]');
     if (!iframe) return null;
     try {
-      const iframeDoc = iframe.contentDocument;
-      const editor = iframeDoc?.querySelector(".redactor-editor");
-      if (!iframeDoc || !editor) return null;
-      return { iframeDoc, iframeWin: iframe.contentWindow, editor };
+      const doc = iframe.contentDocument;
+      return doc?.querySelector('div.ProseMirror[contenteditable="true"]') || doc?.querySelector('div[contenteditable="true"]');
     } catch (_) {
       return null;
     }
   }
-  function getRedactorHtml3(iframeWin, editor) {
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      if ($textarea.length) {
-        const r = $textarea.data("redactor");
-        if (r) {
-          return r.$editor ? r.$editor.html() : r.get ? r.get() : editor.innerHTML;
-        }
-      }
-    }
+  function getTipTapHtml2(editor) {
     return editor.innerHTML;
   }
-  function setRedactorHtml2(iframeWin, editor, html) {
-    const $ = iframeWin.$;
-    if ($) {
-      const $textarea = $('textarea[name="description"], textarea').first();
-      if ($textarea.length) {
-        const r = $textarea.data("redactor");
-        if (r) {
-          if (typeof r.set === "function") {
-            r.set(html);
-          } else if (r.$editor) {
-            r.$editor.html(html);
-            if (typeof r.sync === "function") r.sync();
-          } else {
-            editor.innerHTML = html;
-          }
-          const ta = $textarea[0];
-          if (ta) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-              iframeWin.HTMLTextAreaElement.prototype,
-              "value"
-            )?.set;
-            if (nativeSetter) nativeSetter.call(ta, ta.value);
-            ta.dispatchEvent(new iframeWin.Event("input", { bubbles: true }));
-            ta.dispatchEvent(new iframeWin.Event("change", { bubbles: true }));
-          }
-          return;
-        }
-      }
+  function appendTipTapHtml(editor, html) {
+    const doc = editor.ownerDocument;
+    const win = doc.defaultView;
+    editor.focus();
+    const range = doc.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    const sel = win.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("insertHTML", false, html);
+  }
+  function getToolbarBtnRow2() {
+    const iframe = document.querySelector('iframe[src*="description/edit"]');
+    if (!iframe) return null;
+    let iframeDoc;
+    try {
+      iframeDoc = iframe.contentDocument;
+    } catch (_) {
+      return null;
     }
-    editor.innerHTML = html;
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    if (!iframeDoc?.body) return null;
+    const toolbar = iframeDoc.querySelector('[role="toolbar"]');
+    if (!toolbar) return null;
+    return toolbar.querySelector(".overflow--scrollX-raw .flex") || toolbar.querySelector(".flex.gap--all-2") || null;
   }
   function appendDescriptionText(text) {
-    const ctx = getDescriptionEditor2();
-    if (!ctx) return false;
+    const editor = getTipTapEditor2();
+    if (!editor) return false;
     const htmlBlock = text.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
-    const current = getRedactorHtml3(ctx.iframeWin, ctx.editor);
+    const current = getTipTapHtml2(editor);
     const separator = current.trim() ? "<p><br></p>" : "";
-    setRedactorHtml2(ctx.iframeWin, ctx.editor, current + separator + htmlBlock);
+    appendTipTapHtml(editor, separator + htmlBlock);
     return true;
   }
   function pastePendingDescription(btn) {
@@ -3756,54 +3823,39 @@
     }
     openLensForDescription(btn);
   }
-  function injectLensAiToolbarBtn(targetDoc) {
-    const toolbar = targetDoc.querySelector(".toolbar");
-    if (!toolbar) return false;
-    if (toolbar.querySelector(".jp-toolbar-lens-ai-btn")) return true;
-    const btn = targetDoc.createElement("button");
+  function injectLensAiToolbarBtn() {
+    const btnRow = getToolbarBtnRow2();
+    if (!btnRow) return false;
+    if (btnRow.querySelector(".jp-toolbar-lens-ai-btn")) return true;
+    const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "button button--type-tag button--mode-light button--square jp-toolbar-lens-ai-btn";
+    btn.className = "button button--type-text button--mode-secondary button--square space--h-2 space--v-2 size--all-m bRad--a button button--type-editor jp-toolbar-lens-ai-btn";
     btn.title = t("mToolbarLensAiTitle");
     btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">AI</span>';
     btn.addEventListener("click", () => handleAiToolbarClick(btn));
-    toolbar.appendChild(btn);
+    btnRow.appendChild(btn);
     return true;
   }
-  function watchIframeToolbar3(iframe, iframeDoc) {
-    if (_watchedIframes3.has(iframe)) return;
-    _watchedIframes3.add(iframe);
-    const innerObs = new MutationObserver(() => {
-      if (injectLensAiToolbarBtn(iframeDoc)) {
-        innerObs.disconnect();
-        _innerObservers.delete(iframe);
-      }
-    });
-    _innerObservers.set(iframe, innerObs);
-    innerObs.observe(iframeDoc.body, { childList: true, subtree: true });
-  }
   function watchForDescriptionToolbar3() {
-    function doCheckAndInject() {
-      injectLensAiToolbarBtn(document);
-      const iframe = document.querySelector('iframe[src*="description/edit"]');
-      if (!iframe) return;
-      let iframeDoc;
-      try {
-        iframeDoc = iframe.contentDocument;
-      } catch (_) {
-        return;
-      }
-      if (!iframeDoc?.body) return;
-      if (!injectLensAiToolbarBtn(iframeDoc)) {
-        watchIframeToolbar3(iframe, iframeDoc);
-      }
-    }
-    function checkAndInject() {
+    function tryInject() {
       clearTimeout(_toolbarDebounceTimer);
-      _toolbarDebounceTimer = setTimeout(doCheckAndInject, 400);
+      _toolbarDebounceTimer = setTimeout(() => {
+        injectLensAiToolbarBtn();
+        const iframe = document.querySelector('iframe[src*="description/edit"]');
+        if (!iframe || iframe._jpLensWatching) return;
+        let iframeDoc;
+        try {
+          iframeDoc = iframe.contentDocument;
+        } catch (_) {
+          return;
+        }
+        if (!iframeDoc?.body) return;
+        iframe._jpLensWatching = true;
+        new MutationObserver(() => injectLensAiToolbarBtn()).observe(iframeDoc.body, { childList: true, subtree: true });
+      }, 400);
     }
-    const parentObs = new MutationObserver(checkAndInject);
-    parentObs.observe(document.body, { childList: true, subtree: true });
-    checkAndInject();
+    new MutationObserver(tryInject).observe(document.body, { childList: true, subtree: true });
+    tryInject();
   }
   function initLensDescriptionPaste(settings3) {
     if (_pasteInitialized || settings3.enableLensDescription === false) return;
@@ -9743,6 +9795,294 @@
     });
   }
 
+  // src/features/commentTemplates.js
+  var STORAGE_KEY4 = "jpCommentTemplates";
+  var _stylesInjected5 = false;
+  var _initialized2 = false;
+  var _activePopover = null;
+  var _outsideHandler = null;
+  var DEFAULT_TEMPLATES = [
+    {
+      id: "no_vote",
+      label: "Nie spełnia warunków podbić",
+      text: "Hej, przykro mi, ale okazja nie spełnia warunków podbić - [powód]. Więcej o podbiciach przeczytasz tutaj: https://www.pepper.pl/dyskusji/aktualizacja-zasad-podbijania-okazji-392175",
+      placeholder: "[powód]"
+    },
+    {
+      id: "voted",
+      label: "Okazja podbita",
+      text: "Hej, Twoja okazja właśnie została podbita! Dziękujemy za dodanie wartościowej okazji :)"
+    },
+    {
+      id: "expiry_date",
+      label: "Termin przydatności",
+      text: "Podaj proszę termin przydatności do spożycia produktu z okazji :)"
+    }
+  ];
+  function migrateTemplates(templates) {
+    return templates.map((tpl) => {
+      if (tpl.id === "no_vote" && tpl.text.includes("pepper.pl/dys…175")) {
+        return { ...tpl, text: tpl.text.replace("pepper.pl/dys…175", "https://www.pepper.pl/dyskusji/aktualizacja-zasad-podbijania-okazji-392175") };
+      }
+      return tpl;
+    });
+  }
+  function getTemplates() {
+    try {
+      const raw = GM_getValue(STORAGE_KEY4, null);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const migrated = migrateTemplates(parsed);
+          if (JSON.stringify(migrated) !== raw) saveTemplates(migrated);
+          return migrated;
+        }
+      }
+    } catch (_) {
+    }
+    return DEFAULT_TEMPLATES;
+  }
+  function saveTemplates(templates) {
+    GM_setValue(STORAGE_KEY4, JSON.stringify(templates));
+  }
+  function injectStyles7() {
+    if (_stylesInjected5) return;
+    _stylesInjected5 = true;
+    GM_addStyle(`
+        .jp-qr-btn { position: relative; }
+        .jp-qr-popover {
+            position: fixed;
+            z-index: 99999;
+            background: var(--jp-bg, #2a2b2e);
+            border: 1px solid var(--jp-border, #555);
+            border-radius: 6px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+            min-width: 240px;
+            max-width: 360px;
+            font-size: 12px;
+            overflow: hidden;
+        }
+        .jp-qr-popover-header {
+            padding: 7px 12px 5px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            color: var(--jp-text-muted, #888);
+            border-bottom: 1px solid var(--jp-border, #444);
+        }
+        .jp-qr-popover-list {
+            list-style: none;
+            margin: 0;
+            padding: 4px 0;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+        .jp-qr-popover-item {
+            padding: 7px 12px;
+            cursor: pointer;
+            color: var(--jp-text, #ddd);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+        }
+        .jp-qr-popover-item:hover { background: rgba(255,255,255,0.07); }
+        .jp-qr-popover-item.jp-qr-active { background: rgba(192,57,43,0.15); }
+        .jp-qr-placeholder-form {
+            padding: 9px 11px 10px;
+            border-top: 1px solid var(--jp-border, #444);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .jp-qr-placeholder-label {
+            color: var(--jp-text-muted, #999);
+            font-size: 11px;
+        }
+        .jp-qr-placeholder-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px 7px;
+            border: 1px solid var(--jp-border, #555);
+            border-radius: 4px;
+            background: var(--jp-input-bg, #1e1f21);
+            color: var(--jp-text, #ddd);
+            font-size: 12px;
+            outline: none;
+        }
+        .jp-qr-placeholder-input:focus { border-color: #c0392b; }
+        .jp-qr-placeholder-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .jp-qr-placeholder-submit {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #c0392b;
+            color: #fff;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .jp-qr-placeholder-submit:hover { background: #e74c3c; }
+    `);
+  }
+  function closePopover() {
+    if (_outsideHandler) {
+      document.removeEventListener("mousedown", _outsideHandler);
+      _outsideHandler = null;
+    }
+    if (_activePopover) {
+      _activePopover.remove();
+      _activePopover = null;
+    }
+  }
+  function getEditorForToolbar(toolbar) {
+    let el = toolbar.parentElement;
+    while (el && el !== document.body) {
+      const editor = el.querySelector('div.ProseMirror[contenteditable="true"]');
+      if (editor) return editor;
+      el = el.parentElement;
+    }
+    return document.querySelector('div.ProseMirror[contenteditable="true"]');
+  }
+  function insertText(editor, text) {
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    document.execCommand("insertText", false, text);
+  }
+  function showPlaceholderForm(popover, activeItem, tpl, editor) {
+    popover.querySelector(".jp-qr-placeholder-form")?.remove();
+    const form = document.createElement("div");
+    form.className = "jp-qr-placeholder-form";
+    const label = document.createElement("div");
+    label.className = "jp-qr-placeholder-label";
+    label.textContent = tpl.placeholder.replace(/[\[\]]/g, "") + ":";
+    const row = document.createElement("div");
+    row.className = "jp-qr-placeholder-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "jp-qr-placeholder-input";
+    input.placeholder = tpl.placeholder.replace(/[\[\]]/g, "");
+    const submit = document.createElement("button");
+    submit.type = "button";
+    submit.className = "jp-qr-placeholder-submit";
+    submit.textContent = "Wstaw";
+    const doInsert = () => {
+      const value = input.value.trim() || tpl.placeholder;
+      insertText(editor, tpl.text.replace(tpl.placeholder, value));
+      closePopover();
+    };
+    submit.addEventListener("click", doInsert);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doInsert();
+      }
+      if (e.key === "Escape") closePopover();
+    });
+    row.appendChild(input);
+    row.appendChild(submit);
+    form.appendChild(label);
+    form.appendChild(row);
+    popover.appendChild(form);
+    requestAnimationFrame(() => input.focus());
+  }
+  function openPopover(btn, toolbar) {
+    closePopover();
+    const templates = getTemplates();
+    const editor = getEditorForToolbar(toolbar);
+    const popover = document.createElement("div");
+    popover.className = "jp-qr-popover";
+    _activePopover = popover;
+    const header = document.createElement("div");
+    header.className = "jp-qr-popover-header";
+    header.textContent = t("mQuickReplyPopoverHeader");
+    popover.appendChild(header);
+    const list = document.createElement("ul");
+    list.className = "jp-qr-popover-list";
+    for (const tpl of templates) {
+      const li = document.createElement("li");
+      li.className = "jp-qr-popover-item";
+      li.textContent = tpl.label;
+      li.title = tpl.text;
+      li.addEventListener("click", () => {
+        list.querySelectorAll(".jp-qr-active").forEach((el) => el.classList.remove("jp-qr-active"));
+        li.classList.add("jp-qr-active");
+        if (tpl.placeholder && editor) {
+          showPlaceholderForm(popover, li, tpl, editor);
+        } else if (editor) {
+          insertText(editor, tpl.text);
+          closePopover();
+        }
+      });
+      list.appendChild(li);
+    }
+    popover.appendChild(list);
+    document.body.appendChild(popover);
+    const rect = btn.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      const popH = popover.offsetHeight;
+      const top = Math.max(8, rect.top - popH - 6);
+      popover.style.top = top + "px";
+      popover.style.left = Math.min(rect.left, window.innerWidth - popover.offsetWidth - 8) + "px";
+    });
+    _outsideHandler = (e) => {
+      if (_activePopover && !_activePopover.contains(e.target) && e.target !== btn) {
+        closePopover();
+      }
+    };
+    setTimeout(() => document.addEventListener("mousedown", _outsideHandler), 0);
+  }
+  function togglePopover(btn, toolbar) {
+    if (_activePopover) {
+      closePopover();
+      return;
+    }
+    openPopover(btn, toolbar);
+  }
+  function injectIntoToolbar(toolbar) {
+    const btnRow = toolbar.querySelector(".overflow--scrollX-raw .flex") || toolbar.querySelector(".flex.gap--all-2");
+    if (!btnRow) return false;
+    if (btnRow.querySelector(".jp-qr-btn")) return true;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "button button--type-text button--mode-secondary button--square space--h-2 space--v-2 size--all-m bRad--a button button--type-editor jp-qr-btn";
+    btn.title = t("mQuickReplyTitle");
+    btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">QR</span>';
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      togglePopover(btn, toolbar);
+    });
+    btnRow.appendChild(btn);
+    return true;
+  }
+  function scanAndInject() {
+    document.querySelectorAll('[role="toolbar"].tip-tap-editor--toolbar').forEach((toolbar) => {
+      injectIntoToolbar(toolbar);
+    });
+  }
+  function initCommentTemplates() {
+    if (_initialized2) return;
+    _initialized2 = true;
+    injectStyles7();
+    const obs = new MutationObserver(scanAndInject);
+    obs.observe(document.body, { childList: true, subtree: true });
+    scanAndInject();
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -9798,6 +10138,7 @@
       enableReverseImageSearch: true,
       enableProductInspector: true,
       enableLinkExpander: true,
+      enableCommentTemplates: true,
       enableLensDescription: true,
       enableAllegroImages: true,
       enableCategoryAdvisor: true,
@@ -9840,6 +10181,11 @@
       if (settings3.enableShopInfo !== false && isShopInfoTabContext()) runShopInfoTabContext();
       return;
     }
+    const isPromocjePage = /^\/promocje\//.test(location.pathname);
+    if (isPromocjePage) {
+      if (settings3.enableCommentTemplates) initCommentTemplates();
+      return;
+    }
     initAnalytics();
     checkForScriptUpdate();
     function saveSettings(newSettings) {
@@ -9852,6 +10198,7 @@
     if (settings3.enableSnippets) initSnippets();
     if (settings3.enableCheatsheet) initCheatsheet(settings3);
     if (settings3.enableMerchantNotes) initAutopromoTracker();
+    if (settings3.enableCommentTemplates) initCommentTemplates();
     if (settings3.enableGeekStats) initGeekStats();
     if (settings3.enableEyeBreak && location.pathname.includes("/deals/new")) initEyeBreak(settings3.eyeBreakMinute ?? 50);
     function initEyeBreak(targetMinute) {
@@ -9986,6 +10333,7 @@
           settingsModuleToggle("set-infraction-note", s.enableInfractionNote, "mInfracNote", "mInfracNoteHint"),
           settingsModuleToggle("set-merchant-notes", s.enableMerchantNotes, "lblMerchantNotes", "lblMerchantNotesHint"),
           settingsModuleToggle("set-approve-reasons", s.enableApproveReasons, "mApproveReasons", "mApproveReasonsHint"),
+          settingsModuleToggle("set-comment-templates", s.enableCommentTemplates, "mCommentTemplates", "mCommentTemplatesHint"),
           settingsModuleToggle("set-move-approve", s.enableMoveApproveBtn, "mMoveApprove", "mMoveApproveHint")
         ]),
         settingsModuleGroup("secModQueue", "secModQueueDesc", [
@@ -10110,6 +10458,11 @@
                         <label>${t("lblEyeBreakMinute")}</label>
                         <input type="number" id="set-eye-break-minute" min="0" max="59" value="${settings3.eyeBreakMinute ?? 50}" style="width:100%">
                         <div class="jp-settings-field-hint">${t("lblEyeBreakMinuteHint")}</div>
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <label>${t("lblGeminiApiKey")}</label>
+                        <input type="password" id="set-gemini-key" value="${GM_getValue("jpGeminiApiKey", "")}" placeholder="AIza..." style="width:100%; font-family: monospace;">
+                        <div class="jp-settings-field-hint">${t("lblGeminiApiKeyHint")}</div>
                     </div>
                 </div>
 
@@ -10276,6 +10629,7 @@
       updatePreview();
       document.getElementById("btn-save-settings").onclick = () => {
         const hidden = Array.from(document.querySelectorAll(".hide-btn-check:checked")).map((el) => el.value);
+        GM_setValue("jpGeminiApiKey", document.getElementById("set-gemini-key").value.trim());
         saveSettings({
           theme: document.getElementById("set-theme").value,
           language: document.getElementById("set-lang").value,
@@ -10311,6 +10665,7 @@
           enableMerchantNotes: document.getElementById("set-merchant-notes").checked,
           enableShippingCosts: document.getElementById("set-shipping-costs").checked,
           enableApproveReasons: document.getElementById("set-approve-reasons").checked,
+          enableCommentTemplates: document.getElementById("set-comment-templates").checked,
           enableLockButtons: document.getElementById("set-lock-buttons").checked,
           enableBannedHighlight: document.getElementById("set-banned-highlight").checked,
           shippingPanelTopOffset: parseInt(document.getElementById("set-shipping-offset").value) || 0,
