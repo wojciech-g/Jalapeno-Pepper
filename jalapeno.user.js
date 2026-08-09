@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.18
+// @version      5.0.20
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -1710,8 +1710,11 @@
       lblDealDateCustomHint: "Dodaje własny przycisk w panelu daty. Format: DD.MM.YYYY lub DD.MM.YYYY HH:MM (np. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Minuta przerwy wzrokowej (0–59):",
       lblEyeBreakMinuteHint: "O której minucie każdej godziny wyświetlić przypomnienie. Np. 50 = zawsze o XX:50.",
-      lblGeminiApiKey: "Klucz Gemini API (opcjonalny):",
-      lblGeminiApiKeyHint: "Darmowy klucz z aistudio.google.com — poprawia naturalność opisów AI Overview. Bez klucza działa standardowe tłumaczenie.",
+      lblGeminiApiKey: "Klucz Gemini API (opcjonalny, fallback):",
+      lblGeminiApiKeyHint: "Zapasowe AI — darmowy klucz z Google AI Studio, model Gemini 3.6 Flash. Używany gdy Groq jest niedostępny lub nie skonfigurowany. Bez żadnego klucza działa standardowe tłumaczenie i prosta zamiana na małe litery.",
+      lblGeminiApiKeyLink: "Jak zdobyć klucz?",
+      lblGroqApiKey: "Klucz Groq API (opcjonalny, zalecany):",
+      lblGroqApiKeyHint: "Główne AI skryptu — darmowy klucz z console.groq.com, model Llama 3.3. Używany jako pierwszy do przepisywania opisów i poprawy wielkości liter w tytułach. Hojny darmowy limit (1000+ zapytań/dzień).",
       mPriceWarning: "Alert wzrostu ceny na liście",
       mImageSearch: "Wyszukiwanie obrazem (Lens)",
       mProductInspector: "Inspektor produktu (EAN / ASIN)",
@@ -1789,9 +1792,14 @@
       mCopyBarcodeError: "❌ Nie udało się skopiować barcode: ",
       mApproveReasons: "Szablony wiadomości (Approve & Send PM)",
       mCommentTemplates: "Szybkie odpowiedzi w komentarzach",
-      mCommentTemplatesHint: "Przycisk QR w pasku narzędzi edytora komentarzy — pozwala wstawić predefiniowane wiadomości (np. odrzucenie podbicia).",
+      mCommentTemplatesHint: "Przycisk QR w pasku narzędzi edytora komentarzy — pozwala wstawić predefiniowane wiadomości (np. odrzucenie podbicia, blokada sekcji komentarzy).",
       mQuickReplyTitle: "Szybka odpowiedź",
       mQuickReplyPopoverHeader: "Wybierz szablon",
+      mDealReviewer: "Asystent oceny okazji (AI)",
+      mDealReviewerHint: "Panel Ocena AI w panelu bocznym — automatycznie analizuje tytuł, opis, cenę i sklep po otwarciu formularza. Wymaga klucza Groq lub Gemini API.",
+      mTitleCase: "Poprawianie wielkości liter w tytule",
+      mTitleCaseHint: 'Przycisk "Aa" przy polu tytułu — zamienia CAPS LOCK na poprawne litery. Z kluczem Gemini lub Groq API zachowuje nazwy marek i skróty techniczne; bez klucza prosta zamiana na małe litery.',
+      mTitleCaseTitle: "Popraw wielkość liter w tytule (Aa)",
       // Analytics
       secAnalytics: "📊 Statystyki Produktywności",
       statUsageHeader: "Użycie",
@@ -2089,8 +2097,11 @@
       lblDealDateCustomHint: "Adds a custom button to the date panel. Format: DD.MM.YYYY or DD.MM.YYYY HH:MM (e.g. 31.12.2026 23:59).",
       lblEyeBreakMinute: "Eye break minute (0–59):",
       lblEyeBreakMinuteHint: "Which minute of every hour to show the reminder. E.g. 50 = always at XX:50.",
-      lblGeminiApiKey: "Gemini API key (optional):",
-      lblGeminiApiKeyHint: "Free key from aistudio.google.com — improves naturalness of AI Overview descriptions. Without the key, standard translation is used.",
+      lblGeminiApiKey: "Gemini API key (optional, fallback):",
+      lblGeminiApiKeyHint: "Fallback AI — free key from Google AI Studio, Gemini 3.6 Flash model. Used when Groq is unavailable or not configured. Without either key, standard translation and simple lowercasing are used.",
+      lblGeminiApiKeyLink: "How to get the key?",
+      lblGroqApiKey: "Groq API key (optional, recommended):",
+      lblGroqApiKeyHint: "Primary AI — free key from console.groq.com, Llama 3.3 model. Used first for rephrasing descriptions and fixing title capitalisation. Generous free tier (1000+ requests/day).",
       mPriceWarning: "Price rise alert on queue list",
       mImageSearch: "Reverse Image Search (Google Lens)",
       mProductInspector: "Product Inspector (EAN / ASIN)",
@@ -2168,9 +2179,14 @@
       mCopyBarcodeError: "❌ Could not copy barcode: ",
       mApproveReasons: "Message templates (Approve & Send PM)",
       mCommentTemplates: "Quick replies in comments",
-      mCommentTemplatesHint: "QR button in the comment editor toolbar — insert predefined messages (e.g. voting rejection).",
+      mCommentTemplatesHint: "QR button in the comment editor toolbar — insert predefined messages (e.g. voting rejection, comment section lock).",
       mQuickReplyTitle: "Quick reply",
       mQuickReplyPopoverHeader: "Select template",
+      mDealReviewer: "AI deal reviewer",
+      mDealReviewerHint: '"AI review" panel in the side stack — automatically analyses title, description, price and merchant when the deal form opens. Requires a Groq or Gemini API key.',
+      mTitleCase: "Title case fixer",
+      mTitleCaseHint: '"Aa" button next to the title field — converts ALL CAPS to proper casing. With a Gemini or Groq API key it preserves brand names and technical abbreviations; without the key it just lowercases everything.',
+      mTitleCaseTitle: "Fix title capitalisation (Aa)",
       // Analytics
       secAnalytics: "📊 Productivity Statistics",
       statUsageHeader: "Usage",
@@ -3599,7 +3615,7 @@
     closeBtn.addEventListener("click", () => banner.remove());
     banner.append(title, status, captureBtn, closeBtn);
   }
-  function showGoogleBanner(preview) {
+  function showGoogleBanner(preview, aiUsed, aiProvider, aiError) {
     const banner = getBanner();
     const short = preview.length > 120 ? preview.slice(0, 117) + "…" : preview;
     banner.replaceChildren();
@@ -3607,45 +3623,142 @@
     title.style.cssText = "font-weight:700;color:#4fc3f7;margin-bottom:6px;";
     title.textContent = "🌶️ Jalapeño";
     const msg = document.createElement("div");
-    msg.style.marginBottom = "8px";
+    msg.style.marginBottom = "4px";
     msg.textContent = t("mLensAiCopied");
+    const badge = document.createElement("div");
+    const hasAnyKey = !!GM_getValue("jpGeminiApiKey", "") || !!GM_getValue("jpGroqApiKey", "");
+    if (aiUsed && aiProvider) {
+      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#81c995;";
+      badge.textContent = `✅ Przepisano przez ${aiProvider}`;
+    } else if (hasAnyKey && aiError) {
+      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#f28b82;";
+      const shortError = aiError.length > 80 ? aiError.slice(0, 77) + "…" : aiError;
+      badge.textContent = `⚠️ AI błąd: ${shortError}`;
+    } else if (hasAnyKey) {
+      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#f28b82;";
+      badge.textContent = "⚠️ AI niedostępny";
+    }
     const previewEl = document.createElement("div");
     previewEl.style.cssText = "font-size:11px;color:#b9bbbe;max-height:72px;overflow:hidden;";
     previewEl.textContent = short;
-    banner.append(title, msg, previewEl);
+    banner.append(title, msg, badge, previewEl);
   }
   function rephraseWithGemini(text) {
     const apiKey = GM_getValue("jpGeminiApiKey", "");
-    if (!apiKey) return Promise.resolve(text);
+    if (!apiKey) return Promise.resolve({ text, used: false, error: null });
     return new Promise((resolve) => {
       GM_xmlhttpRequest({
         method: "POST",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        headers: { "Content-Type": "application/json" },
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         data: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, płynnym językiem polskim, zachowując wszystkie fakty techniczne i parametry. Popraw styl, usuń nadmiarowe słowa i sztuczne zwroty charakterystyczne dla tłumaczenia maszynowego. Odpowiedz wyłącznie przepisanym tekstem, bez żadnych komentarzy ani wyjaśnień.
+              text: `Jesteś redaktorem tekstów na polski portal z okazjami zakupowymi. Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, żywym językiem polskim — tak, żeby brzmiał jak napisany przez człowieka, a nie przez automat. Zachowaj wszystkie dane techniczne i parametry produktu. Usuń sztuczne sformułowania, powtórzenia i kalki językowe. Tekst powinien być zwięzły i zachęcający. Odpowiedz WYŁĄCZNIE przepisanym opisem, bez wstępu, komentarzy ani cudzysłowów.
 
 ${text}`
             }]
           }],
-          generationConfig: { maxOutputTokens: 800 }
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.4 }
         }),
         timeout: 3e4,
         onload(res) {
           try {
             const data = JSON.parse(res.responseText);
+            if (data.error) {
+              const msg = `${data.error.code}: ${data.error.message}`;
+              console.warn("[JP Gemini] API error:", msg);
+              resolve({ text, used: false, error: msg });
+              return;
+            }
             const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            resolve(improved && improved.length > 30 ? improved : text);
-          } catch (_) {
-            resolve(text);
+            if (improved && improved.length > 30) {
+              resolve({ text: improved, used: true, provider: "Gemini", error: null });
+            } else {
+              const msg = "pusta odpowiedź z API";
+              console.warn("[JP Gemini] Empty or too short response:", improved);
+              resolve({ text, used: false, error: msg });
+            }
+          } catch (err) {
+            const msg = `błąd parsowania: ${err.message}`;
+            console.warn("[JP Gemini] Parse error:", err, res.responseText?.slice(0, 200));
+            resolve({ text, used: false, error: msg });
           }
         },
-        onerror: () => resolve(text),
-        ontimeout: () => resolve(text)
+        onerror: (err) => {
+          const msg = `błąd sieci: ${JSON.stringify(err).slice(0, 80)}`;
+          console.warn("[JP Gemini] Network error:", err);
+          resolve({ text, used: false, error: msg });
+        },
+        ontimeout: () => {
+          console.warn("[JP Gemini] Request timed out");
+          resolve({ text, used: false, error: "timeout (>30s)" });
+        }
       });
     });
+  }
+  var AI_PROMPT = `Jesteś redaktorem tekstów na polski portal z okazjami zakupowymi. Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, żywym językiem polskim — tak, żeby brzmiał jak napisany przez człowieka, a nie przez automat. Zachowaj wszystkie dane techniczne i parametry produktu. Usuń sztuczne sformułowania, powtórzenia i kalki językowe. Tekst powinien być zwięzły i zachęcający. Odpowiedz WYŁĄCZNIE przepisanym opisem, bez wstępu, komentarzy ani cudzysłowów.`;
+  function rephraseWithGroq(text) {
+    const apiKey = GM_getValue("jpGroqApiKey", "");
+    if (!apiKey) return Promise.resolve({ text, used: false, provider: null, error: null });
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        data: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: AI_PROMPT },
+            { role: "user", content: text }
+          ],
+          max_tokens: 1e3,
+          temperature: 0.4
+        }),
+        timeout: 3e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data.error) {
+              const msg = `${data.error.type || data.error.code}: ${data.error.message}`;
+              console.warn("[JP Groq] API error:", msg);
+              resolve({ text, used: false, provider: null, error: `Groq: ${msg}` });
+              return;
+            }
+            const improved = data?.choices?.[0]?.message?.content?.trim();
+            if (improved && improved.length > 30) {
+              resolve({ text: improved, used: true, provider: "Groq", error: null });
+            } else {
+              console.warn("[JP Groq] Empty response:", improved);
+              resolve({ text, used: false, provider: null, error: "Groq: pusta odpowiedź" });
+            }
+          } catch (err) {
+            console.warn("[JP Groq] Parse error:", err);
+            resolve({ text, used: false, provider: null, error: `Groq: błąd parsowania` });
+          }
+        },
+        onerror: (err) => {
+          console.warn("[JP Groq] Network error:", err);
+          resolve({ text, used: false, provider: null, error: "Groq: błąd sieci" });
+        },
+        ontimeout: () => {
+          console.warn("[JP Groq] Timeout");
+          resolve({ text, used: false, provider: null, error: "Groq: timeout" });
+        }
+      });
+    });
+  }
+  async function rephraseWithAI(text) {
+    const groqKey = GM_getValue("jpGroqApiKey", "");
+    if (groqKey) {
+      const result = await rephraseWithGroq(text);
+      if (result.used) return result;
+    }
+    const geminiKey = GM_getValue("jpGeminiApiKey", "");
+    if (geminiKey) {
+      return rephraseWithGemini(text);
+    }
+    return { text, used: false, provider: null, error: null };
   }
   function extractAnyDescriptionText() {
     const candidates = [];
@@ -3686,13 +3799,13 @@ ${text}`
     _lastProcessedOverview = rawText;
     try {
       const translated = await translateToPolish(rawText);
-      const rephrased = await rephraseWithGemini(translated);
+      const { text: rephrased, used: aiUsed, provider: aiProvider, error: aiError } = await rephraseWithAI(translated);
       const formatted = formatDescription(rephrased);
       if (!formatted) return;
       storePendingDescription(formatted);
       await copyToClipboard(formatted);
       increment("lensDescriptionsGenerated");
-      showGoogleBanner(formatted);
+      showGoogleBanner(formatted, aiUsed, aiProvider, aiError);
     } catch (err) {
       console.warn("[JP LensAI] Processing failed:", err);
     }
@@ -3703,7 +3816,7 @@ ${text}`
     GM_addValueChangeListener(LENS_FLOW_KEY, (_key, _old, newVal) => {
       if (newVal === "1") showWatchingBanner();
     });
-    const scan = () => {
+    const scan2 = () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
         if (!isLensFlowActive()) return;
@@ -3718,9 +3831,9 @@ ${text}`
         }
       }, 1500);
     };
-    const observer = new MutationObserver(scan);
+    const observer = new MutationObserver(scan2);
     observer.observe(document.body, { childList: true, subtree: true });
-    scan();
+    scan2();
   }
   function initLensAiOverview(settings3) {
     if (_googleInitialized || settings3.enableLensDescription === false) return;
@@ -9811,12 +9924,22 @@ ${text}`
     {
       id: "voted",
       label: "Okazja podbita",
-      text: "Hej, Twoja okazja właśnie została podbita! Dziękujemy za dodanie wartościowej okazji :)"
+      text: "Hej, Twoja okazja właśnie została podbita!"
     },
     {
       id: "expiry_date",
       label: "Termin przydatności",
       text: "Podaj proszę termin przydatności do spożycia produktu z okazji :)"
+    },
+    {
+      id: "lock_reflinks",
+      label: "Blokada (Bestsecret / reflinki)",
+      text: "Sekcja komentarzy pod tą okazją została zablokowana ze względu na powtarzające się naruszenia Regulaminu (reflinki). Zachęcamy do korzystania z programu polecającego i dodawania swoich linków tutaj: https://www.pepper.pl/search/referral-offer?merchant-id=2539"
+    },
+    {
+      id: "lock_policy",
+      label: "Blokada (spam / polityka)",
+      text: "Sekcja komentarzy pod tą okazją została zablokowana ze względu na powtarzające się naruszenia Regulaminu (spam/polityka). Zachęcamy do merytorycznej dyskusji pod innymi okazjami :)"
     }
   ];
   function migrateTemplates(templates) {
@@ -9951,16 +10074,13 @@ ${text}`
     }
     return document.querySelector('div.ProseMirror[contenteditable="true"]');
   }
-  function insertText(editor, text) {
+  function replaceText(editor, text) {
     editor.focus();
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) {
-      const range = document.createRange();
-      range.selectNodeContents(editor);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    sel.removeAllRanges();
+    sel.addRange(range);
     document.execCommand("insertText", false, text);
   }
   function showPlaceholderForm(popover, activeItem, tpl, editor) {
@@ -9982,7 +10102,7 @@ ${text}`
     submit.textContent = "Wstaw";
     const doInsert = () => {
       const value = input.value.trim() || tpl.placeholder;
-      insertText(editor, tpl.text.replace(tpl.placeholder, value));
+      replaceText(editor, tpl.text.replace(tpl.placeholder, value));
       closePopover();
     };
     submit.addEventListener("click", doInsert);
@@ -10024,7 +10144,7 @@ ${text}`
         if (tpl.placeholder && editor) {
           showPlaceholderForm(popover, li, tpl, editor);
         } else if (editor) {
-          insertText(editor, tpl.text);
+          replaceText(editor, tpl.text);
           closePopover();
         }
       });
@@ -10081,6 +10201,369 @@ ${text}`
     const obs = new MutationObserver(scanAndInject);
     obs.observe(document.body, { childList: true, subtree: true });
     scanAndInject();
+  }
+
+  // src/features/titleCaseHelper.js
+  var _initialized3 = false;
+  function dumbTitleCase(title) {
+    const lower = title.toLowerCase();
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }
+  var TITLE_CASE_PROMPT = `Popraw wielkość liter w poniższym tytule okazji ze sklepu internetowego. Zasady:
+- Nazwy marek pisz jak producent: iPhone, iPad, MacBook, AirPods, Samsung, LEGO, PlayStation, OnePlus, Xiaomi, Garmin, Dyson itd.
+- Oznaczenia modeli i wersji: Pro, Max, Ultra, Plus — zachowaj oryginalną konwencję; jeśli producent pisze PRO lub MAX dużymi, zostaw duże
+- Skróty techniczne zachowaj bez zmian: GB, TB, RAM, SSD, USB, USB-C, HDMI, WiFi, Bluetooth, LED, OLED, AMOLED, LTE, 5G
+- Resztę słów pisz małymi literami
+- Pierwsze słowo tytułu pisz z dużej litery
+- Nie zmieniaj kolejności ani treści słów, nie tłumacz
+- Odpowiedz TYLKO poprawionym tytułem, bez komentarzy ani cudzysłowów
+
+Tytuł: `;
+  function smartTitleCaseWithGemini(title) {
+    const apiKey = GM_getValue("jpGeminiApiKey", "");
+    if (!apiKey) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        data: JSON.stringify({
+          contents: [{ parts: [{ text: TITLE_CASE_PROMPT + title }] }],
+          generationConfig: { maxOutputTokens: 200, temperature: 0 }
+        }),
+        timeout: 2e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data.error) {
+              resolve(null);
+              return;
+            }
+            const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            resolve(improved && improved.length > 2 ? improved : null);
+          } catch (_) {
+            resolve(null);
+          }
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+  function smartTitleCaseWithGroq(title) {
+    const apiKey = GM_getValue("jpGroqApiKey", "");
+    if (!apiKey) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        data: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: "You are a title case fixer for a Polish deal portal." },
+            { role: "user", content: TITLE_CASE_PROMPT + title }
+          ],
+          max_tokens: 200,
+          temperature: 0
+        }),
+        timeout: 2e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            if (data.error) {
+              resolve(null);
+              return;
+            }
+            const improved = data?.choices?.[0]?.message?.content?.trim();
+            resolve(improved && improved.length > 2 ? improved : null);
+          } catch (_) {
+            resolve(null);
+          }
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+  async function smartTitleCase(title) {
+    const result = await smartTitleCaseWithGroq(title);
+    if (result) return result;
+    const result2 = await smartTitleCaseWithGemini(title);
+    if (result2) return result2;
+    return dumbTitleCase(title);
+  }
+  async function fixTitleCase(btn, titleInput, triggerVueInput) {
+    const title = titleInput.value.trim();
+    if (!title) return;
+    const hasAnyKey = !!GM_getValue("jpGeminiApiKey", "") || !!GM_getValue("jpGroqApiKey", "");
+    const originalHTML = btn.innerHTML;
+    btn.textContent = "⏳";
+    btn.disabled = true;
+    try {
+      const fixed = hasAnyKey ? await smartTitleCase(title) : dumbTitleCase(title);
+      if (fixed && fixed !== title) {
+        await triggerVueInput(titleInput, fixed);
+      }
+      btn.textContent = "✅";
+      setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+      }, 1500);
+    } catch (_) {
+      btn.innerHTML = originalHTML;
+      btn.disabled = false;
+    }
+  }
+  function injectButton(titleInput, triggerVueInput) {
+    if (titleInput.dataset.jpTitleCase) return;
+    titleInput.dataset.jpTitleCase = "1";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "jp-titlecase-btn";
+    btn.title = t("mTitleCaseTitle");
+    btn.textContent = "Aa";
+    btn.style.cssText = [
+      "display:inline-flex",
+      "align-items:center",
+      "justify-content:center",
+      "margin-top:4px",
+      "padding:3px 10px",
+      "font-size:11px",
+      "font-weight:700",
+      "cursor:pointer",
+      "border:1px solid var(--jp-border,#555)",
+      "border-radius:4px",
+      "background:var(--jp-bg,#2a2b2e)",
+      "color:var(--jp-text,#ddd)",
+      "line-height:1.4",
+      "vertical-align:middle"
+    ].join(";");
+    btn.addEventListener("click", () => fixTitleCase(btn, titleInput, triggerVueInput));
+    titleInput.insertAdjacentElement("afterend", btn);
+  }
+  function scan(triggerVueInput) {
+    const titleInput = document.querySelector('input[placeholder="Thread title"]');
+    if (titleInput && !titleInput.dataset.jpTitleCase) {
+      injectButton(titleInput, triggerVueInput);
+    }
+  }
+  function initTitleCaseHelper(triggerVueInput) {
+    if (_initialized3) return;
+    _initialized3 = true;
+    scan(triggerVueInput);
+    const obs = new MutationObserver(() => scan(triggerVueInput));
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // src/features/dealReviewer.js
+  var SYSTEM_PROMPT = `Jesteś asystentem moderatora na polskim portalu z okazjami zakupowymi pepper.pl. Przeanalizuj okazję i zwróć listę konkretnych uwag.
+
+Dane okazji zawierają pola: Tytuł, Cena, Dostawa, Sklep, URL, Next Best Price (pole Omnibus — tylko informacyjnie), Opis.
+
+Sprawdzaj TYLKO:
+- Tytuł: CAPS LOCK (poza skrótami jak GB/RAM/LED/SSD/USB), clickbait ("SZOK!", "TYLKO DZIŚ!", nadmiar wykrzykników), zbyt krótki (<15 znaków), brak nazwy produktu
+- Opis: za krótki (<2 zdania), nie po polsku, podejrzenie linku afiliacyjnego (TYLKO linki przez znane sieci afiliacyjne lub z parametrami aff=/affiliate=/tag= — NIE flaguj: ref=, smid=, offer_id=, utm_*, fbclid=, zwykłe linki do allegro.pl/amazon.pl/ceneo.pl itp.; jeśli flagujesz użyj poziomu warn i tekstu "Możliwy link afiliacyjny?"), czysto reklamowy język bez informacji
+- Sklep: brak nazwy sklepu (puste pole)
+- URL: tylko oczywiste skracacze (bit.ly, tinyurl, t.co, shorturl itp.) — bezpośrednie linki do sklepów są OK
+
+NIE oceniaj: cen, wartości okazji, czy jest taniej gdzie indziej, Next Best Price — nie masz dostępu do internetu ani baz cen.
+
+Odpowiedz WYŁĄCZNIE jako JSON bez markdown:
+{"items":[{"level":"ok","text":"..."},{"level":"warn","text":"..."},{"level":"error","text":"..."}]}
+
+Poziomy: ok=wszystko gra, warn=warto sprawdzić, error=wyraźny problem.
+Maksymalnie 5 pozycji. Każda uwaga max 55 znaków. Zgłaszaj tylko realne problemy — nie wymyślaj.`;
+  function getDealData() {
+    const get = (sel) => {
+      const el = document.querySelector(sel);
+      return (el?.value || el?.innerText || "").trim();
+    };
+    let description = "";
+    try {
+      const preview = document.querySelector(".cept-thread-description-container");
+      if (preview) {
+        description = preview.innerText.trim();
+      } else {
+        const iframe = document.querySelector('iframe[src*="description/edit"]');
+        if (iframe?.contentDocument) {
+          description = (iframe.contentDocument.querySelector("div.ProseMirror")?.innerText || "").trim();
+        }
+      }
+    } catch (_) {
+    }
+    return {
+      title: get('input[placeholder="Thread title"]'),
+      price: get('input[placeholder="Price"]'),
+      shipping: get('input[placeholder="Shipping costs"]'),
+      merchant: get('input[placeholder="Merchant name"]') || get('input[placeholder="No merchant"]'),
+      url: get('textarea[name="mainUrl"]'),
+      nextBestPrice: get('input[placeholder="NBP"]'),
+      description: description.slice(0, 1e3)
+    };
+  }
+  function buildInput(data) {
+    const parts = [];
+    if (data.title) parts.push(`Tytuł: ${data.title}`);
+    if (data.price) parts.push(`Cena: ${data.price} PLN`);
+    if (data.shipping) parts.push(`Dostawa: ${data.shipping} PLN`);
+    if (data.merchant) parts.push(`Sklep: ${data.merchant}`);
+    if (data.url) parts.push(`URL: ${data.url}`);
+    if (data.nextBestPrice) parts.push(`Next Best Price: ${data.nextBestPrice} PLN`);
+    if (data.description) parts.push(`Opis:
+${data.description}`);
+    return parts.join("\n");
+  }
+  function callGroq(input, apiKey) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        data: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: input }
+          ],
+          max_tokens: 400,
+          temperature: 0,
+          response_format: { type: "json_object" }
+        }),
+        timeout: 2e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            resolve(JSON.parse(data?.choices?.[0]?.message?.content));
+          } catch (_) {
+            resolve(null);
+          }
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+  function callGemini(input, apiKey) {
+    return new Promise((resolve) => {
+      GM_xmlhttpRequest({
+        method: "POST",
+        url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        data: JSON.stringify({
+          contents: [{ parts: [{ text: SYSTEM_PROMPT + "\n\n" + input }] }],
+          generationConfig: { maxOutputTokens: 400, temperature: 0, responseMimeType: "application/json" }
+        }),
+        timeout: 2e4,
+        onload(res) {
+          try {
+            const data = JSON.parse(res.responseText);
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            resolve(JSON.parse(text));
+          } catch (_) {
+            resolve(null);
+          }
+        },
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+  async function analyze() {
+    const data = getDealData();
+    if (!data.title) return null;
+    const input = buildInput(data);
+    const groqKey = GM_getValue("jpGroqApiKey", "");
+    if (groqKey) return callGroq(input, groqKey);
+    const geminiKey = GM_getValue("jpGeminiApiKey", "");
+    if (geminiKey) return callGemini(input, geminiKey);
+    return null;
+  }
+  var LEVEL_ICON = { ok: "✅", warn: "⚠️", error: "🔴" };
+  var LEVEL_COLOR = { ok: "#81c995", warn: "#f9c74f", error: "#f28b82" };
+  function renderItems(list, items) {
+    list.innerHTML = "";
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:5px;align-items:baseline;padding:2px 0;";
+      const icon = document.createElement("span");
+      icon.textContent = LEVEL_ICON[item.level] || "•";
+      icon.style.flexShrink = "0";
+      const txt = document.createElement("span");
+      txt.textContent = item.text;
+      txt.style.cssText = `font-size:11px;line-height:1.4;color:${LEVEL_COLOR[item.level] || "#ddd"};`;
+      row.append(icon, txt);
+      list.appendChild(row);
+    }
+  }
+  async function runAnalysis(panel) {
+    const spinner = panel.querySelector("#jp-reviewer-spinner");
+    const list = panel.querySelector("#jp-reviewer-list");
+    const btn = panel.querySelector("#jp-reviewer-refresh");
+    spinner.style.display = "block";
+    list.style.display = "none";
+    btn.disabled = true;
+    const result = await analyze();
+    spinner.style.display = "none";
+    list.style.display = "block";
+    btn.disabled = false;
+    if (result?.items?.length) {
+      renderItems(list, result.items);
+    } else {
+      list.innerHTML = '<span style="font-size:11px;color:#666;">Brak odpowiedzi AI</span>';
+    }
+  }
+  function createPanel(stackEl) {
+    const panel = document.createElement("div");
+    panel.id = "jp-deal-reviewer";
+    panel.style.cssText = [
+      "background:var(--jp-bg,#2a2b2e)",
+      "border:1px solid var(--jp-border,#444)",
+      "border-radius:6px",
+      "padding:8px 10px 10px",
+      "margin-bottom:8px"
+    ].join(";");
+    panel.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:10px;color:var(--jp-text-muted,#888);text-transform:uppercase;letter-spacing:.05em;">🤖 Ocena AI</span>
+            <button id="jp-reviewer-refresh" type="button" style="font-size:10px;padding:1px 7px;border:1px solid var(--jp-border,#555);border-radius:3px;background:transparent;color:var(--jp-text,#ccc);cursor:pointer;line-height:1.6;">Odśwież</button>
+        </div>
+        <div id="jp-reviewer-spinner" style="font-size:11px;color:#777;">Analizuję…</div>
+        <div id="jp-reviewer-list" style="display:none;"></div>
+    `;
+    panel.querySelector("#jp-reviewer-refresh").addEventListener("click", () => runAnalysis(panel));
+    stackEl.prepend(panel);
+    return panel;
+  }
+  function waitForDealData(callback, timeout = 12e3) {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const title = document.querySelector('input[placeholder="Thread title"]')?.value?.trim();
+      if (!title) {
+        if (Date.now() - start > timeout) {
+          clearInterval(interval);
+          callback();
+        }
+        return;
+      }
+      const descEl = document.querySelector(".cept-thread-description-container");
+      const descReady = !descEl || !!descEl.innerText?.trim();
+      if (descReady) {
+        clearInterval(interval);
+        callback();
+        return;
+      }
+      if (Date.now() - start > timeout) {
+        clearInterval(interval);
+        callback();
+      }
+    }, 300);
+  }
+  function initDealReviewer(stackEl) {
+    if (!stackEl || stackEl.querySelector("#jp-deal-reviewer")) return;
+    if (!GM_getValue("jpGroqApiKey", "") && !GM_getValue("jpGeminiApiKey", "")) return;
+    const panel = createPanel(stackEl);
+    waitForDealData(() => runAnalysis(panel));
   }
 
   // src/main.js
@@ -10152,6 +10635,8 @@ ${text}`
       enableDealChangelog: true,
       enableDealDateTools: true,
       enableMultipackHelper: true,
+      enableTitleCaseHelper: true,
+      enableDealReviewer: false,
       dealDateCustom: "",
       enableShopInfo: true,
       enableGeekStats: true,
@@ -10317,7 +10802,9 @@ ${text}`
           settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint"),
           settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint"),
           settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint"),
-          settingsModuleToggle("set-shop-info", s.enableShopInfo, "mShopInfo", "mShopInfoHint")
+          settingsModuleToggle("set-shop-info", s.enableShopInfo, "mShopInfo", "mShopInfoHint"),
+          settingsModuleToggle("set-title-case", s.enableTitleCaseHelper, "mTitleCase", "mTitleCaseHint"),
+          settingsModuleToggle("set-deal-reviewer", s.enableDealReviewer, "mDealReviewer", "mDealReviewerHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
@@ -10460,7 +10947,18 @@ ${text}`
                         <div class="jp-settings-field-hint">${t("lblEyeBreakMinuteHint")}</div>
                     </div>
                     <div style="grid-column: 1 / -1;">
-                        <label>${t("lblGeminiApiKey")}</label>
+                        <label style="display:flex; align-items:center; gap:8px;">
+                            ${t("lblGroqApiKey")}
+                            <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="font-size:10px; font-weight:400; color:#c0392b; text-decoration:underline;">console.groq.com →</a>
+                        </label>
+                        <input type="password" id="set-groq-key" value="${GM_getValue("jpGroqApiKey", "")}" placeholder="gsk_..." style="width:100%; font-family: monospace;">
+                        <div class="jp-settings-field-hint">${t("lblGroqApiKeyHint")}</div>
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <label style="display:flex; align-items:center; gap:8px;">
+                            ${t("lblGeminiApiKey")}
+                            <button id="jp-gemini-hint-btn" type="button" style="font-size:10px; font-weight:400; color:#c0392b; text-decoration:underline; background:none; border:none; cursor:pointer; padding:0;">${t("lblGeminiApiKeyLink")}</button>
+                        </label>
                         <input type="password" id="set-gemini-key" value="${GM_getValue("jpGeminiApiKey", "")}" placeholder="AIza..." style="width:100%; font-family: monospace;">
                         <div class="jp-settings-field-hint">${t("lblGeminiApiKeyHint")}</div>
                     </div>
@@ -10630,6 +11128,7 @@ ${text}`
       document.getElementById("btn-save-settings").onclick = () => {
         const hidden = Array.from(document.querySelectorAll(".hide-btn-check:checked")).map((el) => el.value);
         GM_setValue("jpGeminiApiKey", document.getElementById("set-gemini-key").value.trim());
+        GM_setValue("jpGroqApiKey", document.getElementById("set-groq-key").value.trim());
         saveSettings({
           theme: document.getElementById("set-theme").value,
           language: document.getElementById("set-lang").value,
@@ -10687,6 +11186,8 @@ ${text}`
           enableDealChangelog: document.getElementById("set-deal-changelog").checked,
           enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
           enableMultipackHelper: document.getElementById("set-multipack").checked,
+          enableTitleCaseHelper: document.getElementById("set-title-case").checked,
+          enableDealReviewer: document.getElementById("set-deal-reviewer").checked,
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
           enableGeekStats: document.getElementById("set-geekstats").checked,
           enableEyeBreak: document.getElementById("set-eye-break").checked,
@@ -10706,6 +11207,67 @@ ${text}`
       document.getElementById("btn-close-settings").onclick = () => {
         document.getElementById("modal-overlay").remove();
         document.getElementById("jalapeno-settings-modal").remove();
+      };
+      document.getElementById("jp-gemini-hint-btn").onclick = (e) => {
+        document.getElementById("jp-gemini-hint-popup")?.remove();
+        const popup = document.createElement("div");
+        popup.id = "jp-gemini-hint-popup";
+        popup.style.cssText = "position:fixed;z-index:999999;background:#202124;border:1px solid #444;border-radius:10px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.75);width:470px;";
+        const btnRect = e.target.getBoundingClientRect();
+        popup.style.top = Math.min(btnRect.bottom + 8, window.innerHeight - 320) + "px";
+        popup.style.left = Math.max(8, Math.min(btnRect.left - 60, window.innerWidth - 490)) + "px";
+        popup.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <span style="color:#bdc1c6;font-size:12px;font-weight:600;">Jak zdobyć klucz Gemini API?</span>
+                    <button id="jp-gemini-hint-close" type="button" style="background:none;border:none;color:#888;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;">×</button>
+                </div>
+                <svg width="438" height="172" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+                  <defs>
+                    <marker id="jparr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                      <polygon points="0 0,8 3,0 6" fill="#e74c3c"/>
+                    </marker>
+                  </defs>
+                  <rect width="438" height="172" rx="8" fill="#1a1b1e"/>
+                  <rect width="438" height="46" rx="8" fill="#202124"/>
+                  <rect y="38" width="438" height="8" fill="#202124"/>
+                  <rect x="196" y="10" width="118" height="28" rx="4" fill="none" stroke="#555" stroke-width="1"/>
+                  <text x="255" y="28" text-anchor="middle" fill="#bbb" font-size="12" font-family="Arial,sans-serif">📄 API quickstart</text>
+                  <rect x="322" y="10" width="106" height="28" rx="14" fill="#303134" stroke="#555" stroke-width="1"/>
+                  <text x="375" y="28" text-anchor="middle" fill="#e8eaed" font-size="12" font-family="Arial,sans-serif">⚿ Create API key</text>
+                  <text x="12" y="30" fill="#e74c3c" font-size="15" font-weight="bold" font-family="Arial,sans-serif">1)</text>
+                  <path d="M 38 26 Q 180 8 318 24" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#jparr)"/>
+                  <line x1="0" y1="46" x2="438" y2="46" stroke="#3c3c3c" stroke-width="1"/>
+                  <text x="18" y="64" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Created</text>
+                  <text x="175" y="64" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Billing Tier</text>
+                  <line x1="0" y1="70" x2="438" y2="70" stroke="#3c3c3c" stroke-width="1"/>
+                  <text x="18" y="96" fill="#bdc1c6" font-size="12" font-family="Arial,sans-serif">Jul 31, 2026</text>
+                  <text x="175" y="90" fill="#8ab4f8" font-size="12" font-family="Arial,sans-serif">Set up billing</text>
+                  <text x="175" y="106" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Free tier</text>
+                  <rect x="352" y="82" width="22" height="22" rx="3" fill="#303134" stroke="#555" stroke-width="1"/>
+                  <text x="363" y="98" text-anchor="middle" fill="#bdc1c6" font-size="13" font-family="Arial,sans-serif">❐</text>
+                  <text x="386" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">$</text>
+                  <text x="406" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">⊪</text>
+                  <text x="424" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">⋮</text>
+                  <line x1="0" y1="120" x2="438" y2="120" stroke="#2a2a2a" stroke-width="1"/>
+                  <text x="12" y="148" fill="#e74c3c" font-size="15" font-weight="bold" font-family="Arial,sans-serif">2)</text>
+                  <path d="M 38 144 Q 200 128 348 106" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#jparr)"/>
+                  <text x="60" y="148" fill="#bdc1c6" font-size="11" font-family="Arial,sans-serif">Skopiuj klucz ikoną ❐ — wklej w pole "Klucz Gemini API" powyżej</text>
+                  <text x="18" y="165" fill="#5f6368" font-size="10" font-family="Arial,sans-serif">Wymagane konto Google. Limit darmowy: 1500 zapytań/dzień.</text>
+                </svg>
+                <div style="margin-top:10px;text-align:right;">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:#8ab4f8;font-size:12px;text-decoration:none;">Otwórz AI Studio →</a>
+                </div>`;
+        document.body.appendChild(popup);
+        popup.querySelector("#jp-gemini-hint-close").onclick = () => popup.remove();
+        setTimeout(() => {
+          const outsideClick = (ev) => {
+            if (!popup.contains(ev.target) && ev.target !== e.target) {
+              popup.remove();
+              document.removeEventListener("mousedown", outsideClick);
+            }
+          };
+          document.addEventListener("mousedown", outsideClick);
+        }, 0);
       };
     }
     GM_addStyle(`
@@ -13761,6 +14323,9 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             if (settings3.enableMultipackHelper) {
               initMultipackHelper(shippingStack, triggerVueInput, { compact: _isHorizontal });
             }
+            if (settings3.enableDealReviewer) {
+              initDealReviewer(shippingStack);
+            }
             if (settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom") {
               const dtEl = shippingStack.querySelector("#jp-date-tools");
               const mpEl = shippingStack.querySelector("#jp-multipack");
@@ -13810,6 +14375,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         if (settings3.enableReverseImageSearch) initReverseImageSearch();
         if (settings3.enableLensDescription) initLensDescriptionPaste(settings3);
         if (settings3.enableLinkExpander) initLinkExpander();
+        if (settings3.enableTitleCaseHelper) initTitleCaseHelper(triggerVueInput);
         if (settings3.enableAllegroImages) initAllegroImages(settings3);
         if (settings3.enablePriceWarning) {
           let threadMatch = window.location.href.match(/moderation\/thread\/(\d+)/);
