@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.20
+// @version      5.0.21
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -10361,34 +10361,81 @@ Tytuł: `;
 
 Dane okazji zawierają pola: Tytuł, Cena, Dostawa, Sklep, URL, Next Best Price (pole Omnibus — tylko informacyjnie), Opis.
 
-Sprawdzaj TYLKO:
-- Tytuł: CAPS LOCK (poza skrótami jak GB/RAM/LED/SSD/USB), clickbait ("SZOK!", "TYLKO DZIŚ!", nadmiar wykrzykników), zbyt krótki (<15 znaków), brak nazwy produktu
-- Opis: za krótki (<2 zdania), nie po polsku, podejrzenie linku afiliacyjnego (TYLKO linki przez znane sieci afiliacyjne lub z parametrami aff=/affiliate=/tag= — NIE flaguj: ref=, smid=, offer_id=, utm_*, fbclid=, zwykłe linki do allegro.pl/amazon.pl/ceneo.pl itp.; jeśli flagujesz użyj poziomu warn i tekstu "Możliwy link afiliacyjny?"), czysto reklamowy język bez informacji
-- Sklep: brak nazwy sklepu (puste pole)
-- URL: tylko oczywiste skracacze (bit.ly, tinyurl, t.co, shorturl itp.) — bezpośrednie linki do sklepów są OK
+Sprawdzaj TYLKO te rzeczy:
 
-NIE oceniaj: cen, wartości okazji, czy jest taniej gdzie indziej, Next Best Price — nie masz dostępu do internetu ani baz cen.
+TYTUŁ — sprawdzaj TYLKO:
+- Reklamowy bełkot: słowa typu "SZOK!", "HIT!", "TYLKO DZIŚ!", "SUPER OKAZJA!", nadmiar wykrzykników
+- CAPS LOCK: gdy większość zwykłych słów jest wielkimi literami (np. "ROWER GÓRSKI BLA BLA"). Skróty techniczne (MTB, USB, RAM, SSD, XL, XXL, LED itp.) i nazwy marek są OK — nie flaguj ich. Jeśli flagujesz, tekst uwagi: "Tytuł caps lock — użyj przycisku Aa"
+
+OPIS:
+- Za krótki: poniżej 2 zdań merytorycznych (długie opisy z instrukcjami, listami, parametrami technicznymi są OK)
+- Język: opis wyraźnie nie po polsku (np. w całości po angielsku lub rosyjsku) — obecność obcych walut, nazw produktów, nazw zagranicznych serwisów jest NORMALNA
+
+SKLEP: puste pole merchant
+
+URL: flaguj TYLKO gdy pole URL jest całkowicie puste — nie oceniaj czy to znany sklep ani rodzaju linku
+
+NIE oceniaj: linków afiliacyjnych (zbyt wiele fałszywych alarmów), cen, walut, wartości okazji, Next Best Price.
 
 Odpowiedz WYŁĄCZNIE jako JSON bez markdown:
 {"items":[{"level":"ok","text":"..."},{"level":"warn","text":"..."},{"level":"error","text":"..."}]}
 
 Poziomy: ok=wszystko gra, warn=warto sprawdzić, error=wyraźny problem.
-Maksymalnie 5 pozycji. Każda uwaga max 55 znaków. Zgłaszaj tylko realne problemy — nie wymyślaj.`;
+Maksymalnie 5 pozycji. Każda uwaga max 55 znaków. Jeśli nie ma realnych problemów — zwróć same pozycje ok. Nie wymyślaj problemów.`;
+  var AFFILIATE_DOMAINS = [
+    "admitad.com",
+    "ad.admitad.com",
+    "tradedoubler.com",
+    "tbl.net",
+    "awin1.com",
+    "aw1.dwnsrv.com",
+    "shareasale.com",
+    "linksynergy.com",
+    "anrdoezrs.net",
+    "tkqlhce.com",
+    "dpbolvw.net",
+    "pjtra.com",
+    "jdoqocy.com",
+    "go.skimresources.com",
+    "skimlinks.com",
+    "impact.com",
+    "partnerize.com",
+    "effiliation.com",
+    "zanox.com"
+  ];
+  var AFFILIATE_PARAMS = /[?&](aff|affid|aff_id|affiliate|afftrack|subid)=/i;
+  function detectAffiliateLink(root) {
+    for (const a of root.querySelectorAll("a[href]")) {
+      const href = a.getAttribute("href") || "";
+      try {
+        const u = new URL(href, location.href);
+        if (AFFILIATE_DOMAINS.some((d) => u.hostname === d || u.hostname.endsWith("." + d))) {
+          return u.hostname;
+        }
+        if (AFFILIATE_PARAMS.test(u.search)) {
+          return u.hostname;
+        }
+      } catch (_) {
+      }
+    }
+    return null;
+  }
   function getDealData() {
     const get = (sel) => {
       const el = document.querySelector(sel);
       return (el?.value || el?.innerText || "").trim();
     };
     let description = "";
+    let affiliateLink = null;
     try {
       const preview = document.querySelector(".cept-thread-description-container");
-      if (preview) {
-        description = preview.innerText.trim();
-      } else {
+      const root = preview || (() => {
         const iframe = document.querySelector('iframe[src*="description/edit"]');
-        if (iframe?.contentDocument) {
-          description = (iframe.contentDocument.querySelector("div.ProseMirror")?.innerText || "").trim();
-        }
+        return iframe?.contentDocument?.querySelector("div.ProseMirror") || null;
+      })();
+      if (root) {
+        description = root.innerText.trim();
+        affiliateLink = detectAffiliateLink(root);
       }
     } catch (_) {
     }
@@ -10399,7 +10446,8 @@ Maksymalnie 5 pozycji. Każda uwaga max 55 znaków. Zgłaszaj tylko realne probl
       merchant: get('input[placeholder="Merchant name"]') || get('input[placeholder="No merchant"]'),
       url: get('textarea[name="mainUrl"]'),
       nextBestPrice: get('input[placeholder="NBP"]'),
-      description: description.slice(0, 1e3)
+      description: description.slice(0, 3e3),
+      affiliateLink
     };
   }
   function buildInput(data) {
@@ -10474,10 +10522,12 @@ ${data.description}`);
     if (!data.title) return null;
     const input = buildInput(data);
     const groqKey = GM_getValue("jpGroqApiKey", "");
-    if (groqKey) return callGroq(input, groqKey);
-    const geminiKey = GM_getValue("jpGeminiApiKey", "");
-    if (geminiKey) return callGemini(input, geminiKey);
-    return null;
+    const aiResult = groqKey ? await callGroq(input, groqKey) : GM_getValue("jpGeminiApiKey", "") ? await callGemini(input, GM_getValue("jpGeminiApiKey", "")) : null;
+    const items = aiResult?.items || [];
+    if (data.affiliateLink) {
+      items.push({ level: "error", text: `Link afiliacyjny w opisie (${data.affiliateLink})` });
+    }
+    return items.length ? { items } : null;
   }
   var LEVEL_ICON = { ok: "✅", warn: "⚠️", error: "🔴" };
   var LEVEL_COLOR = { ok: "#81c995", warn: "#f9c74f", error: "#f28b82" };
