@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.21
+// @version      5.0.24
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -6141,9 +6141,39 @@ ${text}`
             opacity: 1;
             color: #c0392b;
         }
+        #jp-reported-reason-banner .jp-rr-extras {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--jp-border, #ddd);
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        #jp-reported-reason-banner .jp-rr-extra {
+            font-size: 11px;
+            color: var(--jp-text-muted, #777);
+            line-height: 1.4;
+        }
+        #jp-reported-reason-banner .jp-rr-extra-text {
+            word-break: break-word;
+        }
+        #jp-reported-reason-banner .jp-rr-extra-reporter {
+            color: var(--jp-text-muted, #999);
+        }
     `);
   }
-  function renderBanner(entry) {
+  function renderEntryHtml(entry, main) {
+    const text = entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${linkifyHtml(entry.reason)}”` : linkifyHtml(entry.label || entry.reason || "");
+    if (main) {
+      return `<div class=”jp-rr-text”><span class=”jp-rr-label”>Powód:</span> ${text}</div>
+            ${entry.userId ? `<div class=”jp-rr-reporter”>ID zgłaszającego: ${entry.userId}</div>` : ""}`;
+    }
+    return `<div class=”jp-rr-extra”>
+        <span class=”jp-rr-extra-text”>${text}</span>
+        ${entry.userId ? `<span class=”jp-rr-extra-reporter”> · ID: ${entry.userId}</span>` : ""}
+    </div>`;
+  }
+  function renderBanner(entries) {
     if (document.getElementById("jp-reported-reason-banner")) return;
     const anchor = document.querySelector(".mod-tools-container") || document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.querySelector(".v-card.rounded-medium");
     if (!anchor) return;
@@ -6151,15 +6181,18 @@ ${text}`
       injectStyles();
       _stylesInjected = true;
     }
+    const list = Array.isArray(entries) ? entries : [entries];
+    const [main, ...rest] = list;
+    const extrasHtml = rest.length ? `<div class=”jp-rr-extras”>${rest.map((e) => renderEntryHtml(e, false)).join("")}</div>` : "";
     const banner = document.createElement("div");
     banner.id = "jp-reported-reason-banner";
     banner.innerHTML = `
-        <i class="material-icons jp-rr-icon">flag</i>
-        <div class="jp-rr-body">
-            <div class=”jp-rr-text”><span class=”jp-rr-label”>Powód:</span> ${entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${linkifyHtml(entry.reason)}”` : linkifyHtml(entry.label || entry.reason || "")}</div>
-            ${entry.userId ? `<div class="jp-rr-reporter">ID zgłaszającego: ${entry.userId}</div>` : ""}
+        <span class=”jp-rr-icon”>🚩</span>
+        <div class=”jp-rr-body”>
+            ${renderEntryHtml(main, true)}
+            ${extrasHtml}
         </div>
-        <button id="jp-reported-reason-dismiss" title="Zamknij">✕</button>
+        <button id=”jp-reported-reason-dismiss” title=”Zamknij”>✕</button>
     `;
     anchor.parentNode.insertBefore(banner, anchor);
     document.getElementById("jp-reported-reason-dismiss").onclick = () => banner.remove();
@@ -6173,13 +6206,18 @@ ${text}`
   function cacheReportedIssues(items) {
     for (const item of items) {
       if (item?.issue) {
-        _cache2.set(String(item.id), {
+        const entry = {
           reason: item.issue.reason || "",
           label: item.issue.reportTypeLabel || null,
           typeName: item.issue.reportTypeName || null,
           userId: item.issue.userId ?? null,
           issueId: item.issue.id ?? null
-        });
+        };
+        const key = String(item.id);
+        if (!_cache2.has(key)) _cache2.set(key, []);
+        const arr = _cache2.get(key);
+        const isDupe = entry.issueId != null ? arr.some((e) => e.issueId === entry.issueId) : arr.some((e) => e.reason === entry.reason && e.userId === entry.userId);
+        if (!isDupe) arr.push(entry);
       }
     }
   }
@@ -10209,99 +10247,14 @@ ${text}`
     const lower = title.toLowerCase();
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   }
-  var TITLE_CASE_PROMPT = `Popraw wielkość liter w poniższym tytule okazji ze sklepu internetowego. Zasady:
-- Nazwy marek pisz jak producent: iPhone, iPad, MacBook, AirPods, Samsung, LEGO, PlayStation, OnePlus, Xiaomi, Garmin, Dyson itd.
-- Oznaczenia modeli i wersji: Pro, Max, Ultra, Plus — zachowaj oryginalną konwencję; jeśli producent pisze PRO lub MAX dużymi, zostaw duże
-- Skróty techniczne zachowaj bez zmian: GB, TB, RAM, SSD, USB, USB-C, HDMI, WiFi, Bluetooth, LED, OLED, AMOLED, LTE, 5G
-- Resztę słów pisz małymi literami
-- Pierwsze słowo tytułu pisz z dużej litery
-- Nie zmieniaj kolejności ani treści słów, nie tłumacz
-- Odpowiedz TYLKO poprawionym tytułem, bez komentarzy ani cudzysłowów
-
-Tytuł: `;
-  function smartTitleCaseWithGemini(title) {
-    const apiKey = GM_getValue("jpGeminiApiKey", "");
-    if (!apiKey) return Promise.resolve(null);
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        data: JSON.stringify({
-          contents: [{ parts: [{ text: TITLE_CASE_PROMPT + title }] }],
-          generationConfig: { maxOutputTokens: 200, temperature: 0 }
-        }),
-        timeout: 2e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            if (data.error) {
-              resolve(null);
-              return;
-            }
-            const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            resolve(improved && improved.length > 2 ? improved : null);
-          } catch (_) {
-            resolve(null);
-          }
-        },
-        onerror: () => resolve(null),
-        ontimeout: () => resolve(null)
-      });
-    });
-  }
-  function smartTitleCaseWithGroq(title) {
-    const apiKey = GM_getValue("jpGroqApiKey", "");
-    if (!apiKey) return Promise.resolve(null);
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        data: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: "You are a title case fixer for a Polish deal portal." },
-            { role: "user", content: TITLE_CASE_PROMPT + title }
-          ],
-          max_tokens: 200,
-          temperature: 0
-        }),
-        timeout: 2e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            if (data.error) {
-              resolve(null);
-              return;
-            }
-            const improved = data?.choices?.[0]?.message?.content?.trim();
-            resolve(improved && improved.length > 2 ? improved : null);
-          } catch (_) {
-            resolve(null);
-          }
-        },
-        onerror: () => resolve(null),
-        ontimeout: () => resolve(null)
-      });
-    });
-  }
-  async function smartTitleCase(title) {
-    const result = await smartTitleCaseWithGroq(title);
-    if (result) return result;
-    const result2 = await smartTitleCaseWithGemini(title);
-    if (result2) return result2;
-    return dumbTitleCase(title);
-  }
   async function fixTitleCase(btn, titleInput, triggerVueInput) {
     const title = titleInput.value.trim();
     if (!title) return;
-    const hasAnyKey = !!GM_getValue("jpGeminiApiKey", "") || !!GM_getValue("jpGroqApiKey", "");
     const originalHTML = btn.innerHTML;
     btn.textContent = "⏳";
     btn.disabled = true;
     try {
-      const fixed = hasAnyKey ? await smartTitleCase(title) : dumbTitleCase(title);
+      const fixed = dumbTitleCase(title);
       if (fixed && fixed !== title) {
         await triggerVueInput(titleInput, fixed);
       }
@@ -10357,211 +10310,20 @@ Tytuł: `;
   }
 
   // src/features/dealReviewer.js
-  var SYSTEM_PROMPT = `Jesteś asystentem moderatora na polskim portalu z okazjami zakupowymi pepper.pl. Przeanalizuj okazję i zwróć listę konkretnych uwag.
-
-Dane okazji zawierają pola: Tytuł, Cena, Dostawa, Sklep, URL, Next Best Price (pole Omnibus — tylko informacyjnie), Opis.
-
-Sprawdzaj TYLKO te rzeczy:
-
-TYTUŁ — sprawdzaj TYLKO:
-- Reklamowy bełkot: słowa typu "SZOK!", "HIT!", "TYLKO DZIŚ!", "SUPER OKAZJA!", nadmiar wykrzykników
-- CAPS LOCK: gdy większość zwykłych słów jest wielkimi literami (np. "ROWER GÓRSKI BLA BLA"). Skróty techniczne (MTB, USB, RAM, SSD, XL, XXL, LED itp.) i nazwy marek są OK — nie flaguj ich. Jeśli flagujesz, tekst uwagi: "Tytuł caps lock — użyj przycisku Aa"
-
-OPIS:
-- Za krótki: poniżej 2 zdań merytorycznych (długie opisy z instrukcjami, listami, parametrami technicznymi są OK)
-- Język: opis wyraźnie nie po polsku (np. w całości po angielsku lub rosyjsku) — obecność obcych walut, nazw produktów, nazw zagranicznych serwisów jest NORMALNA
-
-SKLEP: puste pole merchant
-
-URL: flaguj TYLKO gdy pole URL jest całkowicie puste — nie oceniaj czy to znany sklep ani rodzaju linku
-
-NIE oceniaj: linków afiliacyjnych (zbyt wiele fałszywych alarmów), cen, walut, wartości okazji, Next Best Price.
-
-Odpowiedz WYŁĄCZNIE jako JSON bez markdown:
-{"items":[{"level":"ok","text":"..."},{"level":"warn","text":"..."},{"level":"error","text":"..."}]}
-
-Poziomy: ok=wszystko gra, warn=warto sprawdzić, error=wyraźny problem.
-Maksymalnie 5 pozycji. Każda uwaga max 55 znaków. Jeśli nie ma realnych problemów — zwróć same pozycje ok. Nie wymyślaj problemów.`;
-  var AFFILIATE_DOMAINS = [
-    "admitad.com",
-    "ad.admitad.com",
-    "tradedoubler.com",
-    "tbl.net",
-    "awin1.com",
-    "aw1.dwnsrv.com",
-    "shareasale.com",
-    "linksynergy.com",
-    "anrdoezrs.net",
-    "tkqlhce.com",
-    "dpbolvw.net",
-    "pjtra.com",
-    "jdoqocy.com",
-    "go.skimresources.com",
-    "skimlinks.com",
-    "impact.com",
-    "partnerize.com",
-    "effiliation.com",
-    "zanox.com"
-  ];
-  var AFFILIATE_PARAMS = /[?&](aff|affid|aff_id|affiliate|afftrack|subid)=/i;
-  function detectAffiliateLink(root) {
-    for (const a of root.querySelectorAll("a[href]")) {
-      const href = a.getAttribute("href") || "";
-      try {
-        const u = new URL(href, location.href);
-        if (AFFILIATE_DOMAINS.some((d) => u.hostname === d || u.hostname.endsWith("." + d))) {
-          return u.hostname;
-        }
-        if (AFFILIATE_PARAMS.test(u.search)) {
-          return u.hostname;
-        }
-      } catch (_) {
-      }
-    }
-    return null;
-  }
-  function getDealData() {
-    const get = (sel) => {
-      const el = document.querySelector(sel);
-      return (el?.value || el?.innerText || "").trim();
-    };
-    let description = "";
-    let affiliateLink = null;
+  var AMZN_SHORT = /^https?:\/\/(amzn\.eu|amzn\.to|a\.co)\//i;
+  function findAmznShortLink() {
+    const url = document.querySelector('textarea[name="mainUrl"]')?.value?.trim() || "";
+    if (AMZN_SHORT.test(url)) return url;
     try {
-      const preview = document.querySelector(".cept-thread-description-container");
-      const root = preview || (() => {
-        const iframe = document.querySelector('iframe[src*="description/edit"]');
-        return iframe?.contentDocument?.querySelector("div.ProseMirror") || null;
-      })();
+      const root = document.querySelector(".cept-thread-description-container") || document.querySelector('iframe[src*="description/edit"]')?.contentDocument?.querySelector("div.ProseMirror");
       if (root) {
-        description = root.innerText.trim();
-        affiliateLink = detectAffiliateLink(root);
+        for (const a of root.querySelectorAll("a[href]")) {
+          if (AMZN_SHORT.test(a.getAttribute("href") || "")) return a.getAttribute("href");
+        }
       }
     } catch (_) {
     }
-    return {
-      title: get('input[placeholder="Thread title"]'),
-      price: get('input[placeholder="Price"]'),
-      shipping: get('input[placeholder="Shipping costs"]'),
-      merchant: get('input[placeholder="Merchant name"]') || get('input[placeholder="No merchant"]'),
-      url: get('textarea[name="mainUrl"]'),
-      nextBestPrice: get('input[placeholder="NBP"]'),
-      description: description.slice(0, 3e3),
-      affiliateLink
-    };
-  }
-  function buildInput(data) {
-    const parts = [];
-    if (data.title) parts.push(`Tytuł: ${data.title}`);
-    if (data.price) parts.push(`Cena: ${data.price} PLN`);
-    if (data.shipping) parts.push(`Dostawa: ${data.shipping} PLN`);
-    if (data.merchant) parts.push(`Sklep: ${data.merchant}`);
-    if (data.url) parts.push(`URL: ${data.url}`);
-    if (data.nextBestPrice) parts.push(`Next Best Price: ${data.nextBestPrice} PLN`);
-    if (data.description) parts.push(`Opis:
-${data.description}`);
-    return parts.join("\n");
-  }
-  function callGroq(input, apiKey) {
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        data: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: input }
-          ],
-          max_tokens: 400,
-          temperature: 0,
-          response_format: { type: "json_object" }
-        }),
-        timeout: 2e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            resolve(JSON.parse(data?.choices?.[0]?.message?.content));
-          } catch (_) {
-            resolve(null);
-          }
-        },
-        onerror: () => resolve(null),
-        ontimeout: () => resolve(null)
-      });
-    });
-  }
-  function callGemini(input, apiKey) {
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        data: JSON.stringify({
-          contents: [{ parts: [{ text: SYSTEM_PROMPT + "\n\n" + input }] }],
-          generationConfig: { maxOutputTokens: 400, temperature: 0, responseMimeType: "application/json" }
-        }),
-        timeout: 2e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            resolve(JSON.parse(text));
-          } catch (_) {
-            resolve(null);
-          }
-        },
-        onerror: () => resolve(null),
-        ontimeout: () => resolve(null)
-      });
-    });
-  }
-  async function analyze() {
-    const data = getDealData();
-    if (!data.title) return null;
-    const input = buildInput(data);
-    const groqKey = GM_getValue("jpGroqApiKey", "");
-    const aiResult = groqKey ? await callGroq(input, groqKey) : GM_getValue("jpGeminiApiKey", "") ? await callGemini(input, GM_getValue("jpGeminiApiKey", "")) : null;
-    const items = aiResult?.items || [];
-    if (data.affiliateLink) {
-      items.push({ level: "error", text: `Link afiliacyjny w opisie (${data.affiliateLink})` });
-    }
-    return items.length ? { items } : null;
-  }
-  var LEVEL_ICON = { ok: "✅", warn: "⚠️", error: "🔴" };
-  var LEVEL_COLOR = { ok: "#81c995", warn: "#f9c74f", error: "#f28b82" };
-  function renderItems(list, items) {
-    list.innerHTML = "";
-    for (const item of items) {
-      const row = document.createElement("div");
-      row.style.cssText = "display:flex;gap:5px;align-items:baseline;padding:2px 0;";
-      const icon = document.createElement("span");
-      icon.textContent = LEVEL_ICON[item.level] || "•";
-      icon.style.flexShrink = "0";
-      const txt = document.createElement("span");
-      txt.textContent = item.text;
-      txt.style.cssText = `font-size:11px;line-height:1.4;color:${LEVEL_COLOR[item.level] || "#ddd"};`;
-      row.append(icon, txt);
-      list.appendChild(row);
-    }
-  }
-  async function runAnalysis(panel) {
-    const spinner = panel.querySelector("#jp-reviewer-spinner");
-    const list = panel.querySelector("#jp-reviewer-list");
-    const btn = panel.querySelector("#jp-reviewer-refresh");
-    spinner.style.display = "block";
-    list.style.display = "none";
-    btn.disabled = true;
-    const result = await analyze();
-    spinner.style.display = "none";
-    list.style.display = "block";
-    btn.disabled = false;
-    if (result?.items?.length) {
-      renderItems(list, result.items);
-    } else {
-      list.innerHTML = '<span style="font-size:11px;color:#666;">Brak odpowiedzi AI</span>';
-    }
+    return null;
   }
   function createPanel(stackEl) {
     const panel = document.createElement("div");
@@ -10569,51 +10331,22 @@ ${data.description}`);
     panel.style.cssText = [
       "background:var(--jp-bg,#2a2b2e)",
       "border:1px solid var(--jp-border,#444)",
+      "border-left:3px solid #f9c74f",
       "border-radius:6px",
-      "padding:8px 10px 10px",
-      "margin-bottom:8px"
+      "padding:7px 10px",
+      "margin-bottom:8px",
+      "font-size:11px",
+      "color:#f9c74f",
+      "display:flex",
+      "align-items:center",
+      "gap:6px"
     ].join(";");
-    panel.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <span style="font-weight:700;font-size:10px;color:var(--jp-text-muted,#888);text-transform:uppercase;letter-spacing:.05em;">🤖 Ocena AI</span>
-            <button id="jp-reviewer-refresh" type="button" style="font-size:10px;padding:1px 7px;border:1px solid var(--jp-border,#555);border-radius:3px;background:transparent;color:var(--jp-text,#ccc);cursor:pointer;line-height:1.6;">Odśwież</button>
-        </div>
-        <div id="jp-reviewer-spinner" style="font-size:11px;color:#777;">Analizuję…</div>
-        <div id="jp-reviewer-list" style="display:none;"></div>
-    `;
-    panel.querySelector("#jp-reviewer-refresh").addEventListener("click", () => runAnalysis(panel));
+    panel.innerHTML = `<span>⚠️</span><span>Rozwiń skrócony link Amazon (amzn.eu/to) przed zatwierdzeniem</span>`;
     stackEl.prepend(panel);
-    return panel;
-  }
-  function waitForDealData(callback, timeout = 12e3) {
-    const start = Date.now();
-    const interval = setInterval(() => {
-      const title = document.querySelector('input[placeholder="Thread title"]')?.value?.trim();
-      if (!title) {
-        if (Date.now() - start > timeout) {
-          clearInterval(interval);
-          callback();
-        }
-        return;
-      }
-      const descEl = document.querySelector(".cept-thread-description-container");
-      const descReady = !descEl || !!descEl.innerText?.trim();
-      if (descReady) {
-        clearInterval(interval);
-        callback();
-        return;
-      }
-      if (Date.now() - start > timeout) {
-        clearInterval(interval);
-        callback();
-      }
-    }, 300);
   }
   function initDealReviewer(stackEl) {
     if (!stackEl || stackEl.querySelector("#jp-deal-reviewer")) return;
-    if (!GM_getValue("jpGroqApiKey", "") && !GM_getValue("jpGeminiApiKey", "")) return;
-    const panel = createPanel(stackEl);
-    waitForDealData(() => runAnalysis(panel));
+    if (findAmznShortLink()) createPanel(stackEl);
   }
 
   // src/main.js
@@ -10686,7 +10419,6 @@ ${data.description}`);
       enableDealDateTools: true,
       enableMultipackHelper: true,
       enableTitleCaseHelper: true,
-      enableDealReviewer: false,
       dealDateCustom: "",
       enableShopInfo: true,
       enableGeekStats: true,
@@ -10853,8 +10585,7 @@ ${data.description}`);
           settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint"),
           settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint"),
           settingsModuleToggle("set-shop-info", s.enableShopInfo, "mShopInfo", "mShopInfoHint"),
-          settingsModuleToggle("set-title-case", s.enableTitleCaseHelper, "mTitleCase", "mTitleCaseHint"),
-          settingsModuleToggle("set-deal-reviewer", s.enableDealReviewer, "mDealReviewer", "mDealReviewerHint")
+          settingsModuleToggle("set-title-case", s.enableTitleCaseHelper, "mTitleCase", "mTitleCaseHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
@@ -10995,22 +10726,6 @@ ${data.description}`);
                         <label>${t("lblEyeBreakMinute")}</label>
                         <input type="number" id="set-eye-break-minute" min="0" max="59" value="${settings3.eyeBreakMinute ?? 50}" style="width:100%">
                         <div class="jp-settings-field-hint">${t("lblEyeBreakMinuteHint")}</div>
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <label style="display:flex; align-items:center; gap:8px;">
-                            ${t("lblGroqApiKey")}
-                            <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="font-size:10px; font-weight:400; color:#c0392b; text-decoration:underline;">console.groq.com →</a>
-                        </label>
-                        <input type="password" id="set-groq-key" value="${GM_getValue("jpGroqApiKey", "")}" placeholder="gsk_..." style="width:100%; font-family: monospace;">
-                        <div class="jp-settings-field-hint">${t("lblGroqApiKeyHint")}</div>
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <label style="display:flex; align-items:center; gap:8px;">
-                            ${t("lblGeminiApiKey")}
-                            <button id="jp-gemini-hint-btn" type="button" style="font-size:10px; font-weight:400; color:#c0392b; text-decoration:underline; background:none; border:none; cursor:pointer; padding:0;">${t("lblGeminiApiKeyLink")}</button>
-                        </label>
-                        <input type="password" id="set-gemini-key" value="${GM_getValue("jpGeminiApiKey", "")}" placeholder="AIza..." style="width:100%; font-family: monospace;">
-                        <div class="jp-settings-field-hint">${t("lblGeminiApiKeyHint")}</div>
                     </div>
                 </div>
 
@@ -11177,8 +10892,6 @@ ${data.description}`);
       updatePreview();
       document.getElementById("btn-save-settings").onclick = () => {
         const hidden = Array.from(document.querySelectorAll(".hide-btn-check:checked")).map((el) => el.value);
-        GM_setValue("jpGeminiApiKey", document.getElementById("set-gemini-key").value.trim());
-        GM_setValue("jpGroqApiKey", document.getElementById("set-groq-key").value.trim());
         saveSettings({
           theme: document.getElementById("set-theme").value,
           language: document.getElementById("set-lang").value,
@@ -11237,7 +10950,6 @@ ${data.description}`);
           enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
           enableMultipackHelper: document.getElementById("set-multipack").checked,
           enableTitleCaseHelper: document.getElementById("set-title-case").checked,
-          enableDealReviewer: document.getElementById("set-deal-reviewer").checked,
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
           enableGeekStats: document.getElementById("set-geekstats").checked,
           enableEyeBreak: document.getElementById("set-eye-break").checked,
@@ -11257,67 +10969,6 @@ ${data.description}`);
       document.getElementById("btn-close-settings").onclick = () => {
         document.getElementById("modal-overlay").remove();
         document.getElementById("jalapeno-settings-modal").remove();
-      };
-      document.getElementById("jp-gemini-hint-btn").onclick = (e) => {
-        document.getElementById("jp-gemini-hint-popup")?.remove();
-        const popup = document.createElement("div");
-        popup.id = "jp-gemini-hint-popup";
-        popup.style.cssText = "position:fixed;z-index:999999;background:#202124;border:1px solid #444;border-radius:10px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.75);width:470px;";
-        const btnRect = e.target.getBoundingClientRect();
-        popup.style.top = Math.min(btnRect.bottom + 8, window.innerHeight - 320) + "px";
-        popup.style.left = Math.max(8, Math.min(btnRect.left - 60, window.innerWidth - 490)) + "px";
-        popup.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <span style="color:#bdc1c6;font-size:12px;font-weight:600;">Jak zdobyć klucz Gemini API?</span>
-                    <button id="jp-gemini-hint-close" type="button" style="background:none;border:none;color:#888;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;">×</button>
-                </div>
-                <svg width="438" height="172" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-                  <defs>
-                    <marker id="jparr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-                      <polygon points="0 0,8 3,0 6" fill="#e74c3c"/>
-                    </marker>
-                  </defs>
-                  <rect width="438" height="172" rx="8" fill="#1a1b1e"/>
-                  <rect width="438" height="46" rx="8" fill="#202124"/>
-                  <rect y="38" width="438" height="8" fill="#202124"/>
-                  <rect x="196" y="10" width="118" height="28" rx="4" fill="none" stroke="#555" stroke-width="1"/>
-                  <text x="255" y="28" text-anchor="middle" fill="#bbb" font-size="12" font-family="Arial,sans-serif">📄 API quickstart</text>
-                  <rect x="322" y="10" width="106" height="28" rx="14" fill="#303134" stroke="#555" stroke-width="1"/>
-                  <text x="375" y="28" text-anchor="middle" fill="#e8eaed" font-size="12" font-family="Arial,sans-serif">⚿ Create API key</text>
-                  <text x="12" y="30" fill="#e74c3c" font-size="15" font-weight="bold" font-family="Arial,sans-serif">1)</text>
-                  <path d="M 38 26 Q 180 8 318 24" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#jparr)"/>
-                  <line x1="0" y1="46" x2="438" y2="46" stroke="#3c3c3c" stroke-width="1"/>
-                  <text x="18" y="64" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Created</text>
-                  <text x="175" y="64" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Billing Tier</text>
-                  <line x1="0" y1="70" x2="438" y2="70" stroke="#3c3c3c" stroke-width="1"/>
-                  <text x="18" y="96" fill="#bdc1c6" font-size="12" font-family="Arial,sans-serif">Jul 31, 2026</text>
-                  <text x="175" y="90" fill="#8ab4f8" font-size="12" font-family="Arial,sans-serif">Set up billing</text>
-                  <text x="175" y="106" fill="#9aa0a6" font-size="11" font-family="Arial,sans-serif">Free tier</text>
-                  <rect x="352" y="82" width="22" height="22" rx="3" fill="#303134" stroke="#555" stroke-width="1"/>
-                  <text x="363" y="98" text-anchor="middle" fill="#bdc1c6" font-size="13" font-family="Arial,sans-serif">❐</text>
-                  <text x="386" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">$</text>
-                  <text x="406" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">⊪</text>
-                  <text x="424" y="98" fill="#9aa0a6" font-size="13" font-family="Arial,sans-serif">⋮</text>
-                  <line x1="0" y1="120" x2="438" y2="120" stroke="#2a2a2a" stroke-width="1"/>
-                  <text x="12" y="148" fill="#e74c3c" font-size="15" font-weight="bold" font-family="Arial,sans-serif">2)</text>
-                  <path d="M 38 144 Q 200 128 348 106" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#jparr)"/>
-                  <text x="60" y="148" fill="#bdc1c6" font-size="11" font-family="Arial,sans-serif">Skopiuj klucz ikoną ❐ — wklej w pole "Klucz Gemini API" powyżej</text>
-                  <text x="18" y="165" fill="#5f6368" font-size="10" font-family="Arial,sans-serif">Wymagane konto Google. Limit darmowy: 1500 zapytań/dzień.</text>
-                </svg>
-                <div style="margin-top:10px;text-align:right;">
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:#8ab4f8;font-size:12px;text-decoration:none;">Otwórz AI Studio →</a>
-                </div>`;
-        document.body.appendChild(popup);
-        popup.querySelector("#jp-gemini-hint-close").onclick = () => popup.remove();
-        setTimeout(() => {
-          const outsideClick = (ev) => {
-            if (!popup.contains(ev.target) && ev.target !== e.target) {
-              popup.remove();
-              document.removeEventListener("mousedown", outsideClick);
-            }
-          };
-          document.addEventListener("mousedown", outsideClick);
-        }, 0);
       };
     }
     GM_addStyle(`
@@ -14373,9 +14024,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
             if (settings3.enableMultipackHelper) {
               initMultipackHelper(shippingStack, triggerVueInput, { compact: _isHorizontal });
             }
-            if (settings3.enableDealReviewer) {
-              initDealReviewer(shippingStack);
-            }
+            initDealReviewer(shippingStack);
             if (settings3.shippingStackPosition === "top" || settings3.shippingStackPosition === "bottom") {
               const dtEl = shippingStack.querySelector("#jp-date-tools");
               const mpEl = shippingStack.querySelector("#jp-multipack");
