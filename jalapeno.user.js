@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.24
+// @version      5.0.25
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -11,6 +11,7 @@
 // @match        *://*.pepper.pl/admin-v2/moderation/*
 // @match        *://*.pepper.pl/admin/inspector/users/*
 // @match        *://*.pepper.pl/promocje/*
+// @match        *://*.pepper.pl/
 // @match        *://www.google.com/*
 // @match        *://www.google.pl/*
 // @match        *://lens.google.com/*
@@ -1674,6 +1675,10 @@
       lblShippingCosts: "Baza kosztów dostawy",
       mDealChangelog: "Tracker zmian w formularzu deala",
       mDealChangelogHint: "Nad panelem dostawy pokazuje które pola zostały zmienione od momentu otwarcia strony (tytuł, URL, cena, sklep, dostawa).",
+      mSpicyEditLog: "Spicy edit log",
+      mSpicyEditLogHint: "Dodaje przycisk 🌶️ Spicy log obok natywnego Edit log. Pokazuje historię akcji moderatorów (akcja, nick, dokładny czas) w oknie na stronie, bez otwierania nowej karty.",
+      secSpicyLogFields: "Pola widoczne w Spicy edit log",
+      secSpicyLogFieldsDesc: "Wybierz które zmienione pola mają pojawiać się w diffie edycji. Domyślnie wszystkie widoczne.",
       mGeekStats: "GeekStats — licznik akcji zmiany",
       mGeekStatsHint: "Floating widget (lewy dół) liczący kliknięcia DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE od godziny 2:00 w nocy. Resetuje się codziennie o 2:00.",
       mEyeBreak: "Przypomnienie o przerwie dla oczu",
@@ -2061,6 +2066,10 @@
       lblShippingCosts: "Shipping cost database",
       mDealChangelog: "Deal form change tracker",
       mDealChangelogHint: "Above the shipping panel, shows which fields were changed since opening the page (title, URL, price, merchant, delivery).",
+      mSpicyEditLog: "Spicy edit log",
+      mSpicyEditLogHint: "Adds a 🌶️ Spicy log button next to the native Edit log. Shows the moderation history (action, nick, exact time) in an on-page dialog, without opening a new tab.",
+      secSpicyLogFields: "Fields shown in Spicy edit log",
+      secSpicyLogFieldsDesc: "Choose which changed fields appear in the edit diff. All shown by default.",
       mGeekStats: "GeekStats — shift action counter",
       mGeekStatsHint: "Floating widget (bottom-left) counting DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE clicks since 2:00 AM. Resets daily at 2:00.",
       mEyeBreak: "Eye break reminder",
@@ -6280,9 +6289,7 @@ ${text}`
     const data = await fetchModerationListPage(path, page);
     const items = data?.state?.threadsList?.items || [];
     _listCache = { key, items, at: Date.now() };
-    if (/\/admin-v2\/moderation\/deals\/reported/.test(path)) {
-      cacheReportedIssues(items);
-    }
+    cacheReportedIssues(items);
     return items;
   }
   function getExpirationParts(item) {
@@ -10349,6 +10356,472 @@ ${text}`
     if (findAmznShortLink()) createPanel(stackEl);
   }
 
+  // src/features/spicyEditLog.js
+  var THREAD_PATH_RE2 = /\/admin-v2\/moderation\/thread\/(\d+)/;
+  var EDIT_LOG_HREF_RE = /\/admin\/thread-edit-log\/(\d+)/;
+  var _stylesInjected6 = false;
+  var _nickCache = /* @__PURE__ */ new Map();
+  async function resolveNick(userId) {
+    const key = String(userId);
+    if (_nickCache.has(key)) return _nickCache.get(key);
+    let nick = null;
+    try {
+      const json = await fetchAdminUser(userId);
+      nick = json?.user?.username || json?.data?.user?.username || null;
+    } catch (_) {
+    }
+    _nickCache.set(key, nick);
+    return nick;
+  }
+  var ACTIONS = {
+    approved: { icon: "✅", label: "Zatwierdzone" },
+    activated: { icon: "✅", label: "Aktywowane" },
+    rejected: { icon: "⛔", label: "Odrzucone" },
+    deleted: { icon: "🗑️", label: "Usunięte" },
+    edited: { icon: "✏️", label: "Edycja" },
+    expired: { icon: "⌛", label: "Wygaszone" },
+    unexpired: { icon: "🔄", label: "Przywrócone z wygaszenia" },
+    restored: { icon: "🔄", label: "Przywrócone" },
+    held: { icon: "⏸️", label: "Wstrzymane" },
+    putOnHold: { icon: "⏸️", label: "Wstrzymane" },
+    resolvedIssueReport: { icon: "🚩", label: "Zgłoszenie rozpatrzone" },
+    reportedIssue: { icon: "🚩", label: "Zgłoszone" },
+    moved: { icon: "📁", label: "Przeniesione" },
+    merged: { icon: "🔗", label: "Scalone" },
+    published: { icon: "✅", label: "Opublikowane" },
+    unpublished: { icon: "↩️", label: "Cofnięta publikacja" }
+  };
+  function prettifyAction(action) {
+    const spaced = String(action || "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase().trim();
+    return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : "Akcja";
+  }
+  function describeAction(action) {
+    return ACTIONS[action] || { icon: "•", label: prettifyAction(action) };
+  }
+  var SPICY_LOG_FIELDS = [
+    { key: "title", label: "Tytuł" },
+    { key: "description", label: "Opis" },
+    { key: "price", label: "Cena" },
+    { key: "shipping_price", label: "Koszt dostawy" },
+    { key: "status", label: "Status" },
+    { key: "link", label: "Link" },
+    { key: "merchant_id", label: "Merchant" },
+    { key: "score", label: "Wynik" },
+    { key: "voucher_code", label: "Kod kuponu" },
+    { key: "next_best_price", label: "Next Best Price" },
+    { key: "is_local", label: "Oferta lokalna" },
+    { key: "free_shipping", label: "Darmowa dostawa" },
+    { key: "starts", label: "Data startu" },
+    { key: "ends", label: "Data zakończenia" },
+    { key: "is_expired", label: "Wygaszone" },
+    { key: "un_expired_by_human_at", label: "Wznowione" },
+    { key: "deleted_at", label: "Data usunięcia" },
+    { key: "image_data", label: "Zdjęcie (dane)" },
+    { key: "main_image_autoslot", label: "Slot zdjęcia" }
+  ];
+  var PROPERTY_LABELS = Object.fromEntries(SPICY_LOG_FIELDS.map((f) => [f.key, f.label]));
+  var _hiddenFields = /* @__PURE__ */ new Set();
+  function prettifyProperty(property) {
+    if (!property) return "Utworzenie";
+    if (PROPERTY_LABELS[property]) return PROPERTY_LABELS[property];
+    return property.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  }
+  function stripHtml(s) {
+    return String(s || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function truncate(s, max = 90) {
+    const str = String(s ?? "");
+    return str.length > max ? `${str.slice(0, max)}…` : str;
+  }
+  var TIMESTAMP_PROPERTIES = /* @__PURE__ */ new Set([
+    "ends",
+    "starts",
+    "deleted_at",
+    "created_at",
+    "updated_at",
+    "un_expired_by_human_at",
+    "approved_at",
+    "expiry_start_date",
+    "hot_date",
+    "picked_at",
+    "bumped_at"
+  ]);
+  var _merchantCache = /* @__PURE__ */ new Map();
+  function formatFieldValue(property, value) {
+    if (property === "merchant_id") {
+      const id = Number(value);
+      if (!id) return "—";
+      return escapeHtml4(_merchantCache.get(id) || `#${id}`);
+    }
+    if (TIMESTAMP_PROPERTIES.has(property)) {
+      const num = Number(value);
+      return escapeHtml4(num ? formatPlTimestamp(num) || "—" : "—");
+    }
+    return escapeHtml4(truncate(stripHtml(value)) || "—");
+  }
+  function escapeHtml4(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function injectStyles8() {
+    if (_stylesInjected6) return;
+    _stylesInjected6 = true;
+    GM_addStyle(`
+        #jp-sel-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 100000;
+        }
+        #jp-sel-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100001;
+            width: 560px;
+            max-width: calc(100vw - 32px);
+            max-height: 78vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--jp-bg, #fff);
+            border: 1px solid var(--jp-border, #ddd);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,.35);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--jp-text, #333);
+        }
+        #jp-sel-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--jp-border, #ddd);
+            font-weight: 700;
+            font-size: 13px;
+            color: #c0392b;
+        }
+        #jp-sel-header .jp-sel-count {
+            font-weight: 400;
+            font-size: 11px;
+            color: var(--jp-text-muted, #888);
+        }
+        #jp-sel-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 2px 4px;
+            color: var(--jp-text-muted, #999);
+            font-family: inherit;
+        }
+        #jp-sel-close:hover { color: #c0392b; }
+        #jp-sel-body {
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+        .jp-sel-row {
+            display: grid;
+            grid-template-columns: 22px 1fr auto;
+            gap: 2px 8px;
+            align-items: flex-start;
+            padding: 7px 14px;
+            border-bottom: 1px solid var(--jp-border, #eee);
+        }
+        .jp-sel-row:last-child { border-bottom: none; }
+        .jp-sel-icon { font-size: 13px; }
+        .jp-sel-action {
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .jp-sel-user {
+            font-weight: 400;
+            font-size: 12px;
+            color: var(--jp-text-muted, #777);
+        }
+        .jp-sel-user a {
+            color: var(--jp-link, #c0392b);
+            text-decoration: none;
+        }
+        .jp-sel-user a:hover { text-decoration: underline; }
+        .jp-sel-time {
+            font-size: 11px;
+            color: var(--jp-text-muted, #888);
+            white-space: nowrap;
+        }
+        .jp-sel-state {
+            padding: 20px 14px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--jp-text-muted, #888);
+        }
+        .jp-sel-state.jp-sel-error { color: #c0392b; }
+        .jp-spicy-log-btn { cursor: pointer; }
+        .jp-sel-edit-fields {
+            margin-top: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .jp-sel-edit-field {
+            font-size: 10px;
+            color: var(--jp-text-muted, #888);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .jp-sel-edit-field-name {
+            font-weight: 600;
+            color: var(--jp-text-muted, #999);
+        }
+        .jp-sel-edit-old {
+            text-decoration: line-through;
+            opacity: .8;
+        }
+        .jp-sel-edit-arrow {
+            margin: 0 3px;
+            color: #c0392b;
+        }
+        .jp-sel-edit-new {
+            color: var(--jp-text, #333);
+        }
+    `);
+  }
+  function getDealId() {
+    const fromPath = window.location.pathname.match(THREAD_PATH_RE2);
+    if (fromPath) return fromPath[1];
+    const link = document.querySelector('a[href*="/admin/thread-edit-log/"]');
+    const fromLink = link?.getAttribute("href")?.match(EDIT_LOG_HREF_RE);
+    return fromLink ? fromLink[1] : null;
+  }
+  async function fetchArchive(dealId) {
+    const url = `https://www.pepper.pl/admin-v2/moderation/archive/?term=${encodeURIComponent(dealId)}&noCache=${Date.now()}`;
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": getXsrfToken2()
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const items = data?.state?.archive?.items || [];
+    const moderators = data?.state?.archive?.moderators || [];
+    const nickById = new Map(moderators.map((m) => [m.id, m.username]));
+    const entries = items.filter((it) => String(it.objectId) === String(dealId)).map((it) => ({
+      type: "action",
+      action: it.moderationAction,
+      moderatorId: it.moderatorUserId,
+      nick: nickById.get(it.moderatorUserId) || null,
+      timestamp: it.createdAt
+    })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const missingIds = [...new Set(
+      entries.filter((e) => !e.nick && e.moderatorId != null).map((e) => e.moderatorId)
+    )];
+    if (missingIds.length) {
+      const resolved = await Promise.all(missingIds.map(async (id) => [id, await resolveNick(id)]));
+      const resolvedMap = new Map(resolved);
+      for (const e of entries) {
+        if (!e.nick && resolvedMap.has(e.moderatorId)) e.nick = resolvedMap.get(e.moderatorId);
+      }
+    }
+    return entries;
+  }
+  async function fetchEditLog(dealId) {
+    const url = `https://www.pepper.pl/admin/thread-edit-log/${encodeURIComponent(dealId)}`;
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-XSRF-TOKEN": getXsrfToken2()
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const changes = data?.thread?.changes || data?.changes || data?.data?.thread?.changes || data?.data?.changes || [];
+    const merchant = data?.thread?.merchant || data?.merchant || data?.data?.thread?.merchant || data?.data?.merchant;
+    if (merchant?.merchant_id != null && merchant?.merchant_name) {
+      _merchantCache.set(Number(merchant.merchant_id), merchant.merchant_name);
+    }
+    const groups = /* @__PURE__ */ new Map();
+    for (const c of changes) {
+      const key = c.change_set || `single-${c.change_id}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          type: "edit",
+          userId: c.user_id ?? null,
+          nick: c.username && c.username !== "N/A" ? c.username : null,
+          timestamp: c.created_at,
+          changeType: c.change_type,
+          fields: []
+        });
+      }
+      if (c.property && !_hiddenFields.has(c.property)) {
+        groups.get(key).fields.push({ property: c.property, oldValue: c.old_value, newValue: c.new_value });
+      }
+    }
+    return [...groups.values()].filter((g) => g.changeType === "create" || g.fields.length > 0);
+  }
+  function renderWho(nick, userId) {
+    if (!nick) return "—";
+    return userId ? `<a href="https://www.pepper.pl/admin/inspector/users/${userId}" target="_blank" rel="noopener">${escapeHtml4(nick)}</a>` : escapeHtml4(nick);
+  }
+  function renderFieldsHtml(fields) {
+    if (!fields || !fields.length) return "";
+    return `
+        <div class="jp-sel-edit-fields">
+            ${fields.map((f) => `
+                <div class="jp-sel-edit-field">
+                    <span class="jp-sel-edit-field-name">${escapeHtml4(prettifyProperty(f.property))}:</span>
+                    <span class="jp-sel-edit-old">${formatFieldValue(f.property, f.oldValue)}</span>
+                    <span class="jp-sel-edit-arrow">→</span>
+                    <span class="jp-sel-edit-new">${formatFieldValue(f.property, f.newValue)}</span>
+                </div>
+            `).join("")}
+        </div>`;
+  }
+  function renderActionRow(entry) {
+    const { icon, label } = describeAction(entry.action);
+    const who = renderWho(entry.nick, entry.moderatorId);
+    const when = formatPlTimestamp(entry.timestamp) || "—";
+    return `
+        <div class="jp-sel-row">
+            <span class="jp-sel-icon">${icon}</span>
+            <span>
+                <span class="jp-sel-action">${escapeHtml4(label)}</span> <span class="jp-sel-user">· ${who}</span>
+                ${renderFieldsHtml(entry.fields)}
+            </span>
+            <span class="jp-sel-time">${escapeHtml4(when)}</span>
+        </div>`;
+  }
+  function renderEditRow(entry) {
+    const who = renderWho(entry.nick, entry.userId);
+    const when = formatPlTimestamp(entry.timestamp) || "—";
+    const isCreate = entry.changeType === "create" && !entry.fields.length;
+    const label = isCreate ? "Utworzenie okazji" : "Edycja";
+    const fieldNames = entry.fields.map((f) => prettifyProperty(f.property)).join(", ");
+    return `
+        <div class="jp-sel-row jp-sel-row--edit">
+            <span class="jp-sel-icon">✏️</span>
+            <span>
+                <span class="jp-sel-action">${escapeHtml4(label)}${fieldNames ? `: ${escapeHtml4(fieldNames)}` : ""}</span>
+                <span class="jp-sel-user">· ${who}</span>
+                ${renderFieldsHtml(entry.fields)}
+            </span>
+            <span class="jp-sel-time">${escapeHtml4(when)}</span>
+        </div>`;
+  }
+  function renderRows(entries) {
+    if (!entries.length) {
+      return '<div class="jp-sel-state">Brak zarejestrowanych akcji</div>';
+    }
+    return entries.map((e) => e.type === "edit" ? renderEditRow(e) : renderActionRow(e)).join("");
+  }
+  function mergeEditsIntoActions(actions, edits) {
+    const used = /* @__PURE__ */ new Set();
+    const leftoverEdits = [];
+    for (const edit of edits) {
+      const matchIndex = actions.findIndex(
+        (a, i) => !used.has(i) && Math.abs((a.timestamp || 0) - (edit.timestamp || 0)) <= 1 && a.moderatorId != null && a.moderatorId === edit.userId
+      );
+      if (matchIndex !== -1) {
+        used.add(matchIndex);
+        actions[matchIndex].fields = edit.fields;
+      } else {
+        leftoverEdits.push(edit);
+      }
+    }
+    return [...actions, ...leftoverEdits];
+  }
+  function closeModal() {
+    document.getElementById("jp-sel-overlay")?.remove();
+    document.getElementById("jp-sel-modal")?.remove();
+    document.removeEventListener("keydown", onEscape);
+  }
+  function onEscape(e) {
+    if (e.key === "Escape") closeModal();
+  }
+  async function openModal(dealId) {
+    closeModal();
+    injectStyles8();
+    const overlay = document.createElement("div");
+    overlay.id = "jp-sel-overlay";
+    overlay.onclick = closeModal;
+    const modal = document.createElement("div");
+    modal.id = "jp-sel-modal";
+    modal.innerHTML = `
+        <div id="jp-sel-header">
+            <span>🌶️ Spicy edit log</span>
+            <span class="jp-sel-count">ID ${escapeHtml4(dealId)}</span>
+            <button id="jp-sel-close" type="button" title="Zamknij">✕</button>
+        </div>
+        <div id="jp-sel-body"><div class="jp-sel-state">Wczytuję historię…</div></div>
+    `;
+    document.body.append(overlay, modal);
+    modal.querySelector("#jp-sel-close").onclick = closeModal;
+    document.addEventListener("keydown", onEscape);
+    const body = modal.querySelector("#jp-sel-body");
+    try {
+      const [actions, edits] = await Promise.all([
+        fetchArchive(dealId).catch((err) => {
+          console.warn("[Jalapeño] spicy log archive:", err);
+          return [];
+        }),
+        fetchEditLog(dealId).catch((err) => {
+          console.warn("[Jalapeño] spicy log edit-log:", err);
+          return [];
+        })
+      ]);
+      const entries = mergeEditsIntoActions(actions, edits).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (!document.getElementById("jp-sel-modal")) return;
+      body.innerHTML = renderRows(entries);
+      modal.querySelector(".jp-sel-count").textContent = `ID ${dealId} · ${entries.length} wpisów`;
+    } catch (err) {
+      if (!document.getElementById("jp-sel-modal")) return;
+      body.innerHTML = `<div class="jp-sel-state jp-sel-error">Nie udało się pobrać historii (${escapeHtml4(err.message)})</div>`;
+    }
+  }
+  function injectIntoUserAdminBar() {
+    const bar = document.getElementById("jp-user-admin-links");
+    if (!bar || bar.querySelector("#jp-spicy-log-btn")) return;
+    const dealId = getDealId();
+    if (!dealId) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "jp-spicy-log-btn";
+    btn.className = "jp-user-admin-btn jp-user-admin-btn--metabase jp-spicy-log-btn";
+    btn.title = "Historia akcji moderatorów (bez otwierania nowej karty)";
+    btn.textContent = "🌶️ Spicy log";
+    btn.onclick = () => openModal(getDealId() || dealId);
+    bar.appendChild(btn);
+  }
+  function injectIntoFooter() {
+    const nativeLinks = document.querySelectorAll('a.thread-footer-option[href*="/admin/thread-edit-log/"]');
+    for (const nativeLink of nativeLinks) {
+      if (nativeLink.nextElementSibling?.classList?.contains("jp-spicy-log-footer-btn")) continue;
+      const m = nativeLink.getAttribute("href")?.match(EDIT_LOG_HREF_RE);
+      const dealId = m ? m[1] : null;
+      if (!dealId) continue;
+      const btn = document.createElement("a");
+      btn.className = `${nativeLink.className} jp-spicy-log-footer-btn`;
+      btn.title = "Historia akcji moderatorów (bez otwierania nowej karty)";
+      btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c">🌶️ Spicy log</span>';
+      btn.onclick = (e) => {
+        e.preventDefault();
+        openModal(dealId);
+      };
+      nativeLink.insertAdjacentElement("afterend", btn);
+    }
+  }
+  function initSpicyEditLog(settings3) {
+    if (!settings3.enableSpicyEditLog) return;
+    _hiddenFields = new Set(settings3.spicyLogHiddenFields || []);
+    injectIntoUserAdminBar();
+    injectIntoFooter();
+  }
+
   // src/main.js
   (function() {
     "use strict";
@@ -10419,6 +10892,8 @@ ${text}`
       enableDealDateTools: true,
       enableMultipackHelper: true,
       enableTitleCaseHelper: true,
+      enableSpicyEditLog: true,
+      spicyLogHiddenFields: ["image_data", "main_image_autoslot"],
       dealDateCustom: "",
       enableShopInfo: true,
       enableGeekStats: true,
@@ -10429,6 +10904,8 @@ ${text}`
       shippingStackPosition: "right",
       shippingStackPosOffset: 300
     };
+    GM_deleteValue("jpGroqApiKey");
+    GM_deleteValue("jpGeminiApiKey");
     let settings3 = Object.assign({}, DEFAULT_SETTINGS, GM_getValue("jalapenoSettings", {}));
     initTextUtils(settings3);
     initI18n(settings3);
@@ -10451,6 +10928,20 @@ ${text}`
     const isPromocjePage = /^\/promocje\//.test(location.pathname);
     if (isPromocjePage) {
       if (settings3.enableCommentTemplates) initCommentTemplates();
+      if (settings3.enableSpicyEditLog) {
+        initSpicyEditLog(settings3);
+        const selObs = new MutationObserver(() => initSpicyEditLog(settings3));
+        selObs.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => selObs.disconnect(), 1e4);
+      }
+      return;
+    }
+    const isFrontPage = location.pathname === "/";
+    if (isFrontPage) {
+      if (settings3.enableSpicyEditLog) {
+        initSpicyEditLog(settings3);
+        setInterval(() => initSpicyEditLog(settings3), 2e3);
+      }
       return;
     }
     initAnalytics();
@@ -10585,7 +11076,8 @@ ${text}`
           settingsModuleToggle("set-user-admin-links", s.enableUserAdminLinks, "mUserAdminLinks", "mUserAdminLinksHint"),
           settingsModuleToggle("set-reported-reason", s.enableReportedReason, "mReportedReason", "mReportedReasonHint"),
           settingsModuleToggle("set-shop-info", s.enableShopInfo, "mShopInfo", "mShopInfoHint"),
-          settingsModuleToggle("set-title-case", s.enableTitleCaseHelper, "mTitleCase", "mTitleCaseHint")
+          settingsModuleToggle("set-title-case", s.enableTitleCaseHelper, "mTitleCase", "mTitleCaseHint"),
+          settingsModuleToggle("set-spicy-edit-log", s.enableSpicyEditLog, "mSpicyEditLog", "mSpicyEditLogHint")
         ]),
         settingsModuleGroup("secModShipping", "secModShippingDesc", [
           settingsModuleToggle("set-auto-amazon", s.enableAutoAmazonShipping, "mAutoAmz", "mAutoAmzHint"),
@@ -10617,6 +11109,16 @@ ${text}`
           settingsModuleToggle("set-eye-break", s.enableEyeBreak, "mEyeBreak", "mEyeBreakHint")
         ])
       ].join("");
+    }
+    function buildSpicyLogFieldsHtml() {
+      const hidden = new Set(settings3.spicyLogHiddenFields || []);
+      return SPICY_LOG_FIELDS.map((f) => `
+            <label class="jp-module-toggle">
+                <input type="checkbox" class="jp-spicy-field-check" value="${f.key}" ${hidden.has(f.key) ? "" : "checked"}>
+                <span class="jp-module-toggle-body">
+                    <span class="jp-module-toggle-title">${f.label}</span>
+                </span>
+            </label>`).join("");
     }
     function openSettings() {
       increment("settingsOpened");
@@ -10664,6 +11166,9 @@ ${text}`
                 </div>
                 ${settingsSectionHead("secModules", "secModulesDesc")}
                 <div class="jp-settings-groups">${buildSettingsModulesHtml()}</div>
+
+                ${settingsSectionHead("secSpicyLogFields", "secSpicyLogFieldsDesc")}
+                <div class="jp-module-grid jp-module-grid--3col">${buildSpicyLogFieldsHtml()}</div>
 
                 ${settingsSectionHead("secFloatingBtn", "secFloatingBtnDesc")}
                 <div class="settings-row settings-row-special jp-floating-settings">
@@ -10950,6 +11455,8 @@ ${text}`
           enableDealDateTools: document.getElementById("set-deal-date-tools").checked,
           enableMultipackHelper: document.getElementById("set-multipack").checked,
           enableTitleCaseHelper: document.getElementById("set-title-case").checked,
+          enableSpicyEditLog: document.getElementById("set-spicy-edit-log").checked,
+          spicyLogHiddenFields: Array.from(document.querySelectorAll(".jp-spicy-field-check")).filter((el) => !el.checked).map((el) => el.value),
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
           enableGeekStats: document.getElementById("set-geekstats").checked,
           enableEyeBreak: document.getElementById("set-eye-break").checked,
@@ -11292,6 +11799,9 @@ ${text}`
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px 16px;
+        }
+        .jp-module-grid--3col {
+            grid-template-columns: 1fr 1fr 1fr;
         }
         .jp-module-toggle {
             display: flex;
@@ -15222,6 +15732,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       initExactTimestamps(settings3);
       initUserAdminLinks(settings3);
       initReportedReason(settings3);
+      initSpicyEditLog(settings3);
       let now = Date.now();
       if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
         highlightEditedCards();
