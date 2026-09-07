@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.0.25
+// @version      5.1
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -12,9 +12,6 @@
 // @match        *://*.pepper.pl/admin/inspector/users/*
 // @match        *://*.pepper.pl/promocje/*
 // @match        *://*.pepper.pl/
-// @match        *://www.google.com/*
-// @match        *://www.google.pl/*
-// @match        *://lens.google.com/*
 // @match        *://*.allegro.pl/*
 // @match        *://allegro.pl/*
 // @match        *://*.aliexpress.com/*
@@ -33,7 +30,6 @@
 // @connect      script.googleusercontent.com
 // @connect      www.pepper.pl
 // @connect      open.er-api.com
-// @connect      translate.googleapis.com
 // @connect      raw.githubusercontent.com
 // @connect      allegro.pl
 // @connect      a.allegroimg.com
@@ -713,6 +709,8 @@
                 .theme--light .v-input--switch__thumb.accent--text { color: #d84315 !important; background-color: #d84315 !important; }
                 .v-image div.primary.white--text { background-color: #d84315 !important; color: #ffffff !important; }
                 .theme--light.v-card.jp-card-edited { background-color: rgba(178, 92, 0, 0.15) !important; border: 2px solid #b25c00 !important; }
+                .v-chip.jp-duplicates-alert { background-color: #c0392b !important; }
+                .v-chip.jp-duplicates-alert .v-chip__content { color: #fff !important; font-weight: 700; }
 
                 /* -----------------------------------------
                    B. STARY PANEL ADMINA (V1 - Angular/Ace)
@@ -941,6 +939,326 @@
             `;
     }
     GM_addStyle(css);
+  }
+
+  // src/ui/draggable.js
+  var POSITIONS_KEY = "jpPanelPositions";
+  var _positions = null;
+  var _stylesInjected = false;
+  function loadPositions() {
+    if (!_positions) _positions = GM_getValue(POSITIONS_KEY, {});
+    return _positions;
+  }
+  function savePosition(id, left, top, width, height) {
+    const positions = loadPositions();
+    const prev = positions[id];
+    positions[id] = {
+      left,
+      top,
+      width,
+      height: height ?? prev?.height,
+      scrollX: window.scrollX,
+      scrollY: window.scrollY
+    };
+    GM_setValue(POSITIONS_KEY, positions);
+  }
+  function saveSize(id, width, height) {
+    const positions = loadPositions();
+    const prev = positions[id];
+    if (!prev) return;
+    positions[id] = { ...prev, width, height };
+    GM_setValue(POSITIONS_KEY, positions);
+  }
+  function setImportant(el, prop, value) {
+    if (value === "" || value == null) el.style.removeProperty(prop);
+    else el.style.setProperty(prop, value, "important");
+  }
+  var _detachedReposition = /* @__PURE__ */ new Set();
+  var _scrollListenerActive = false;
+  var _scrollRafPending = false;
+  function runRepositionPass() {
+    _scrollRafPending = false;
+    for (const reposition of _detachedReposition) reposition();
+  }
+  function onSharedScroll() {
+    if (_scrollRafPending) return;
+    _scrollRafPending = true;
+    requestAnimationFrame(runRepositionPass);
+  }
+  function registerDetached(reposition) {
+    _detachedReposition.add(reposition);
+    if (!_scrollListenerActive) {
+      _scrollListenerActive = true;
+      window.addEventListener("scroll", onSharedScroll, { passive: true });
+    }
+  }
+  function unregisterDetached(reposition) {
+    _detachedReposition.delete(reposition);
+    if (_scrollListenerActive && _detachedReposition.size === 0) {
+      _scrollListenerActive = false;
+      window.removeEventListener("scroll", onSharedScroll);
+    }
+  }
+  function clearPosition(id) {
+    const positions = loadPositions();
+    delete positions[id];
+    GM_setValue(POSITIONS_KEY, positions);
+  }
+  function resetAllPositions() {
+    _positions = {};
+    GM_setValue(POSITIONS_KEY, {});
+  }
+  function injectStyles() {
+    if (_stylesInjected) return;
+    _stylesInjected = true;
+    GM_addStyle(`
+        .jp-drag-handle {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            cursor: grab;
+            font-size: 12px;
+            line-height: 1;
+            padding: 3px 5px;
+            border-radius: 4px;
+            color: var(--jp-text-muted, #999);
+            background: transparent;
+            user-select: none;
+            z-index: 20;
+            opacity: 0.55;
+            transition: opacity 0.15s, background 0.15s;
+        }
+        .jp-drag-handle:hover {
+            opacity: 1;
+            background: rgba(128,128,128,0.15);
+        }
+        .jp-drag-handle.jp-drag-active {
+            cursor: grabbing;
+            opacity: 1;
+        }
+        .jp-drag-resizable {
+            overflow: auto;
+        }
+        .jp-resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            z-index: 20;
+            opacity: 0.55;
+            background:
+                linear-gradient(135deg, transparent 0 50%, var(--jp-text-muted, #999) 50% 58%, transparent 58% 66%, var(--jp-text-muted, #999) 66% 74%, transparent 74%);
+        }
+        .jp-resize-handle:hover, .jp-resize-handle.jp-resize-active {
+            opacity: 1;
+        }
+    `);
+  }
+  function makeDraggable(el, id) {
+    if (!el || el.dataset.jpDraggable) return;
+    const settings3 = GM_getValue("jalapenoSettings", {});
+    if (!settings3.enablePanelDragging) return;
+    const followsPage = !!settings3.panelDragFollowsPage;
+    el.dataset.jpDraggable = "1";
+    injectStyles();
+    const computedPos = getComputedStyle(el).position;
+    const forcedRelative = computedPos !== "fixed" && computedPos !== "absolute";
+    if (forcedRelative) setImportant(el, "position", "relative");
+    let detached = false;
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
+    let handle = null;
+    let resizeHandle = null;
+    let rStartX = 0, rStartY = 0, rStartWidth = 0, rStartHeight = 0, resizing = false;
+    let pageLeft = 0, pageTop = 0;
+    let refScrollX = 0, refScrollY = 0;
+    const getPoint = (e) => e.touches ? e.touches[0] : e;
+    const applyFromPage = () => {
+      refScrollX = window.scrollX;
+      refScrollY = window.scrollY;
+      setImportant(el, "left", `${pageLeft - refScrollX}px`);
+      setImportant(el, "top", `${pageTop - refScrollY}px`);
+      setImportant(el, "transform", "translate(0px, 0px)");
+    };
+    const repositionForScroll = () => {
+      const dx = refScrollX - window.scrollX;
+      const dy = refScrollY - window.scrollY;
+      setImportant(el, "transform", `translate(${dx}px, ${dy}px)`);
+    };
+    function ensureResizeHandle() {
+      if (!detached) return;
+      if (resizeHandle && el.contains(resizeHandle)) return;
+      resizeHandle = document.createElement("div");
+      resizeHandle.className = "jp-resize-handle";
+      resizeHandle.title = "Przeciągnij, aby zmienić rozmiar panelu";
+      resizeHandle.addEventListener("mousedown", onResizeDown);
+      resizeHandle.addEventListener("touchstart", onResizeDown, { passive: false });
+      el.appendChild(resizeHandle);
+    }
+    function detachAtViewportPoint(left, top, width, height) {
+      if (!detached) {
+        detached = true;
+        const rect = el.getBoundingClientRect();
+        setImportant(el, "width", `${width ?? rect.width}px`);
+        if (height) setImportant(el, "height", `${height}px`);
+        setImportant(el, "margin", "0");
+        setImportant(el, "z-index", "99999");
+        setImportant(el, "position", "fixed");
+        el.classList.add("jp-drag-resizable");
+        if (followsPage) registerDetached(repositionForScroll);
+        ensureResizeHandle();
+      }
+      if (followsPage) {
+        pageLeft = left + window.scrollX;
+        pageTop = top + window.scrollY;
+        applyFromPage();
+      } else {
+        setImportant(el, "left", `${left}px`);
+        setImportant(el, "top", `${top}px`);
+      }
+    }
+    function reattach() {
+      if (!detached) return;
+      detached = false;
+      if (followsPage) unregisterDetached(repositionForScroll);
+      resizeHandle?.remove();
+      resizeHandle = null;
+      el.classList.remove("jp-drag-resizable");
+      if (forcedRelative) setImportant(el, "position", "relative");
+      else setImportant(el, "position", "");
+      setImportant(el, "left", "");
+      setImportant(el, "top", "");
+      setImportant(el, "transform", "");
+      setImportant(el, "width", "");
+      setImportant(el, "height", "");
+      setImportant(el, "margin", "");
+      setImportant(el, "z-index", "");
+    }
+    const onResizeMove = (e) => {
+      if (!resizing) return;
+      const p = getPoint(e);
+      const width = Math.max(120, rStartWidth + (p.clientX - rStartX));
+      const height = Math.max(60, rStartHeight + (p.clientY - rStartY));
+      setImportant(el, "width", `${width}px`);
+      setImportant(el, "height", `${height}px`);
+    };
+    const stopResizing = () => {
+      if (!resizing) return;
+      resizing = false;
+      resizeHandle?.classList.remove("jp-resize-active");
+      document.removeEventListener("mousemove", onResizeMove);
+      document.removeEventListener("mouseup", stopResizing);
+      document.removeEventListener("touchmove", onResizeMove);
+      document.removeEventListener("touchend", stopResizing);
+      saveSize(id, el.offsetWidth, el.offsetHeight);
+    };
+    const onResizeDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizing = true;
+      resizeHandle.classList.add("jp-resize-active");
+      const p = getPoint(e);
+      rStartX = p.clientX;
+      rStartY = p.clientY;
+      rStartWidth = el.offsetWidth;
+      rStartHeight = el.offsetHeight;
+      document.addEventListener("mousemove", onResizeMove);
+      document.addEventListener("mouseup", stopResizing);
+      document.addEventListener("touchmove", onResizeMove, { passive: false });
+      document.addEventListener("touchend", stopResizing);
+    };
+    const onMove = (e) => {
+      if (!dragging) return;
+      const p = getPoint(e);
+      detachAtViewportPoint(startLeft + (p.clientX - startX), startTop + (p.clientY - startY));
+    };
+    const stopDragging = () => {
+      if (!dragging) return;
+      dragging = false;
+      handle?.classList.remove("jp-drag-active");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", stopDragging);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", stopDragging);
+      const rect = el.getBoundingClientRect();
+      savePosition(id, rect.left, rect.top, rect.width);
+    };
+    const onDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      if (!detached) detachAtViewportPoint(rect.left, rect.top, rect.width);
+      dragging = true;
+      handle.classList.add("jp-drag-active");
+      const p = getPoint(e);
+      startX = p.clientX;
+      startY = p.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", stopDragging);
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", stopDragging);
+    };
+    const onReset = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      reattach();
+      clearPosition(id);
+    };
+    const ensureHandle = () => {
+      if (handle && el.contains(handle)) return;
+      handle = document.createElement("div");
+      handle.className = "jp-drag-handle";
+      handle.title = "Przeciągnij, aby przesunąć panel (dwuklik = reset)";
+      handle.textContent = "⋮⋮";
+      handle.addEventListener("mousedown", onDown);
+      handle.addEventListener("touchstart", onDown, { passive: false });
+      handle.addEventListener("dblclick", onReset);
+      el.appendChild(handle);
+    };
+    const saved = loadPositions()[id];
+    if (saved) {
+      detached = true;
+      const rect = el.getBoundingClientRect();
+      const width = saved.width ?? rect.width;
+      setImportant(el, "width", `${width}px`);
+      if (saved.height) setImportant(el, "height", `${saved.height}px`);
+      setImportant(el, "margin", "0");
+      setImportant(el, "z-index", "99999");
+      setImportant(el, "position", "fixed");
+      el.classList.add("jp-drag-resizable");
+      const height = saved.height ?? el.offsetHeight;
+      if (followsPage) {
+        const savedPageLeft = saved.left + (saved.scrollX ?? 0);
+        const savedPageTop = saved.top + (saved.scrollY ?? 0);
+        const left = Math.max(0, Math.min(window.innerWidth - width, savedPageLeft - window.scrollX));
+        const top = Math.max(0, Math.min(window.innerHeight - height, savedPageTop - window.scrollY));
+        pageLeft = left + window.scrollX;
+        pageTop = top + window.scrollY;
+        applyFromPage();
+        registerDetached(repositionForScroll);
+      } else {
+        const left = Math.max(0, Math.min(window.innerWidth - width, saved.left));
+        const top = Math.max(0, Math.min(window.innerHeight - height, saved.top));
+        setImportant(el, "left", `${left}px`);
+        setImportant(el, "top", `${top}px`);
+      }
+      ensureResizeHandle();
+    }
+    ensureHandle();
+    ensureResizeHandle();
+    const observer = new MutationObserver(() => {
+      if (!el.isConnected) {
+        observer.disconnect();
+        if (followsPage) unregisterDetached(repositionForScroll);
+        return;
+      }
+      ensureHandle();
+      ensureResizeHandle();
+    });
+    observer.observe(el, { childList: true });
   }
 
   // src/data/marketDB.js
@@ -1621,7 +1939,6 @@
       mBannedHighlightHint: "Działa w całym panelu moderacji — podświetla „banned” i „unauthenticated” w tekście strony.",
       mPriceWarningHint: "Na liście deals/new pokazuje badge, gdy cena wzrosła o więcej niż 1% vs minimum z logów.",
       mImageSearchHint: "Przycisk Lens przy miniaturze zdjęcia okazji w formularzu.",
-      mLensDescriptionHint: "Generuje opis produktu z Google Lens AI Overview i wkleja do edytora opisu.",
       mProductInspectorHint: "Wykrywa EAN / ASIN z tytułu i URL; generuje barcode do opisu.",
       mLinkExpanderHint: "Przycisk w edytorze opisu — rozwija skrócone linki (bit.ly itd.).",
       mAllegroImagesHint: "Pobiera główne zdjęcie z oferty Allegro i wgrywa do okazji.",
@@ -1679,6 +1996,12 @@
       mSpicyEditLogHint: "Dodaje przycisk 🌶️ Spicy log obok natywnego Edit log. Pokazuje historię akcji moderatorów (akcja, nick, dokładny czas) w oknie na stronie, bez otwierania nowej karty.",
       secSpicyLogFields: "Pola widoczne w Spicy edit log",
       secSpicyLogFieldsDesc: "Wybierz które zmienione pola mają pojawiać się w diffie edycji. Domyślnie wszystkie widoczne.",
+      mPanelDragging: "Przeciąganie paneli (eksperymentalne)",
+      mPanelDraggingHint: "⚠️ Funkcja eksperymentalna, wciąż dopracowywana. Dodaje uchwyt ⋮⋮ w rogu każdego panelu Jalapeño — przeciągnij, aby przesunąć go w dowolne miejsce. Przeciągnij róg panelu, aby zmienić jego rozmiar. Pozycja i rozmiar zapamiętywane na stałe. Dwuklik na uchwycie resetuje pozycję.",
+      mPanelDragFollowsPage: "Panele podążają za treścią strony",
+      mPanelDragFollowsPageHint: "Domyślnie przesunięty panel zostaje przyklejony do miejsca na ekranie. Włącz, aby zamiast tego trzymał się miejsca na stronie i przewijał się razem z treścią.",
+      btnResetPanelPositions: "Resetuj wszystkie pozycje",
+      confirmResetPanelPositions: "Zresetować pozycję i rozmiar wszystkich przesuniętych paneli? Strona zostanie przeładowana.",
       mGeekStats: "GeekStats — licznik akcji zmiany",
       mGeekStatsHint: "Floating widget (lewy dół) liczący kliknięcia DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE od godziny 2:00 w nocy. Resetuje się codziennie o 2:00.",
       mEyeBreak: "Przypomnienie o przerwie dla oczu",
@@ -1779,14 +2102,6 @@
       mAllegroImgNone: "Nie znaleziono zdjęć produktu w galerii Allegro",
       mAllegroImgNoUrl: "Brak linku do oferty Allegro (mainUrl / canonicalUrl)",
       mAllegroImgUploadFailed: "Nie udało się wgrać zdjęcia: ",
-      mLensDescription: "Opis produktu z AI Overview (Google Lens)",
-      mLensAiCopied: "Opis po polsku skopiowany do schowka. Wróć do Peppera i kliknij przycisk AI w edytorze opisu.",
-      mLensAiPasted: "Opis z Lens wklejony do opisu okazji",
-      mLensAiNothingPending: "Brak gotowego opisu — kliknij przycisk AI w edytorze opisu, aby otworzyć Lens",
-      mLensAiOpenEditor: 'Najpierw otwórz "Edytuj opis"',
-      mLensAiOpenLens: "🔍 Lens otwarty — poczekaj na AI Overview i wróć tutaj",
-      mLensAiNoImage: "Brak zdjęcia okazji — dodaj obrazek przed użyciem opisu AI",
-      mToolbarLensAiTitle: "Otwórz Lens i wygeneruj opis produktu (AI Overview)",
       mUpdateBannerTitle: "Dostępna wersja Jalapeño {v}",
       mUpdateBannerHint: "Kliknij „Pobierz”, aby zaktualizować skrypt w Tampermonkey.",
       mUpdateDownload: "Pobierz aktualizację",
@@ -2012,7 +2327,6 @@
       mBannedHighlightHint: "Works across the whole moderation panel — highlights “banned” and “unauthenticated” in page text.",
       mPriceWarningHint: "On deals/new list shows a badge when price rose more than 1% vs log minimum.",
       mImageSearchHint: "Lens button on the deal thumbnail in the form.",
-      mLensDescriptionHint: "Generates product description from Google Lens AI Overview into the editor.",
       mProductInspectorHint: "Detects EAN / ASIN from title and URL; generates barcode for description.",
       mLinkExpanderHint: "Button in description editor — expands shortened links (bit.ly etc.).",
       mAllegroImagesHint: "Pulls main image from Allegro offer and uploads to the deal.",
@@ -2070,6 +2384,12 @@
       mSpicyEditLogHint: "Adds a 🌶️ Spicy log button next to the native Edit log. Shows the moderation history (action, nick, exact time) in an on-page dialog, without opening a new tab.",
       secSpicyLogFields: "Fields shown in Spicy edit log",
       secSpicyLogFieldsDesc: "Choose which changed fields appear in the edit diff. All shown by default.",
+      mPanelDragging: "Panel dragging (experimental)",
+      mPanelDraggingHint: "⚠️ Experimental feature, still being refined. Adds a ⋮⋮ handle to the corner of every Jalapeño panel — drag it to move the panel anywhere. Drag a panel's corner to resize it. Position and size are remembered permanently. Double-click the handle to reset.",
+      mPanelDragFollowsPage: "Panels follow the page content",
+      mPanelDragFollowsPageHint: "By default a moved panel stays glued to a spot on screen. Enable this to have it stick to a spot on the page and scroll with the content instead.",
+      btnResetPanelPositions: "Reset all positions",
+      confirmResetPanelPositions: "Reset the position and size of every moved panel? The page will reload.",
       mGeekStats: "GeekStats — shift action counter",
       mGeekStatsHint: "Floating widget (bottom-left) counting DELETE / HOLD / SAVE / APPROVE & SEND PM / SAVE & APPROVE clicks since 2:00 AM. Resets daily at 2:00.",
       mEyeBreak: "Eye break reminder",
@@ -2170,14 +2490,6 @@
       mAllegroImgUploadFailed: "Could not upload image: ",
       mLensBtn: "🔍 Search with Google Lens",
       mLensTitle: "Open current image in Google Lens",
-      mLensDescription: "Product description from AI Overview (Google Lens)",
-      mLensAiCopied: "Polish description copied to clipboard. Return to Pepper and click the AI button in the description editor.",
-      mLensAiPasted: "Lens description pasted into deal description",
-      mLensAiNothingPending: "No ready description — click the AI button in the description editor to open Lens",
-      mLensAiOpenEditor: 'Open "Edit description" first',
-      mLensAiOpenLens: "🔍 Lens opened — wait for AI Overview and return here",
-      mLensAiNoImage: "No deal image found — add an image before using AI description",
-      mToolbarLensAiTitle: "Open Lens and generate product description (AI Overview)",
       mUpdateBannerTitle: "Jalapeño {v} is available",
       mUpdateBannerHint: "Click Download to update the script in Tampermonkey.",
       mUpdateDownload: "Download update",
@@ -2324,6 +2636,17 @@
       }
     });
   }
+  function highlightDuplicatesChip() {
+    document.querySelectorAll(".hidden-sm-and-down.caption.text-uppercase.grey--text").forEach((label) => {
+      if (label.textContent.trim() !== "Duplicates") return;
+      const chip = label.previousElementSibling;
+      if (!chip || !chip.classList.contains("v-chip")) return;
+      const content = chip.querySelector(".v-chip__content");
+      if (!content) return;
+      const count = parseInt(content.textContent.trim(), 10) || 0;
+      chip.classList.toggle("jp-duplicates-alert", count > 0);
+    });
+  }
   var SAVE_DESCRIPTION_LABEL = "Zapisz opis";
   var _observedRoots = /* @__PURE__ */ new WeakSet();
   var _saveBtnWatchStarted = false;
@@ -2368,25 +2691,36 @@
   function ensureSaveButtonWatch() {
     if (_saveBtnWatchStarted) return;
     _saveBtnWatchStarted = true;
-    const rerun = () => {
-      if (!isThreadEditPage()) return;
-      updateSaveButtonTextInRoot(document);
-      updateSaveButtonTextInRoot(getDescriptionIframeDoc());
+    let rerunTimer = null;
+    const scheduleRerun = () => {
+      if (rerunTimer) return;
+      rerunTimer = setTimeout(() => {
+        rerunTimer = null;
+        if (!isThreadEditPage()) return;
+        updateSaveButtonTextInRoot(document);
+        updateSaveButtonTextInRoot(getDescriptionIframeDoc());
+      }, 250);
     };
     const observeRoot = (root) => {
       if (!root?.body || _observedRoots.has(root)) return;
       _observedRoots.add(root);
-      new MutationObserver(rerun).observe(root.body, {
+      new MutationObserver(scheduleRerun).observe(root.body, {
         childList: true,
         subtree: true,
         characterData: true
       });
     };
     observeRoot(document);
-    rerun();
+    scheduleRerun();
+    let iframeCheckTimer = null;
     new MutationObserver(() => {
-      observeRoot(getDescriptionIframeDoc());
-      rerun();
+      scheduleRerun();
+      if (!iframeCheckTimer) {
+        iframeCheckTimer = setTimeout(() => {
+          iframeCheckTimer = null;
+          observeRoot(getDescriptionIframeDoc());
+        }, 500);
+      }
     }).observe(document.body, { childList: true, subtree: true });
   }
   function updateSaveButtonText() {
@@ -2993,7 +3327,10 @@
     btnRow.appendChild(btn);
     return true;
   }
+  var _descriptionToolbarWatcherStarted = false;
   function watchForDescriptionToolbar() {
+    if (_descriptionToolbarWatcherStarted) return;
+    _descriptionToolbarWatcherStarted = true;
     function tryInject() {
       injectBarcodeToolbarBtn();
       const iframe = document.querySelector('iframe[src*="description/edit"]');
@@ -3024,6 +3361,7 @@
     body.className = "jp-inspector-body";
     panel.appendChild(body);
     leftCol.appendChild(panel);
+    makeDraggable(panel, "productInspector");
     function refresh() {
       renderInspectorBody(body, detectIdentifiers());
     }
@@ -3045,13 +3383,18 @@
     watchDescriptionChanges(debouncedRefresh);
     watchForDescriptionToolbar();
   }
+  var _descriptionChangeWatcherStarted = false;
+  var _currentDebouncedRefresh = null;
   function watchDescriptionChanges(debouncedRefresh) {
+    _currentDebouncedRefresh = debouncedRefresh;
+    if (_descriptionChangeWatcherStarted) return;
+    _descriptionChangeWatcherStarted = true;
     const attached = /* @__PURE__ */ new WeakSet();
     function attach(ctx) {
       if (!ctx || attached.has(ctx.editor)) return;
       attached.add(ctx.editor);
-      ctx.editor.addEventListener("input", debouncedRefresh);
-      new MutationObserver(debouncedRefresh).observe(ctx.editor, {
+      ctx.editor.addEventListener("input", () => _currentDebouncedRefresh?.());
+      new MutationObserver(() => _currentDebouncedRefresh?.()).observe(ctx.editor, {
         childList: true,
         subtree: true,
         characterData: true
@@ -3346,649 +3689,6 @@
     if (_initialized) return;
     _initialized = true;
     watchForDescriptionToolbar2();
-  }
-
-  // src/features/lensAiOverview.js
-  var PENDING_DESC_KEY = "jpPendingLensDescription";
-  var PENDING_DESC_TS_KEY = "jpPendingLensDescriptionTs";
-  var LENS_FLOW_KEY = "jpLensFlowActive";
-  var _pasteInitialized = false;
-  var _googleInitialized = false;
-  var _lastProcessedOverview = "";
-  var _toolbarDebounceTimer = null;
-  function isLensFlowActive() {
-    return GM_getValue(LENS_FLOW_KEY, "") === "1";
-  }
-  function translateToPolish(text) {
-    const CHUNK_SIZE = 3500;
-    const translateChunk = (chunk) => new Promise((resolve, reject) => {
-      const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=pl&dt=t&q=" + encodeURIComponent(chunk);
-      GM_xmlhttpRequest({
-        method: "GET",
-        url,
-        timeout: 2e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            const translated = (data[0] || []).map((part) => part[0]).join("");
-            resolve(translated || chunk);
-          } catch (err) {
-            reject(err);
-          }
-        },
-        onerror: () => reject(new Error("Translation network error")),
-        ontimeout: () => reject(new Error("Translation timed out"))
-      });
-    });
-    if (text.length <= CHUNK_SIZE) return translateChunk(text);
-    const chunks = [];
-    for (let i = 0; i < text.length; i += CHUNK_SIZE) {
-      chunks.push(text.slice(i, i + CHUNK_SIZE));
-    }
-    return chunks.reduce(
-      (promise, chunk) => promise.then((acc) => translateChunk(chunk).then((part) => acc + part)),
-      Promise.resolve("")
-    );
-  }
-  var NOISE_LINE_PATTERNS = [
-    /Kliknij dwukrotnie/i,
-    /Widoczna jest (krótka|pełna) treść/i,
-    /Przeczytaj (krótką|pełną) treść/i,
-    /^(Show more|Show less|Pokaż więcej|Pokaż mniej|Pokaż wszystko)$/i,
-    /^(Źródła|Sources)$/i,
-    /^Ekspert ds\./i,
-    /Przewidzieć/i,
-    /^Funciona muy bien\.?$/i
-  ];
-  var STOP_LINE_PATTERNS = [
-    /^Amazon\.pl$/i,
-    /^Allegro$/i,
-    /^\+\d+$/,
-    /^\d+\s*witryn/i,
-    /Pokaż wszystko/i,
-    /^(Ceneo|empik|botland|Media Expert|RTV Euro AGD|Oficjalny Sklep)/i,
-    /SONOFF.*\.\.\.$/i,
-    /Inteligentny.*\.\.\.$/i
-  ];
-  function isShoppingOrJunkLine(line) {
-    if (/\d+[,.]\d{2}\s*zł/i.test(line)) return true;
-    if (/[·•]/.test(line) && /\d/.test(line)) return true;
-    if (/osób zakupiło|dostawa pojutrze|zakupione|Inteligentnie!/i.test(line)) return true;
-    if (/^Biały, prostokątny|^Czarny, prostokątny/i.test(line)) return true;
-    if (/^\d{1,2}\.\d{1,2}\.\d{4}/.test(line)) return true;
-    if (line.length > 100 && /\.{3}$/.test(line)) return true;
-    return false;
-  }
-  function isNoiseLine(line) {
-    return NOISE_LINE_PATTERNS.some((re) => re.test(line));
-  }
-  function shouldStopCollection(line) {
-    return STOP_LINE_PATTERNS.some((re) => re.test(line));
-  }
-  function mergeIntoParagraphs(lines) {
-    const paragraphs = [];
-    let current = "";
-    for (const line of lines) {
-      if (!current) {
-        current = line;
-        continue;
-      }
-      const continues = /[^.!?]$/.test(current.trimEnd()) && /^[a-ząćęłńóśźż("]/.test(line);
-      if (continues) {
-        current += " " + line;
-      } else {
-        paragraphs.push(current);
-        current = line;
-      }
-    }
-    if (current) paragraphs.push(current);
-    return paragraphs.map((p) => p.replace(/\s+/g, " ").trim()).filter((p) => p.length >= 20).slice(0, 8).join("\n\n");
-  }
-  function cleanAiOverviewRaw(raw) {
-    const text = raw.replace(/^AI\s*Overview\s*/i, "").replace(/^Przegląd\s+AI\s*/i, "").trim();
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    const kept = [];
-    for (const line of lines) {
-      if (shouldStopCollection(line)) break;
-      if (isNoiseLine(line) || isShoppingOrJunkLine(line)) continue;
-      kept.push(line);
-    }
-    const merged = mergeIntoParagraphs(kept);
-    return merged.length >= 40 ? merged : null;
-  }
-  function findAiOverviewHeading() {
-    const labelRe = /^(AI\s*Overview|Przegląd\s+AI)$/i;
-    for (const el of document.querySelectorAll("h1, h2, h3, div, span")) {
-      if (labelRe.test(el.textContent.trim())) return el;
-    }
-    return null;
-  }
-  function getCleanText(el) {
-    const clone = el.cloneNode(true);
-    clone.querySelectorAll('.WBgIic, .NMq1me, button, a.PMDqCb, [jscontroller*="XqmSxe"]').forEach((n) => n.remove());
-    return clone.textContent.replace(/\s+/g, " ").trim();
-  }
-  function collectProseParagraphs(root) {
-    const lines = [];
-    const bulletItems = root.querySelectorAll("li.Z1qcYe");
-    if (bulletItems.length > 0) {
-      for (const li of bulletItems) {
-        const span = li.querySelector(".iNqyIf") || li;
-        const text = getCleanText(span);
-        if (!text || text.length < 15) continue;
-        if (shouldStopCollection(text)) break;
-        if (isNoiseLine(text) || isShoppingOrJunkLine(text)) continue;
-        lines.push(text);
-      }
-      if (lines.length > 0) return lines;
-    }
-    for (const p of root.querySelectorAll("p")) {
-      if (p.closest('a[href*="/shopping"]') || p.closest('[data-attrid*="product"]')) break;
-      if (p.querySelector('a[href*="amazon"], a[href*="allegro"]')) break;
-      const line = (p.innerText || "").trim();
-      if (!line) continue;
-      if (shouldStopCollection(line)) break;
-      if (isNoiseLine(line) || isShoppingOrJunkLine(line)) continue;
-      lines.push(line);
-    }
-    return lines;
-  }
-  function extractAiOverviewText() {
-    const heading = findAiOverviewHeading();
-    if (heading) {
-      const root = heading.closest("[data-container-id]") || heading.closest("[data-hveid]") || heading.closest(".WaaZC") || heading.parentElement?.parentElement?.parentElement;
-      if (root) {
-        const proseLines = collectProseParagraphs(root);
-        if (proseLines.length > 0) {
-          const merged = mergeIntoParagraphs(proseLines);
-          if (merged.length >= 40) return merged;
-        }
-        const cleaned = cleanAiOverviewRaw(root.innerText || "");
-        if (cleaned) return cleaned;
-      }
-    }
-    const containerSelectors = [
-      '[data-subtree="aimc"]',
-      // current format (2025)
-      '[data-container-id="aimc"]',
-      // legacy fallback
-      '[data-container-id="aiml_prs_pro"]',
-      '[jsname="yEVEwb"]',
-      ".I3nEPb",
-      ".YzNkB"
-    ];
-    for (const selector of containerSelectors) {
-      for (const block of document.querySelectorAll(selector)) {
-        const proseLines = collectProseParagraphs(block);
-        if (proseLines.length > 0) {
-          const merged = mergeIntoParagraphs(proseLines);
-          if (merged.length >= 40) return merged;
-        }
-        const cleaned = cleanAiOverviewRaw(block.innerText || "");
-        if (cleaned) return cleaned;
-      }
-    }
-    return null;
-  }
-  function formatDescription(text) {
-    const lines = text.replace(/\r\n/g, "\n").split("\n").map((l) => l.trim()).filter(Boolean);
-    const kept = [];
-    for (const line of lines) {
-      if (shouldStopCollection(line)) break;
-      if (isNoiseLine(line) || isShoppingOrJunkLine(line)) continue;
-      kept.push(line);
-    }
-    let result = kept.length > 0 ? mergeIntoParagraphs(kept) : text;
-    result = result.replace(/\n{3,}/g, "\n\n").replace(/([.!?])\s+(?=[A-ZĄĆĘŁŃÓŚŹŻ])/g, "$1\n\n").trim();
-    if (result.length > 1500) {
-      result = result.slice(0, 1500).replace(/\s+\S*$/, "") + ".";
-    }
-    return result;
-  }
-  function storePendingDescription(text) {
-    GM_setValue(PENDING_DESC_KEY, text);
-    GM_setValue(PENDING_DESC_TS_KEY, Date.now());
-  }
-  function getPendingDescription() {
-    const text = GM_getValue(PENDING_DESC_KEY, "");
-    const ts = GM_getValue(PENDING_DESC_TS_KEY, 0);
-    if (!text || !ts || Date.now() - ts > 30 * 60 * 1e3) return null;
-    return text;
-  }
-  async function copyToClipboard(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (_) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.cssText = "position:fixed;left:-9999px;top:0;";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-    }
-  }
-  function getBanner() {
-    let banner = document.getElementById("jp-lens-ai-banner");
-    if (!banner) {
-      banner = document.createElement("div");
-      banner.id = "jp-lens-ai-banner";
-      banner.style.cssText = [
-        "position:fixed",
-        "bottom:20px",
-        "right:20px",
-        "z-index:2147483647",
-        "max-width:360px",
-        "padding:14px 16px",
-        "border-radius:8px",
-        "background:#1e1f22",
-        "color:#fff",
-        "font:13px/1.5 sans-serif",
-        "box-shadow:0 4px 20px rgba(0,0,0,.35)",
-        "border:1px solid #4fc3f7"
-      ].join(";");
-      document.body.appendChild(banner);
-    }
-    return banner;
-  }
-  function showWatchingBanner() {
-    if (document.getElementById("jp-lens-ai-banner")) return;
-    const banner = getBanner();
-    banner.replaceChildren();
-    const title = document.createElement("div");
-    title.style.cssText = "font-weight:700;color:#4fc3f7;margin-bottom:6px;";
-    title.textContent = "🌶️ Jalapeño";
-    const status = document.createElement("div");
-    status.id = "jp-lens-ai-status";
-    status.style.cssText = "font-size:12px;color:#b9bbbe;margin-bottom:10px;";
-    status.textContent = "Szukam opisu AI Overview…";
-    const captureBtn = document.createElement("button");
-    captureBtn.textContent = "📋 Przechwyć ręcznie";
-    captureBtn.style.cssText = "background:#4fc3f7;color:#1e1f22;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin-right:8px;";
-    captureBtn.addEventListener("click", async () => {
-      captureBtn.disabled = true;
-      captureBtn.textContent = "⏳";
-      const text = extractAiOverviewText() || extractAnyDescriptionText();
-      if (text) {
-        await processAiOverview(text);
-      } else {
-        const s = document.getElementById("jp-lens-ai-status");
-        if (s) s.textContent = "Nie znaleziono opisu na tej stronie.";
-      }
-      captureBtn.disabled = false;
-      captureBtn.textContent = "📋 Przechwyć ręcznie";
-    });
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "✕";
-    closeBtn.style.cssText = "background:transparent;color:#666;border:none;padding:5px 8px;cursor:pointer;font-size:13px;float:right;margin-top:-4px;";
-    closeBtn.addEventListener("click", () => banner.remove());
-    banner.append(title, status, captureBtn, closeBtn);
-  }
-  function showGoogleBanner(preview, aiUsed, aiProvider, aiError) {
-    const banner = getBanner();
-    const short = preview.length > 120 ? preview.slice(0, 117) + "…" : preview;
-    banner.replaceChildren();
-    const title = document.createElement("div");
-    title.style.cssText = "font-weight:700;color:#4fc3f7;margin-bottom:6px;";
-    title.textContent = "🌶️ Jalapeño";
-    const msg = document.createElement("div");
-    msg.style.marginBottom = "4px";
-    msg.textContent = t("mLensAiCopied");
-    const badge = document.createElement("div");
-    const hasAnyKey = !!GM_getValue("jpGeminiApiKey", "") || !!GM_getValue("jpGroqApiKey", "");
-    if (aiUsed && aiProvider) {
-      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#81c995;";
-      badge.textContent = `✅ Przepisano przez ${aiProvider}`;
-    } else if (hasAnyKey && aiError) {
-      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#f28b82;";
-      const shortError = aiError.length > 80 ? aiError.slice(0, 77) + "…" : aiError;
-      badge.textContent = `⚠️ AI błąd: ${shortError}`;
-    } else if (hasAnyKey) {
-      badge.style.cssText = "font-size:10px;margin-bottom:8px;color:#f28b82;";
-      badge.textContent = "⚠️ AI niedostępny";
-    }
-    const previewEl = document.createElement("div");
-    previewEl.style.cssText = "font-size:11px;color:#b9bbbe;max-height:72px;overflow:hidden;";
-    previewEl.textContent = short;
-    banner.append(title, msg, badge, previewEl);
-  }
-  function rephraseWithGemini(text) {
-    const apiKey = GM_getValue("jpGeminiApiKey", "");
-    if (!apiKey) return Promise.resolve({ text, used: false, error: null });
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        data: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Jesteś redaktorem tekstów na polski portal z okazjami zakupowymi. Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, żywym językiem polskim — tak, żeby brzmiał jak napisany przez człowieka, a nie przez automat. Zachowaj wszystkie dane techniczne i parametry produktu. Usuń sztuczne sformułowania, powtórzenia i kalki językowe. Tekst powinien być zwięzły i zachęcający. Odpowiedz WYŁĄCZNIE przepisanym opisem, bez wstępu, komentarzy ani cudzysłowów.
-
-${text}`
-            }]
-          }],
-          generationConfig: { maxOutputTokens: 2048, temperature: 0.4 }
-        }),
-        timeout: 3e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            if (data.error) {
-              const msg = `${data.error.code}: ${data.error.message}`;
-              console.warn("[JP Gemini] API error:", msg);
-              resolve({ text, used: false, error: msg });
-              return;
-            }
-            const improved = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (improved && improved.length > 30) {
-              resolve({ text: improved, used: true, provider: "Gemini", error: null });
-            } else {
-              const msg = "pusta odpowiedź z API";
-              console.warn("[JP Gemini] Empty or too short response:", improved);
-              resolve({ text, used: false, error: msg });
-            }
-          } catch (err) {
-            const msg = `błąd parsowania: ${err.message}`;
-            console.warn("[JP Gemini] Parse error:", err, res.responseText?.slice(0, 200));
-            resolve({ text, used: false, error: msg });
-          }
-        },
-        onerror: (err) => {
-          const msg = `błąd sieci: ${JSON.stringify(err).slice(0, 80)}`;
-          console.warn("[JP Gemini] Network error:", err);
-          resolve({ text, used: false, error: msg });
-        },
-        ontimeout: () => {
-          console.warn("[JP Gemini] Request timed out");
-          resolve({ text, used: false, error: "timeout (>30s)" });
-        }
-      });
-    });
-  }
-  var AI_PROMPT = `Jesteś redaktorem tekstów na polski portal z okazjami zakupowymi. Poniżej jest opis produktu przetłumaczony maszynowo na język polski. Przepisz go naturalnym, żywym językiem polskim — tak, żeby brzmiał jak napisany przez człowieka, a nie przez automat. Zachowaj wszystkie dane techniczne i parametry produktu. Usuń sztuczne sformułowania, powtórzenia i kalki językowe. Tekst powinien być zwięzły i zachęcający. Odpowiedz WYŁĄCZNIE przepisanym opisem, bez wstępu, komentarzy ani cudzysłowów.`;
-  function rephraseWithGroq(text) {
-    const apiKey = GM_getValue("jpGroqApiKey", "");
-    if (!apiKey) return Promise.resolve({ text, used: false, provider: null, error: null });
-    return new Promise((resolve) => {
-      GM_xmlhttpRequest({
-        method: "POST",
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        data: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: AI_PROMPT },
-            { role: "user", content: text }
-          ],
-          max_tokens: 1e3,
-          temperature: 0.4
-        }),
-        timeout: 3e4,
-        onload(res) {
-          try {
-            const data = JSON.parse(res.responseText);
-            if (data.error) {
-              const msg = `${data.error.type || data.error.code}: ${data.error.message}`;
-              console.warn("[JP Groq] API error:", msg);
-              resolve({ text, used: false, provider: null, error: `Groq: ${msg}` });
-              return;
-            }
-            const improved = data?.choices?.[0]?.message?.content?.trim();
-            if (improved && improved.length > 30) {
-              resolve({ text: improved, used: true, provider: "Groq", error: null });
-            } else {
-              console.warn("[JP Groq] Empty response:", improved);
-              resolve({ text, used: false, provider: null, error: "Groq: pusta odpowiedź" });
-            }
-          } catch (err) {
-            console.warn("[JP Groq] Parse error:", err);
-            resolve({ text, used: false, provider: null, error: `Groq: błąd parsowania` });
-          }
-        },
-        onerror: (err) => {
-          console.warn("[JP Groq] Network error:", err);
-          resolve({ text, used: false, provider: null, error: "Groq: błąd sieci" });
-        },
-        ontimeout: () => {
-          console.warn("[JP Groq] Timeout");
-          resolve({ text, used: false, provider: null, error: "Groq: timeout" });
-        }
-      });
-    });
-  }
-  async function rephraseWithAI(text) {
-    const groqKey = GM_getValue("jpGroqApiKey", "");
-    if (groqKey) {
-      const result = await rephraseWithGroq(text);
-      if (result.used) return result;
-    }
-    const geminiKey = GM_getValue("jpGeminiApiKey", "");
-    if (geminiKey) {
-      return rephraseWithGemini(text);
-    }
-    return { text, used: false, provider: null, error: null };
-  }
-  function extractAnyDescriptionText() {
-    const candidates = [];
-    const panelSelectors = [
-      ".kno-rdesc span",
-      '[data-attrid="wa:/description"] span',
-      '[data-attrid*="description"] span',
-      ".X5LH0c",
-      ".LGOjhe",
-      ".PZPZlf"
-    ];
-    for (const sel of panelSelectors) {
-      for (const el of document.querySelectorAll(sel)) {
-        const text = (el.innerText || "").trim();
-        if (text.length >= 60 && !isNoiseLine(text) && !isShoppingOrJunkLine(text)) {
-          candidates.push(text);
-          if (candidates.length >= 3) break;
-        }
-      }
-      if (candidates.length >= 3) break;
-    }
-    if (candidates.length === 0) {
-      for (const p of document.querySelectorAll("p")) {
-        if (p.closest('nav, header, footer, [role="navigation"], [role="banner"]')) continue;
-        const text = (p.innerText || "").trim();
-        if (text.length < 80) continue;
-        if (isNoiseLine(text) || isShoppingOrJunkLine(text)) continue;
-        candidates.push(text);
-        if (candidates.length >= 5) break;
-      }
-    }
-    if (candidates.length === 0) return null;
-    const merged = mergeIntoParagraphs(candidates);
-    return merged.length >= 60 ? merged : null;
-  }
-  async function processAiOverview(rawText) {
-    if (!rawText || rawText === _lastProcessedOverview) return;
-    _lastProcessedOverview = rawText;
-    try {
-      const translated = await translateToPolish(rawText);
-      const { text: rephrased, used: aiUsed, provider: aiProvider, error: aiError } = await rephraseWithAI(translated);
-      const formatted = formatDescription(rephrased);
-      if (!formatted) return;
-      storePendingDescription(formatted);
-      await copyToClipboard(formatted);
-      increment("lensDescriptionsGenerated");
-      showGoogleBanner(formatted, aiUsed, aiProvider, aiError);
-    } catch (err) {
-      console.warn("[JP LensAI] Processing failed:", err);
-    }
-  }
-  function watchForAiOverview() {
-    let debounceTimer = null;
-    if (isLensFlowActive()) showWatchingBanner();
-    GM_addValueChangeListener(LENS_FLOW_KEY, (_key, _old, newVal) => {
-      if (newVal === "1") showWatchingBanner();
-    });
-    const scan2 = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
-        if (!isLensFlowActive()) return;
-        const text = extractAiOverviewText();
-        if (text) {
-          await processAiOverview(text);
-          return;
-        }
-        const s = document.getElementById("jp-lens-ai-status");
-        if (s && s.textContent.startsWith("Szukam")) {
-          s.textContent = "Szukam opisu AI Overview… (brak AI Overview na stronie — spróbuj ręcznie)";
-        }
-      }, 1500);
-    };
-    const observer = new MutationObserver(scan2);
-    observer.observe(document.body, { childList: true, subtree: true });
-    scan2();
-  }
-  function initLensAiOverview(settings3) {
-    if (_googleInitialized || settings3.enableLensDescription === false) return;
-    _googleInitialized = true;
-    watchForAiOverview();
-  }
-  function getTipTapEditor2() {
-    const iframe = document.querySelector('iframe[src*="description/edit"]');
-    if (!iframe) return null;
-    try {
-      const doc = iframe.contentDocument;
-      return doc?.querySelector('div.ProseMirror[contenteditable="true"]') || doc?.querySelector('div[contenteditable="true"]');
-    } catch (_) {
-      return null;
-    }
-  }
-  function getTipTapHtml2(editor) {
-    return editor.innerHTML;
-  }
-  function appendTipTapHtml(editor, html) {
-    const doc = editor.ownerDocument;
-    const win = doc.defaultView;
-    editor.focus();
-    const range = doc.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-    const sel = win.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-    doc.execCommand("insertHTML", false, html);
-  }
-  function getToolbarBtnRow2() {
-    const iframe = document.querySelector('iframe[src*="description/edit"]');
-    if (!iframe) return null;
-    let iframeDoc;
-    try {
-      iframeDoc = iframe.contentDocument;
-    } catch (_) {
-      return null;
-    }
-    if (!iframeDoc?.body) return null;
-    const toolbar = iframeDoc.querySelector('[role="toolbar"]');
-    if (!toolbar) return null;
-    return toolbar.querySelector(".overflow--scrollX-raw .flex") || toolbar.querySelector(".flex.gap--all-2") || null;
-  }
-  function appendDescriptionText(text) {
-    const editor = getTipTapEditor2();
-    if (!editor) return false;
-    const htmlBlock = text.split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
-    const current = getTipTapHtml2(editor);
-    const separator = current.trim() ? "<p><br></p>" : "";
-    appendTipTapHtml(editor, separator + htmlBlock);
-    return true;
-  }
-  function pastePendingDescription(btn) {
-    const pending = getPendingDescription();
-    if (!pending) {
-      showToast(t("mLensAiNothingPending"), true);
-      return false;
-    }
-    if (!appendDescriptionText(pending)) {
-      showToast(t("mLensAiOpenEditor"), true);
-      return false;
-    }
-    GM_setValue(PENDING_DESC_KEY, "");
-    GM_setValue(PENDING_DESC_TS_KEY, 0);
-    GM_setValue(LENS_FLOW_KEY, "");
-    increment("lensDescriptionsInserted");
-    showToast(t("mLensAiPasted"));
-    if (btn) {
-      const orig = btn.innerHTML;
-      btn.innerHTML = '<span style="font-size:10px;font-weight:700;">✅</span>';
-      setTimeout(() => {
-        btn.innerHTML = orig;
-      }, 1500);
-    }
-    return true;
-  }
-  function openLensForDescription(btn) {
-    const url = getImageUrl();
-    if (!url) {
-      showToast(t("mLensAiNoImage"), true);
-      return;
-    }
-    markLensFlowStarted();
-    window.open("https://lens.google.com/uploadbyurl?url=" + encodeURIComponent(url), "_blank");
-    showToast(t("mLensAiOpenLens"));
-    if (btn) {
-      const orig = btn.innerHTML;
-      btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">⏳</span>';
-      setTimeout(() => {
-        btn.innerHTML = orig;
-      }, 1500);
-    }
-  }
-  function handleAiToolbarClick(btn) {
-    if (getPendingDescription()) {
-      pastePendingDescription(btn);
-      return;
-    }
-    openLensForDescription(btn);
-  }
-  function injectLensAiToolbarBtn() {
-    const btnRow = getToolbarBtnRow2();
-    if (!btnRow) return false;
-    if (btnRow.querySelector(".jp-toolbar-lens-ai-btn")) return true;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "button button--type-text button--mode-secondary button--square space--h-2 space--v-2 size--all-m bRad--a button button--type-editor jp-toolbar-lens-ai-btn";
-    btn.title = t("mToolbarLensAiTitle");
-    btn.innerHTML = '<span class="flex--inline boxAlign-ai--all-c" style="font-size:10px;font-weight:700;line-height:1;padding:0 2px;">AI</span>';
-    btn.addEventListener("click", () => handleAiToolbarClick(btn));
-    btnRow.appendChild(btn);
-    return true;
-  }
-  function watchForDescriptionToolbar3() {
-    function tryInject() {
-      clearTimeout(_toolbarDebounceTimer);
-      _toolbarDebounceTimer = setTimeout(() => {
-        injectLensAiToolbarBtn();
-        const iframe = document.querySelector('iframe[src*="description/edit"]');
-        if (!iframe || iframe._jpLensWatching) return;
-        let iframeDoc;
-        try {
-          iframeDoc = iframe.contentDocument;
-        } catch (_) {
-          return;
-        }
-        if (!iframeDoc?.body) return;
-        iframe._jpLensWatching = true;
-        new MutationObserver(() => injectLensAiToolbarBtn()).observe(iframeDoc.body, { childList: true, subtree: true });
-      }, 400);
-    }
-    new MutationObserver(tryInject).observe(document.body, { childList: true, subtree: true });
-    tryInject();
-  }
-  function initLensDescriptionPaste(settings3) {
-    if (_pasteInitialized || settings3.enableLensDescription === false) return;
-    _pasteInitialized = true;
-    watchForDescriptionToolbar3();
-  }
-  function markLensFlowStarted() {
-    GM_setValue(LENS_FLOW_KEY, "1");
-    GM_setValue(PENDING_DESC_KEY, "");
-    GM_setValue(PENDING_DESC_TS_KEY, 0);
-    _lastProcessedOverview = "";
   }
 
   // src/ui/updateBanner.js
@@ -5107,6 +4807,7 @@ ${text}`
     body.innerHTML = `<span class="jp-inspector-empty">${t("mCatAdvisorLoading")}</span>`;
     container.appendChild(header);
     container.appendChild(body);
+    makeDraggable(container, "categoryAdvisor");
     let collapsed = false;
     header.addEventListener("click", () => {
       collapsed = !collapsed;
@@ -6068,7 +5769,7 @@ ${text}`
   var THREAD_PATH_RE = /\/admin-v2\/moderation\/thread\/(\d+)/;
   var _cache2 = /* @__PURE__ */ new Map();
   var _fetchPromise = null;
-  var _stylesInjected = false;
+  var _stylesInjected2 = false;
   function escapeHtml3(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -6086,7 +5787,7 @@ ${text}`
     if (last < str.length) parts.push(escapeHtml3(str.slice(last)));
     return parts.join("");
   }
-  function injectStyles() {
+  function injectStyles2() {
     GM_addStyle(`
         #jp-reported-reason-banner {
             display: flex;
@@ -6174,37 +5875,38 @@ ${text}`
   function renderEntryHtml(entry, main) {
     const text = entry.label && entry.reason ? `${escapeHtml3(entry.label)} – „${linkifyHtml(entry.reason)}”` : linkifyHtml(entry.label || entry.reason || "");
     if (main) {
-      return `<div class=”jp-rr-text”><span class=”jp-rr-label”>Powód:</span> ${text}</div>
-            ${entry.userId ? `<div class=”jp-rr-reporter”>ID zgłaszającego: ${entry.userId}</div>` : ""}`;
+      return `<div class="jp-rr-text"><span class="jp-rr-label">Powód:</span> ${text}</div>
+            ${entry.userId ? `<div class="jp-rr-reporter">ID zgłaszającego: ${entry.userId}</div>` : ""}`;
     }
-    return `<div class=”jp-rr-extra”>
-        <span class=”jp-rr-extra-text”>${text}</span>
-        ${entry.userId ? `<span class=”jp-rr-extra-reporter”> · ID: ${entry.userId}</span>` : ""}
+    return `<div class="jp-rr-extra">
+        <span class="jp-rr-extra-text">${text}</span>
+        ${entry.userId ? `<span class="jp-rr-extra-reporter"> · ID: ${entry.userId}</span>` : ""}
     </div>`;
   }
   function renderBanner(entries) {
     if (document.getElementById("jp-reported-reason-banner")) return;
     const anchor = document.querySelector(".mod-tools-container") || document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.querySelector(".v-card.rounded-medium");
     if (!anchor) return;
-    if (!_stylesInjected) {
-      injectStyles();
-      _stylesInjected = true;
+    if (!_stylesInjected2) {
+      injectStyles2();
+      _stylesInjected2 = true;
     }
     const list = Array.isArray(entries) ? entries : [entries];
     const [main, ...rest] = list;
-    const extrasHtml = rest.length ? `<div class=”jp-rr-extras”>${rest.map((e) => renderEntryHtml(e, false)).join("")}</div>` : "";
+    const extrasHtml = rest.length ? `<div class="jp-rr-extras">${rest.map((e) => renderEntryHtml(e, false)).join("")}</div>` : "";
     const banner = document.createElement("div");
     banner.id = "jp-reported-reason-banner";
     banner.innerHTML = `
-        <span class=”jp-rr-icon”>🚩</span>
-        <div class=”jp-rr-body”>
+        <span class="jp-rr-icon">🚩</span>
+        <div class="jp-rr-body">
             ${renderEntryHtml(main, true)}
             ${extrasHtml}
         </div>
-        <button id=”jp-reported-reason-dismiss” title=”Zamknij”>✕</button>
+        <button id="jp-reported-reason-dismiss" title="Zamknij">✕</button>
     `;
     anchor.parentNode.insertBefore(banner, anchor);
-    document.getElementById("jp-reported-reason-dismiss").onclick = () => banner.remove();
+    banner.querySelector("#jp-reported-reason-dismiss")?.addEventListener("click", () => banner.remove());
+    makeDraggable(banner, "reportedReason");
   }
   async function fetchAndCacheReported() {
     const data = await fetchModerationListPage("/admin-v2/moderation/deals/reported", 1);
@@ -6571,6 +6273,7 @@ ${text}`
     const nativeLinks = document.querySelector(".peps-admin-profile-links");
     const cardBody = document.querySelector(".card-body");
     const panel = buildInspectorPanel(userId);
+    makeDraggable(panel, "userAdminInspectorPanel");
     if (nativeLinks) {
       nativeLinks.insertAdjacentElement("afterend", panel);
       return;
@@ -6586,6 +6289,7 @@ ${text}`
     const threadId = threadIdFromPage();
     const bar = buildLinksBar(userId, threadId, { showUuid: true, showTempChart: !!threadId });
     card.insertAdjacentElement("afterend", bar);
+    makeDraggable(bar, "userAdminLinks");
   }
   function initUserAdminLinks(settings3) {
     if (!settings3.enableUserAdminLinks) return;
@@ -7370,6 +7074,31 @@ ${text}`
           key: "enableCategoryAdvisor",
           label: "Doradca kategorii",
           desc: "Sugeruje kategorie na podstawie tytułu deala porównując z historią kategoryzacji na Pepperze. Widoczny w bocznym panelu przy formularzach."
+        },
+        {
+          key: "enableDealChangelog",
+          label: "Tracker zmian formularza",
+          desc: "Pokazuje nad panelem dostawy które pola zmieniły się od otwarcia strony (tytuł, URL, cena, sklep, dostawa) — stara i nowa wartość obok siebie."
+        },
+        {
+          key: "enableDealDateTools",
+          label: "Szybkie ustawianie daty wygaśnięcia",
+          desc: 'Przyciski "Dziś 23:59", "+7 dni", "+30 dni" oraz własna data z ustawień — jednym kliknięciem ustawiają wygaśnięcie okazji.'
+        },
+        {
+          key: "enableTitleCaseHelper",
+          label: "Poprawa wielkości liter w tytule",
+          desc: 'Przycisk "Aa" przy tytule zamienia WIELKIE LITERY na normalną wielkość, z zachowaniem nazw marek i skrótów technicznych (GB, USB, LED itp.).'
+        },
+        {
+          key: "enableShopInfo",
+          label: "Sprawdzanie sklepu na czarnej liście",
+          desc: "Po wpisaniu URL sprawdza sklep w bazie znanych podejrzanych sprzedawców i ostrzega, jeśli trafi na czarną listę."
+        },
+        {
+          key: "enableReportedReason",
+          label: "Powód zgłoszenia",
+          desc: "Od razu po otwarciu zgłoszonej okazji pokazuje baner z powodem (i wszystkimi powodami, jeśli zgłoszeń jest więcej niż jedno) — bez szukania w archiwum."
         }
       ]
     },
@@ -7411,6 +7140,16 @@ ${text}`
           key: "enableFloatingButton",
           label: "Pływający przycisk ✨",
           desc: "Przycisk wstawiający spersonalizowany tekst do opisu i opcjonalnie ustawiający darmową dostawę. Tekst konfigurowalny w ustawieniach."
+        },
+        {
+          key: "enableMoveApproveBtn",
+          label: "Przeniesienie przycisku Approve",
+          desc: 'Przenosi natywny przycisk "Approve & Send PM" w bardziej wygodne miejsce formularza.'
+        },
+        {
+          key: "enableEyeBreak",
+          label: "Przypomnienie o przerwie dla oczu",
+          desc: "Na liście nowych okazji przypomina o przerwie dla oczu o wybranej minucie każdej godziny."
         }
       ]
     },
@@ -7450,11 +7189,6 @@ ${text}`
           desc: "Rozwija skrócone URLe (bit.ly, tinyurl itp.) w opisie deala i zastępuje je pełnymi adresami przed zatwierdzeniem."
         },
         {
-          key: "enableLensDescription",
-          label: "Opis z Google Lens",
-          desc: "Na stronie Google Lens dodaje przycisk do kopiowania tekstu AI Overview jako gotowego opisu deala."
-        },
-        {
           key: "enableAllegroImages",
           label: "Galeria Allegro",
           desc: "Na stronie Allegro dodaje przycisk do pobrania zdjęć z galerii produktu i wgrania ich bezpośrednio do formularza deala."
@@ -7488,6 +7222,21 @@ ${text}`
           key: "enableUserAdminLinks",
           label: "Linki admina",
           desc: "Dodaje skróty do profilu moderacyjnego użytkownika, Metabase i historii IP przy kartach deali na liście."
+        },
+        {
+          key: "enableMultipackHelper",
+          label: "Multipack — cena za sztukę",
+          desc: 'Wstawia do tytułu adnotację o cenie za sztukę przy zakupie wielosztukowym (np. "8,98€ przy zakupie 4 szt.").'
+        },
+        {
+          key: "enableCommentTemplates",
+          label: "Szablony odpowiedzi na komentarze",
+          desc: "Na stronie moderacji komentarzy dodaje gotowe szablony odpowiedzi (np. o zasadach podbić) wstawiane jednym kliknięciem."
+        },
+        {
+          key: "enableSpicyEditLog",
+          label: "Spicy edit log 🌶️",
+          desc: "Przycisk obok natywnego Edit log pokazujący historię akcji moderatorów i edycji pól w oknie na stronie, bez otwierania nowej karty. Widoczność poszczególnych pól konfigurowalna w ustawieniach."
         }
       ]
     },
@@ -7504,6 +7253,16 @@ ${text}`
           key: "enableSnippets",
           label: "Schowek fragmentów",
           desc: "Własna biblioteka fragmentów tekstu. Kliknięcie kopiuje do schowka. Edytowalne i persystowane między sesjami."
+        },
+        {
+          key: "enableGeekStats",
+          label: "GeekStats — licznik akcji",
+          desc: "Floating widget liczący kliknięcia DELETE/HOLD/SAVE/APPROVE od godziny 4:00 rano, reset codziennie."
+        },
+        {
+          key: "enablePanelDragging",
+          label: "Przeciąganie paneli (eksperymentalne)",
+          desc: "Pozwala przeciągać i zmieniać rozmiar paneli Jalapeño w dowolne miejsce. Domyślnie panel zostaje przyklejony do ekranu; opcjonalnie może zamiast tego trzymać się miejsca na stronie."
         }
       ]
     }
@@ -7770,7 +7529,7 @@ ${text}`
   }
 
   // src/features/dealChangelog.js
-  var _stylesInjected2 = false;
+  var _stylesInjected3 = false;
   var STORAGE_KEY_PREFIX = "jalapeno_changelog_";
   var FIELDS = [
     { key: "title", labelKey: "dcFieldTitle", sel: 'input[placeholder="Thread title"]' },
@@ -7803,9 +7562,9 @@ ${text}`
     }
     if (_renderRef) _renderRef();
   }
-  function injectStyles2() {
-    if (_stylesInjected2) return;
-    _stylesInjected2 = true;
+  function injectStyles3() {
+    if (_stylesInjected3) return;
+    _stylesInjected3 = true;
     GM_addStyle(`
         #jp-deal-changelog {
             width: 100%;
@@ -7913,7 +7672,7 @@ ${text}`
   function initDealChangelog(stackEl, threadId, { alwaysVisible = false } = {}) {
     if (!stackEl || !threadId) return;
     if (document.getElementById("jp-deal-changelog")) return;
-    injectStyles2();
+    injectStyles3();
     const panel = document.createElement("div");
     panel.id = "jp-deal-changelog";
     if (!alwaysVisible) panel.style.display = "none";
@@ -7923,6 +7682,7 @@ ${text}`
     } else {
       stackEl.prepend(panel);
     }
+    makeDraggable(panel, "dealChangelog");
     const snapshot = {};
     function takeSnapshot() {
       _snapshotTaken = true;
@@ -8015,7 +7775,8 @@ ${text}`
         el.addEventListener("input", renderChanges);
         el.addEventListener("change", renderChanges);
       }
-      const root = document.querySelector(".layout.column.mb-3.px-4") || document.body;
+      const root = document.querySelector(".layout.column.mb-3.px-4");
+      if (!root) return;
       new MutationObserver(renderChanges).observe(root, {
         subtree: true,
         attributes: true,
@@ -8030,10 +7791,10 @@ ${text}`
   }
 
   // src/features/dealDateTools.js
-  var _stylesInjected3 = false;
-  function injectStyles3() {
-    if (_stylesInjected3) return;
-    _stylesInjected3 = true;
+  var _stylesInjected4 = false;
+  function injectStyles4() {
+    if (_stylesInjected4) return;
+    _stylesInjected4 = true;
     GM_addStyle(`
         #jp-date-tools {
             width: 100%;
@@ -8334,7 +8095,7 @@ ${text}`
   function initDealDateTools(stackEl, settings3, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-date-tools")) return;
-    injectStyles3();
+    injectStyles4();
     const panel = document.createElement("div");
     panel.id = "jp-date-tools";
     if (compact) panel.classList.add("jp-dt-compact");
@@ -8343,6 +8104,7 @@ ${text}`
     const anchor = changelogEl || shippingEl;
     if (anchor) stackEl.insertBefore(panel, anchor);
     else stackEl.prepend(panel);
+    makeDraggable(panel, "dealDateTools");
     const PRESETS = [
       { label: t("dtPresetToday"), days: 0, h: 23, m: 59 },
       { label: t("dtPreset7"), days: 7, h: 23, m: 59 },
@@ -8397,7 +8159,11 @@ ${text}`
       _busy = false;
     });
     let _last = { date: null, time: null };
-    setInterval(() => {
+    const pollId = setInterval(() => {
+      if (!panel.isConnected) {
+        clearInterval(pollId);
+        return;
+      }
       const { date: _dInp, time: _tInp } = findExpiryPairForSetting(true);
       const date = _dInp?.value?.trim() || null;
       const time = _tInp?.value?.trim() || null;
@@ -8611,6 +8377,7 @@ ${text}`
             <div id="jp-shopinfo-status"></div>
         </div>`;
     document.body.appendChild(div);
+    makeDraggable(div, "shopInfo");
     div.querySelector("#jp-shopinfo-close").addEventListener("click", () => {
       div.classList.remove("jp-shopinfo-show");
     });
@@ -9384,9 +9151,9 @@ ${text}`
       return text.includes("REPLY") || text.includes("RESOLVED") || text.includes("MARK") || text.includes("APPLY") ? "inbox" : null;
     }
     if (path.includes("/comments/")) {
-      if (text.includes("RESOLVE")) return "comment";
+      if (text.includes("RESOLVE") || text.includes("APPROVE")) return "comment";
       if (text.includes("EDIT")) return null;
-      if (text.includes("DELETE") || text.includes("APPROVE")) {
+      if (text.includes("DELETE")) {
         return btn.closest('.v-dialog, [role="dialog"]') ? "comment" : null;
       }
       return null;
@@ -9411,7 +9178,7 @@ ${text}`
     if (text.includes("SAVE") && !text.includes("APPROVE") && text.length < 20) return true;
     return false;
   }
-  function injectStyles4() {
+  function injectStyles5() {
     if (_injected4) return;
     _injected4 = true;
     GM_addStyle(`
@@ -9569,7 +9336,7 @@ ${text}`
         <button id="jp-gs-new-shift">${t("gsNewShift")}</button>`;
   }
   function initGeekStats() {
-    injectStyles4();
+    injectStyles5();
     _widget = document.createElement("div");
     _widget.id = "jp-geekstats-widget";
     _widget.innerHTML = `
@@ -9582,8 +9349,10 @@ ${text}`
     document.body.appendChild(_widget);
     const savedPos = GM_getValue(STORAGE_KEY_POS, null);
     if (savedPos) {
-      _widget.style.left = savedPos.x + "px";
-      _widget.style.top = savedPos.y + "px";
+      const x = Math.max(0, Math.min(window.innerWidth - _widget.offsetWidth, savedPos.x));
+      const y = Math.max(0, Math.min(window.innerHeight - _widget.offsetHeight, savedPos.y));
+      _widget.style.left = x + "px";
+      _widget.style.top = y + "px";
     } else {
       _widget.style.left = "16px";
       _widget.style.top = window.innerHeight - 220 + "px";
@@ -9644,7 +9413,7 @@ ${text}`
 
   // src/features/multipackHelper.js
   var _injected5 = false;
-  function injectStyles5() {
+  function injectStyles6() {
     if (_injected5) return;
     _injected5 = true;
     GM_addStyle(`
@@ -9740,7 +9509,7 @@ ${text}`
   function initMultipackHelper(stackEl, triggerVueInput, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-multipack")) return;
-    injectStyles5();
+    injectStyles6();
     const panel = document.createElement("div");
     panel.id = "jp-multipack";
     if (compact) panel.classList.add("jp-mp-compact-mode");
@@ -9770,6 +9539,7 @@ ${text}`
       if (anchor) stackEl.insertBefore(panel, anchor);
       else stackEl.prepend(panel);
     }
+    makeDraggable(panel, "multipackHelper");
     const qtyInput = panel.querySelector("#jp-mp-qty");
     const insertBtn = panel.querySelector("#jp-mp-insert");
     const previewEl = panel.querySelector("#jp-mp-preview");
@@ -9818,10 +9588,10 @@ ${text}`
   }
 
   // src/features/voteRowEnhancer.js
-  var _stylesInjected4 = false;
-  function injectStyles6() {
-    if (_stylesInjected4) return;
-    _stylesInjected4 = true;
+  var _stylesInjected5 = false;
+  function injectStyles7() {
+    if (_stylesInjected5) return;
+    _stylesInjected5 = true;
     GM_addStyle(`
         .jp-vote-td-wrap {
             display: flex;
@@ -9897,7 +9667,7 @@ ${text}`
   }
   function initVoteRowEnhancer() {
     if (!/\/admin\/inspector\/users\/\d+/.test(window.location.pathname)) return;
-    injectStyles6();
+    injectStyles7();
     const ng = getAngular();
     const rows = document.querySelectorAll('tr[ng-repeat="vote in user.votes"]');
     for (const row of rows) {
@@ -9955,7 +9725,7 @@ ${text}`
 
   // src/features/commentTemplates.js
   var STORAGE_KEY4 = "jpCommentTemplates";
-  var _stylesInjected5 = false;
+  var _stylesInjected6 = false;
   var _initialized2 = false;
   var _activePopover = null;
   var _outsideHandler = null;
@@ -10013,9 +9783,9 @@ ${text}`
   function saveTemplates(templates) {
     GM_setValue(STORAGE_KEY4, JSON.stringify(templates));
   }
-  function injectStyles7() {
-    if (_stylesInjected5) return;
-    _stylesInjected5 = true;
+  function injectStyles8() {
+    if (_stylesInjected6) return;
+    _stylesInjected6 = true;
     GM_addStyle(`
         .jp-qr-btn { position: relative; }
         .jp-qr-popover {
@@ -10242,7 +10012,7 @@ ${text}`
   function initCommentTemplates() {
     if (_initialized2) return;
     _initialized2 = true;
-    injectStyles7();
+    injectStyles8();
     const obs = new MutationObserver(scanAndInject);
     obs.observe(document.body, { childList: true, subtree: true });
     scanAndInject();
@@ -10350,6 +10120,7 @@ ${text}`
     ].join(";");
     panel.innerHTML = `<span>⚠️</span><span>Rozwiń skrócony link Amazon (amzn.eu/to) przed zatwierdzeniem</span>`;
     stackEl.prepend(panel);
+    makeDraggable(panel, "dealReviewer");
   }
   function initDealReviewer(stackEl) {
     if (!stackEl || stackEl.querySelector("#jp-deal-reviewer")) return;
@@ -10359,7 +10130,7 @@ ${text}`
   // src/features/spicyEditLog.js
   var THREAD_PATH_RE2 = /\/admin-v2\/moderation\/thread\/(\d+)/;
   var EDIT_LOG_HREF_RE = /\/admin\/thread-edit-log\/(\d+)/;
-  var _stylesInjected6 = false;
+  var _stylesInjected7 = false;
   var _nickCache = /* @__PURE__ */ new Map();
   async function resolveNick(userId) {
     const key = String(userId);
@@ -10462,9 +10233,9 @@ ${text}`
   function escapeHtml4(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
-  function injectStyles8() {
-    if (_stylesInjected6) return;
-    _stylesInjected6 = true;
+  function injectStyles9() {
+    if (_stylesInjected7) return;
+    _stylesInjected7 = true;
     GM_addStyle(`
         #jp-sel-overlay {
             position: fixed;
@@ -10745,7 +10516,7 @@ ${text}`
   }
   async function openModal(dealId) {
     closeModal();
-    injectStyles8();
+    injectStyles9();
     const overlay = document.createElement("div");
     overlay.id = "jp-sel-overlay";
     overlay.onclick = closeModal;
@@ -10828,7 +10599,6 @@ ${text}`
     if (window !== window.top && /\/admin-v2\/moderation\//.test(window.location.pathname)) {
       return;
     }
-    const isGoogleLensContext = /^www\.google\.(com|pl)$/.test(location.hostname) || location.hostname === "lens.google.com";
     const API_URL = "https://script.google.com/macros/s/AKfycbxPY1KVfIZ-MdhBG_QPYhE-H8QsDCqIp2OkD9nBKU8-tGh8mF5OReV0KRVFMecUX0xUcQ/exec";
     const MERCHANT_NOTES_API_URL = "https://script.google.com/macros/s/AKfycbyLBnmCCfJPnmc1owPB-pcxENNXkRuLEb0jkgmBOseU4bpFQVFsPMojJUcxD8vd-x3d/exec";
     const SHIPPING_COSTS_API_URL = "https://script.google.com/macros/s/AKfycbw-oGcwhBWyvNjr4qosje8MbDXBeiVJeoUa5BLQ1cKUJK51LnvjMw0o7oHNfax72eE1/exec";
@@ -10878,7 +10648,6 @@ ${text}`
       enableProductInspector: true,
       enableLinkExpander: true,
       enableCommentTemplates: true,
-      enableLensDescription: true,
       enableAllegroImages: true,
       enableCategoryAdvisor: true,
       enableOfflineDealsFilter: true,
@@ -10894,6 +10663,8 @@ ${text}`
       enableTitleCaseHelper: true,
       enableSpicyEditLog: true,
       spicyLogHiddenFields: ["image_data", "main_image_autoslot"],
+      enablePanelDragging: false,
+      panelDragFollowsPage: false,
       dealDateCustom: "",
       enableShopInfo: true,
       enableGeekStats: true,
@@ -10911,10 +10682,6 @@ ${text}`
     initI18n(settings3);
     loadMarketDB();
     const isAllegroContext = /(^|\.)allegro\.pl$/i.test(location.hostname);
-    if (isGoogleLensContext) {
-      initLensAiOverview(settings3);
-      return;
-    }
     if (isAllegroContext) {
       initAllegroImages(settings3);
       return;
@@ -10937,12 +10704,9 @@ ${text}`
       return;
     }
     const isFrontPage = location.pathname === "/";
-    if (isFrontPage) {
-      if (settings3.enableSpicyEditLog) {
-        initSpicyEditLog(settings3);
-        setInterval(() => initSpicyEditLog(settings3), 2e3);
-      }
-      return;
+    if (isFrontPage && settings3.enableSpicyEditLog) {
+      initSpicyEditLog(settings3);
+      setInterval(() => initSpicyEditLog(settings3), 2e3);
     }
     initAnalytics();
     checkForScriptUpdate();
@@ -11069,7 +10833,6 @@ ${text}`
           settingsModuleToggle("set-product-inspector", s.enableProductInspector, "mProductInspector", "mProductInspectorHint"),
           settingsModuleToggle("set-image-search", s.enableReverseImageSearch, "mImageSearch", "mImageSearchHint"),
           settingsModuleToggle("set-link-expander", s.enableLinkExpander, "mLinkExpander", "mLinkExpanderHint"),
-          settingsModuleToggle("set-lens-description", s.enableLensDescription, "mLensDescription", "mLensDescriptionHint"),
           settingsModuleToggle("set-allegro-images", s.enableAllegroImages, "mAllegroImages", "mAllegroImagesHint"),
           settingsModuleToggle("set-fakepromo", s.enableFakePromo, "mFakePromo", "mFakePromoHint"),
           settingsModuleToggle("set-lock-buttons", s.enableLockButtons, "mLockButtons", "mLockButtonsHint"),
@@ -11163,6 +10926,25 @@ ${text}`
                             <option value="16px" ${settings3.fontSize === "16px" ? "selected" : ""}>${t("fontVeryLarge")}</option>
                         </select>
                     </div>
+                </div>
+                <div class="settings-row settings-row-special" style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <label class="jp-module-toggle jp-module-toggle--solo" style="flex:1;">
+                            <input type="checkbox" id="set-panel-dragging" ${settings3.enablePanelDragging ? "checked" : ""}>
+                            <span class="jp-module-toggle-body">
+                                <span class="jp-module-toggle-title">${t("mPanelDragging")}</span>
+                                <span class="jp-module-toggle-hint">${t("mPanelDraggingHint")}</span>
+                            </span>
+                        </label>
+                        <button type="button" id="btn-reset-panel-positions" class="btn-cancel" style="flex-shrink:0;">${t("btnResetPanelPositions")}</button>
+                    </div>
+                    <label class="jp-module-toggle jp-module-toggle--solo" style="margin-left:24px;">
+                        <input type="checkbox" id="set-panel-dragging-follows-page" ${settings3.panelDragFollowsPage ? "checked" : ""}>
+                        <span class="jp-module-toggle-body">
+                            <span class="jp-module-toggle-title">${t("mPanelDragFollowsPage")}</span>
+                            <span class="jp-module-toggle-hint">${t("mPanelDragFollowsPageHint")}</span>
+                        </span>
+                    </label>
                 </div>
                 ${settingsSectionHead("secModules", "secModulesDesc")}
                 <div class="jp-settings-groups">${buildSettingsModulesHtml()}</div>
@@ -11438,7 +11220,6 @@ ${text}`
           shippingPanelTopOffset: parseInt(document.getElementById("set-shipping-offset").value) || 0,
           enablePriceWarning: document.getElementById("set-price-warning").checked,
           enableReverseImageSearch: document.getElementById("set-image-search").checked,
-          enableLensDescription: document.getElementById("set-lens-description").checked,
           enableProductInspector: document.getElementById("set-product-inspector").checked,
           enableLinkExpander: document.getElementById("set-link-expander").checked,
           enableAllegroImages: document.getElementById("set-allegro-images").checked,
@@ -11456,6 +11237,8 @@ ${text}`
           enableMultipackHelper: document.getElementById("set-multipack").checked,
           enableTitleCaseHelper: document.getElementById("set-title-case").checked,
           enableSpicyEditLog: document.getElementById("set-spicy-edit-log").checked,
+          enablePanelDragging: document.getElementById("set-panel-dragging").checked,
+          panelDragFollowsPage: document.getElementById("set-panel-dragging-follows-page").checked,
           spicyLogHiddenFields: Array.from(document.querySelectorAll(".jp-spicy-field-check")).filter((el) => !el.checked).map((el) => el.value),
           dealDateCustom: document.getElementById("set-deal-date-custom").value.trim(),
           enableGeekStats: document.getElementById("set-geekstats").checked,
@@ -11476,6 +11259,12 @@ ${text}`
       document.getElementById("btn-close-settings").onclick = () => {
         document.getElementById("modal-overlay").remove();
         document.getElementById("jalapeno-settings-modal").remove();
+      };
+      document.getElementById("btn-reset-panel-positions").onclick = () => {
+        if (confirm(t("confirmResetPanelPositions"))) {
+          resetAllPositions();
+          location.reload();
+        }
       };
     }
     GM_addStyle(`
@@ -11726,8 +11515,6 @@ ${text}`
             cursor: pointer; font-size: 11px; border-radius: 4px; font-weight: bold; transition: 0.2s; white-space: nowrap; width: 100%; text-align: center;
         }
         .mod-conv-btn-v2:hover { background-color: var(--jp-btn-hover); }
-        .mod-settings-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 5px; line-height: 1; transition: transform 0.2s; }
-        .mod-settings-btn:hover { transform: rotate(45deg); }
 
         #jalapeno-settings-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
@@ -13251,6 +13038,7 @@ ${text}`
         }
       });
       targetElement.parentNode.insertBefore(noteBox, targetElement.nextSibling);
+      makeDraggable(noteBox, "merchantNoteProfile");
     }
     function fetchPepperHistory(query, containerNode, isFallback = false, originalTitle = "") {
       let encodedQuery = encodeURIComponent(query);
@@ -14024,15 +13812,6 @@ ${text}`
         toolsBox.id = "jp-tools-box";
         toolsBox.className = "mod-tools-container";
         toolsBox.style.position = "relative";
-        let settingsBtn = document.createElement("button");
-        settingsBtn.innerHTML = "⚙️";
-        settingsBtn.className = "mod-settings-btn";
-        settingsBtn.style.cssText = "position: absolute; top: 5px; right: 5px; z-index: 10;";
-        settingsBtn.onclick = (e) => {
-          e.preventDefault();
-          openSettings();
-        };
-        toolsBox.appendChild(settingsBtn);
         let leftCol = document.createElement("div");
         leftCol.className = "mod-left-col";
         const debounce = (func, delay3) => {
@@ -14057,12 +13836,16 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               addToDatabase(corePat, autoPrice, currentTitle, addBtn);
             }
           };
-          leftCol.appendChild(addBtn);
+          let fakePromoWrapper = document.createElement("div");
+          fakePromoWrapper.appendChild(addBtn);
+          leftCol.appendChild(fakePromoWrapper);
+          makeDraggable(fakePromoWrapper, "fakePromoBtn");
         }
         let smartQuery = generateSmartQuery(currentTitle);
         let linksWrapper = document.createElement("div");
         linksWrapper.className = "mod-links-wrapper";
         leftCol.appendChild(linksWrapper);
+        makeDraggable(linksWrapper, "quickLinks");
         let renderQuickLinks = (titleToUse) => {
           let sQuery = generateSmartQuery(titleToUse);
           let pQuery = sQuery;
@@ -14481,6 +14264,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         if (settings3.enableProductInspector) initProductInspector(leftCol);
         toolsBox.appendChild(leftCol);
         toolsBox.appendChild(rightCol);
+        makeDraggable(rightCol, "historyBox");
         let mainFormPanel = document.querySelector(".layout.column.mb-3.px-4") || document.querySelector(".mb-3");
         if (mainFormPanel) {
           mainFormPanel.style.position = "relative";
@@ -14508,6 +14292,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
               sidePanel.classList.add("jp-shipping-compact");
             }
             shippingStack.appendChild(sidePanel);
+            makeDraggable(sidePanel, "shippingSidePanel");
             if (settings3.shippingStackPosition === "top") {
               shippingStack.classList.add("jp-pos-top");
               const _catPanel = document.getElementById("jp-cat-side-panel");
@@ -14582,7 +14367,6 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
           urlTextarea.parentNode.appendChild(toolsBox);
         }
         if (settings3.enableReverseImageSearch) initReverseImageSearch();
-        if (settings3.enableLensDescription) initLensDescriptionPaste(settings3);
         if (settings3.enableLinkExpander) initLinkExpander();
         if (settings3.enableTitleCaseHelper) initTitleCaseHelper(triggerVueInput);
         if (settings3.enableAllegroImages) initAllegroImages(settings3);
@@ -14977,6 +14761,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                     </div>
                 `;
           insertBeforeToolsBox(lockButtonsContainer);
+          makeDraggable(lockButtonsContainer, "lockButtons");
           attachLockButtonEvents(lockButtonsContainer);
         };
         const rebuildNoteButtonsWrapper = (noteAlertElement) => {
@@ -15027,9 +14812,12 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
                     `;
             wrapperContainer.appendChild(lockButtonsContainer);
             insertBeforeToolsBox(wrapperContainer);
+            makeDraggable(noteAlertElement, "merchantNote");
+            makeDraggable(lockButtonsContainer, "lockButtons");
             attachLockButtonEvents(wrapperContainer);
           } else {
             insertBeforeToolsBox(noteAlertElement);
+            makeDraggable(noteAlertElement, "merchantNote");
           }
         };
         const attachLockButtonEvents = (container) => {
@@ -15490,11 +15278,12 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       }
     }
     function moveNativeApproveBtn() {
-      if (!settings3.enableMoveApproveBtn) return;
+      if (!settings3.enableMoveApproveBtn || window.jpApproveBtnMoved) return;
       let allBtns = Array.from(document.querySelectorAll("button.v-btn"));
       let targetBtn = allBtns.find((b) => b.innerText && b.innerText.includes("APPROVE & SEND PM"));
       if (targetBtn && !targetBtn.classList.contains("jp-approve-moved")) {
         targetBtn.classList.add("jp-approve-moved");
+        window.jpApproveBtnMoved = true;
         let container = targetBtn.closest(".layout.wrap");
         if (container) {
           container.classList.add("jp-relative-container");
@@ -15696,6 +15485,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
         window.jpUserForcedFreeDelivery = false;
         window.jpAutoShippingSet = false;
         window.jpAutoShippingAbortGen = (window.jpAutoShippingAbortGen || 0) + 1;
+        window.jpApproveBtnMoved = false;
         if (prevDealsNew && nowDealsNew) {
           notifyOfflineListPageChange();
           resetExactTimestamps();
@@ -15736,6 +15526,7 @@ ${t("promptPrice")} ${autoPrice} zł`)) {
       let now = Date.now();
       if (now - lastHighlightCheck >= RARE_FUNCTION_INTERVAL) {
         highlightEditedCards();
+        highlightDuplicatesChip();
         lastHighlightCheck = now;
       }
       if (now - lastUpdateSaveBtn >= RARE_FUNCTION_INTERVAL) {
