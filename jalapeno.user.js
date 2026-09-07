@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
 // @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.1
+// @version      5.1.1
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
 // @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
@@ -2799,6 +2799,8 @@
   }
 
   // src/features/reverseImageSearch.js
+  var _lensObserver = null;
+  var _lensRetryTimer = null;
   function getImageUrl() {
     const img = document.querySelector(".imageEditor img[src]");
     if (img && img.src && !img.src.startsWith("data:image/gif") && !img.src.endsWith("/blank.gif")) {
@@ -2842,8 +2844,8 @@
     });
     editor.insertAdjacentElement("afterend", btn);
     updateLensBtn(btn);
-    const observer = new MutationObserver(() => updateLensBtn(btn));
-    observer.observe(editor, {
+    _lensObserver = new MutationObserver(() => updateLensBtn(btn));
+    _lensObserver.observe(editor, {
       subtree: true,
       childList: true,
       attributes: true,
@@ -2851,6 +2853,11 @@
     });
   }
   function initReverseImageSearch() {
+    if (_lensObserver) {
+      _lensObserver.disconnect();
+      _lensObserver = null;
+    }
+    clearTimeout(_lensRetryTimer);
     if (document.getElementById("jp-lens-btn")) return;
     let attempts = 0;
     const MAX_ATTEMPTS = 20;
@@ -2860,7 +2867,7 @@
       if (editor) {
         injectLensBtn(editor);
       } else if (++attempts < MAX_ATTEMPTS) {
-        setTimeout(tryInject, RETRY_MS);
+        _lensRetryTimer = setTimeout(tryInject, RETRY_MS);
       }
     }
     tryInject();
@@ -3385,16 +3392,22 @@
   }
   var _descriptionChangeWatcherStarted = false;
   var _currentDebouncedRefresh = null;
+  var _attachedEditor = null;
+  var _editorContentObserver = null;
   function watchDescriptionChanges(debouncedRefresh) {
     _currentDebouncedRefresh = debouncedRefresh;
     if (_descriptionChangeWatcherStarted) return;
     _descriptionChangeWatcherStarted = true;
-    const attached = /* @__PURE__ */ new WeakSet();
     function attach(ctx) {
-      if (!ctx || attached.has(ctx.editor)) return;
-      attached.add(ctx.editor);
+      if (!ctx || ctx.editor === _attachedEditor) return;
+      if (_editorContentObserver) {
+        _editorContentObserver.disconnect();
+        _editorContentObserver = null;
+      }
+      _attachedEditor = ctx.editor;
       ctx.editor.addEventListener("input", () => _currentDebouncedRefresh?.());
-      new MutationObserver(() => _currentDebouncedRefresh?.()).observe(ctx.editor, {
+      _editorContentObserver = new MutationObserver(() => _currentDebouncedRefresh?.());
+      _editorContentObserver.observe(ctx.editor, {
         childList: true,
         subtree: true,
         characterData: true
@@ -7545,6 +7558,7 @@
   var _pendingBeforeSnapshot = /* @__PURE__ */ new Map();
   var _snapshotTaken = false;
   var _renderRef = null;
+  var _changelogObserver = null;
   function markAutoChange(fieldKey) {
     _autoKeys.add(fieldKey);
     if (!_snapshotTaken && !_pendingBeforeSnapshot.has(fieldKey)) {
@@ -7775,9 +7789,14 @@
         el.addEventListener("input", renderChanges);
         el.addEventListener("change", renderChanges);
       }
+      if (_changelogObserver) {
+        _changelogObserver.disconnect();
+        _changelogObserver = null;
+      }
       const root = document.querySelector(".layout.column.mb-3.px-4");
       if (!root) return;
-      new MutationObserver(renderChanges).observe(root, {
+      _changelogObserver = new MutationObserver(renderChanges);
+      _changelogObserver.observe(root, {
         subtree: true,
         attributes: true,
         attributeFilter: ["class", "aria-checked"]
