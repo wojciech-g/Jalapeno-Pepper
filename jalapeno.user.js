@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
-// @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @version      5.1.1
+// @namespace    https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
+// @version      5.1.5
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
-// @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
-// @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
-// @updateURL    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
-// @downloadURL  https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
+// @homepageURL  https://gitlab.pepper.com/web-applications/jalapeno-admin
+// @supportURL   https://gitlab.pepper.com/web-applications/jalapeno-admin/-/issues
+// @updateURL    https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
+// @downloadURL  https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
 // @match        *://*.pepper.pl/admin-v2/moderation/*
 // @match        *://*.pepper.pl/admin/inspector/users/*
 // @match        *://*.pepper.pl/promocje/*
@@ -23,14 +23,17 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_listValues
+// @grant        GM_setClipboard
 // @grant        GM_openInTab
+// @grant        GM_registerMenuCommand
 // @grant        GM_addValueChangeListener
 // @grant        GM_removeValueChangeListener
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // @connect      www.pepper.pl
 // @connect      open.er-api.com
-// @connect      raw.githubusercontent.com
+// @connect      gitlab.pepper.com
 // @connect      allegro.pl
 // @connect      a.allegroimg.com
 // @connect      *
@@ -3743,7 +3746,7 @@
   }
 
   // src/features/updateCheck.js
-  var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js";
+  var UPDATE_CHECK_URL = "https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js";
   var LAST_CHECK_KEY = "jpLastUpdateCheck";
   var CHECK_INTERVAL_MS = 60 * 60 * 1e3;
   function isNewerVersion(remote, local) {
@@ -3777,6 +3780,180 @@
       ontimeout() {
       }
     });
+  }
+
+  // src/features/settingsBackup.js
+  var _stylesInjected2 = false;
+  function injectStyles2() {
+    if (_stylesInjected2) return;
+    _stylesInjected2 = true;
+    GM_addStyle(`
+        #jp-backup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 100000;
+        }
+        #jp-backup-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100001;
+            width: 560px;
+            max-width: calc(100vw - 32px);
+            max-height: 78vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--jp-bg, #fff);
+            border: 1px solid var(--jp-border, #ddd);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,.35);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: var(--jp-text, #333);
+        }
+        #jp-backup-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--jp-border, #ddd);
+            font-weight: 700;
+            font-size: 13px;
+        }
+        #jp-backup-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 2px 4px;
+            color: var(--jp-text-muted, #999);
+            font-family: inherit;
+        }
+        #jp-backup-close:hover { color: #c0392b; }
+        #jp-backup-body {
+            padding: 12px 14px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #jp-backup-body p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--jp-text-muted, #666);
+            line-height: 1.5;
+        }
+        .jp-backup-textarea {
+            width: 100%;
+            min-height: 160px;
+            box-sizing: border-box;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 11px;
+            padding: 8px;
+            border: 1px solid var(--jp-border, #ccc);
+            border-radius: 6px;
+            background: var(--jp-bg-alt, #f7f7f7);
+            color: var(--jp-text, #333);
+        }
+        .jp-backup-action {
+            align-self: flex-start;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #c0392b;
+            color: #fff;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .jp-backup-action:hover { opacity: .9; }
+    `);
+  }
+  function buildModal(title, bodyHtml) {
+    injectStyles2();
+    const overlay = document.createElement("div");
+    overlay.id = "jp-backup-overlay";
+    overlay.innerHTML = `
+        <div id="jp-backup-modal">
+            <div id="jp-backup-header">
+                <span>${title}</span>
+                <button type="button" id="jp-backup-close">✕</button>
+            </div>
+            <div id="jp-backup-body">${bodyHtml}</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector("#jp-backup-close").addEventListener("click", close);
+    return { overlay, close };
+  }
+  function exportSettings() {
+    const keys = GM_listValues();
+    const dump = {};
+    for (const key of keys) dump[key] = GM_getValue(key);
+    const json = JSON.stringify(dump);
+    const { overlay } = buildModal("📤 Eksport ustawień Jalapeño", `
+        <p>Skopiuj poniższy tekst i zapisz go gdzieś (notatnik, wiadomość do siebie) —
+        po instalacji skryptu z nowego adresu wklej go przez <b>„📥 Importuj ustawienia i statystyki”</b>
+        w menu Tampermonkey, żeby odzyskać ustawienia, statystyki, historię sesji, notatki
+        i pozycje paneli (${keys.length} kluczy).</p>
+        <textarea class="jp-backup-textarea" readonly></textarea>
+        <button type="button" class="jp-backup-action" id="jp-backup-copy">📋 Kopiuj do schowka</button>
+    `);
+    const textarea = overlay.querySelector(".jp-backup-textarea");
+    textarea.value = json;
+    textarea.addEventListener("click", () => textarea.select());
+    overlay.querySelector("#jp-backup-copy").addEventListener("click", () => {
+      try {
+        GM_setClipboard(json);
+        showToast("📋 Skopiowano do schowka");
+      } catch (e) {
+        textarea.select();
+        showToast("Zaznaczono tekst — skopiuj ręcznie (Ctrl+C)");
+      }
+    });
+  }
+  function importSettings() {
+    const { overlay, close } = buildModal("📥 Import ustawień Jalapeño", `
+        <p>Wklej poniżej tekst wyeksportowany wcześniej przez <b>„📤 Eksportuj ustawienia i statystyki”</b>.
+        Strona przeładuje się automatycznie po imporcie.</p>
+        <textarea class="jp-backup-textarea" placeholder="Wklej tutaj wyeksportowany tekst..."></textarea>
+        <button type="button" class="jp-backup-action" id="jp-backup-apply">✅ Zaimportuj i przeładuj</button>
+    `);
+    overlay.querySelector("#jp-backup-apply").addEventListener("click", () => {
+      const textarea = overlay.querySelector(".jp-backup-textarea");
+      let data;
+      try {
+        data = JSON.parse(textarea.value.trim());
+      } catch (e) {
+        showToast("❌ Nieprawidłowy format — sprawdź, czy wklejono cały tekst", true);
+        return;
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        showToast("❌ Nieprawidłowy format", true);
+        return;
+      }
+      const keys = Object.keys(data);
+      if (!keys.length) {
+        showToast("❌ Brak danych do zaimportowania", true);
+        return;
+      }
+      keys.forEach((key) => GM_setValue(key, data[key]));
+      showToast(`✅ Zaimportowano ${keys.length} kluczy — strona się przeładuje`);
+      close();
+      setTimeout(() => location.reload(), 1200);
+    });
+  }
+  function initSettingsBackup() {
+    GM_registerMenuCommand("📤 Eksportuj ustawienia i statystyki", exportSettings);
+    GM_registerMenuCommand("📥 Importuj ustawienia i statystyki", importSettings);
   }
 
   // src/features/allegroImages.js
@@ -4087,8 +4264,8 @@
   }
 
   // src/features/categoryCore.js
-  var DB_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_kategorii_finalna.json";
-  var IGNORE_WORDS_URL = "https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/baza_ignorowanych_slow.json";
+  var DB_URL = "https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/baza_kategorii_finalna.json";
+  var IGNORE_WORDS_URL = "https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/baza_ignorowanych_slow.json";
   var EXAMPLE_TITLE_MAX_LEN = 52;
   var FALLBACK_SHARED_IGNORES = [
     "lcd",
@@ -5782,7 +5959,7 @@
   var THREAD_PATH_RE = /\/admin-v2\/moderation\/thread\/(\d+)/;
   var _cache2 = /* @__PURE__ */ new Map();
   var _fetchPromise = null;
-  var _stylesInjected2 = false;
+  var _stylesInjected3 = false;
   function escapeHtml3(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -5800,7 +5977,7 @@
     if (last < str.length) parts.push(escapeHtml3(str.slice(last)));
     return parts.join("");
   }
-  function injectStyles2() {
+  function injectStyles3() {
     GM_addStyle(`
         #jp-reported-reason-banner {
             display: flex;
@@ -5900,9 +6077,9 @@
     if (document.getElementById("jp-reported-reason-banner")) return;
     const anchor = document.querySelector(".mod-tools-container") || document.querySelector(".v-card.rounded-medium.border-grey--dark") || document.querySelector(".v-card.rounded-medium");
     if (!anchor) return;
-    if (!_stylesInjected2) {
-      injectStyles2();
-      _stylesInjected2 = true;
+    if (!_stylesInjected3) {
+      injectStyles3();
+      _stylesInjected3 = true;
     }
     const list = Array.isArray(entries) ? entries : [entries];
     const [main, ...rest] = list;
@@ -7542,7 +7719,7 @@
   }
 
   // src/features/dealChangelog.js
-  var _stylesInjected3 = false;
+  var _stylesInjected4 = false;
   var STORAGE_KEY_PREFIX = "jalapeno_changelog_";
   var FIELDS = [
     { key: "title", labelKey: "dcFieldTitle", sel: 'input[placeholder="Thread title"]' },
@@ -7576,9 +7753,9 @@
     }
     if (_renderRef) _renderRef();
   }
-  function injectStyles3() {
-    if (_stylesInjected3) return;
-    _stylesInjected3 = true;
+  function injectStyles4() {
+    if (_stylesInjected4) return;
+    _stylesInjected4 = true;
     GM_addStyle(`
         #jp-deal-changelog {
             width: 100%;
@@ -7686,7 +7863,7 @@
   function initDealChangelog(stackEl, threadId, { alwaysVisible = false } = {}) {
     if (!stackEl || !threadId) return;
     if (document.getElementById("jp-deal-changelog")) return;
-    injectStyles3();
+    injectStyles4();
     const panel = document.createElement("div");
     panel.id = "jp-deal-changelog";
     if (!alwaysVisible) panel.style.display = "none";
@@ -7810,10 +7987,10 @@
   }
 
   // src/features/dealDateTools.js
-  var _stylesInjected4 = false;
-  function injectStyles4() {
-    if (_stylesInjected4) return;
-    _stylesInjected4 = true;
+  var _stylesInjected5 = false;
+  function injectStyles5() {
+    if (_stylesInjected5) return;
+    _stylesInjected5 = true;
     GM_addStyle(`
         #jp-date-tools {
             width: 100%;
@@ -8114,7 +8291,7 @@
   function initDealDateTools(stackEl, settings3, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-date-tools")) return;
-    injectStyles4();
+    injectStyles5();
     const panel = document.createElement("div");
     panel.id = "jp-date-tools";
     if (compact) panel.classList.add("jp-dt-compact");
@@ -9197,7 +9374,7 @@
     if (text.includes("SAVE") && !text.includes("APPROVE") && text.length < 20) return true;
     return false;
   }
-  function injectStyles5() {
+  function injectStyles6() {
     if (_injected4) return;
     _injected4 = true;
     GM_addStyle(`
@@ -9355,7 +9532,7 @@
         <button id="jp-gs-new-shift">${t("gsNewShift")}</button>`;
   }
   function initGeekStats() {
-    injectStyles5();
+    injectStyles6();
     _widget = document.createElement("div");
     _widget.id = "jp-geekstats-widget";
     _widget.innerHTML = `
@@ -9432,7 +9609,7 @@
 
   // src/features/multipackHelper.js
   var _injected5 = false;
-  function injectStyles6() {
+  function injectStyles7() {
     if (_injected5) return;
     _injected5 = true;
     GM_addStyle(`
@@ -9528,7 +9705,7 @@
   function initMultipackHelper(stackEl, triggerVueInput, { compact = false } = {}) {
     if (!stackEl) return;
     if (document.getElementById("jp-multipack")) return;
-    injectStyles6();
+    injectStyles7();
     const panel = document.createElement("div");
     panel.id = "jp-multipack";
     if (compact) panel.classList.add("jp-mp-compact-mode");
@@ -9607,10 +9784,10 @@
   }
 
   // src/features/voteRowEnhancer.js
-  var _stylesInjected5 = false;
-  function injectStyles7() {
-    if (_stylesInjected5) return;
-    _stylesInjected5 = true;
+  var _stylesInjected6 = false;
+  function injectStyles8() {
+    if (_stylesInjected6) return;
+    _stylesInjected6 = true;
     GM_addStyle(`
         .jp-vote-td-wrap {
             display: flex;
@@ -9686,7 +9863,7 @@
   }
   function initVoteRowEnhancer() {
     if (!/\/admin\/inspector\/users\/\d+/.test(window.location.pathname)) return;
-    injectStyles7();
+    injectStyles8();
     const ng = getAngular();
     const rows = document.querySelectorAll('tr[ng-repeat="vote in user.votes"]');
     for (const row of rows) {
@@ -9744,7 +9921,7 @@
 
   // src/features/commentTemplates.js
   var STORAGE_KEY4 = "jpCommentTemplates";
-  var _stylesInjected6 = false;
+  var _stylesInjected7 = false;
   var _initialized2 = false;
   var _activePopover = null;
   var _outsideHandler = null;
@@ -9802,9 +9979,9 @@
   function saveTemplates(templates) {
     GM_setValue(STORAGE_KEY4, JSON.stringify(templates));
   }
-  function injectStyles8() {
-    if (_stylesInjected6) return;
-    _stylesInjected6 = true;
+  function injectStyles9() {
+    if (_stylesInjected7) return;
+    _stylesInjected7 = true;
     GM_addStyle(`
         .jp-qr-btn { position: relative; }
         .jp-qr-popover {
@@ -10031,7 +10208,7 @@
   function initCommentTemplates() {
     if (_initialized2) return;
     _initialized2 = true;
-    injectStyles8();
+    injectStyles9();
     const obs = new MutationObserver(scanAndInject);
     obs.observe(document.body, { childList: true, subtree: true });
     scanAndInject();
@@ -10149,7 +10326,7 @@
   // src/features/spicyEditLog.js
   var THREAD_PATH_RE2 = /\/admin-v2\/moderation\/thread\/(\d+)/;
   var EDIT_LOG_HREF_RE = /\/admin\/thread-edit-log\/(\d+)/;
-  var _stylesInjected7 = false;
+  var _stylesInjected8 = false;
   var _nickCache = /* @__PURE__ */ new Map();
   async function resolveNick(userId) {
     const key = String(userId);
@@ -10252,9 +10429,9 @@
   function escapeHtml4(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
-  function injectStyles9() {
-    if (_stylesInjected7) return;
-    _stylesInjected7 = true;
+  function injectStyles10() {
+    if (_stylesInjected8) return;
+    _stylesInjected8 = true;
     GM_addStyle(`
         #jp-sel-overlay {
             position: fixed;
@@ -10535,7 +10712,7 @@
   }
   async function openModal(dealId) {
     closeModal();
-    injectStyles9();
+    injectStyles10();
     const overlay = document.createElement("div");
     overlay.id = "jp-sel-overlay";
     overlay.onclick = closeModal;
@@ -10729,6 +10906,7 @@
     }
     initAnalytics();
     checkForScriptUpdate();
+    initSettingsBackup();
     function saveSettings(newSettings) {
       settings3 = newSettings;
       GM_setValue("jalapenoSettings", settings3);
