@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Jalapeño (Dżalapinio) by Xcited
-// @namespace    https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
-// @version      5.1.5
+// @namespace    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
+// @version      5.2.1
 // @description  Skrypt optymalizujący pracę moderatorów z ponad 15 funkcjonalnościami.
 // @author       Xcited (https://www.pepper.pl/profile/Xcited)
-// @homepageURL  https://gitlab.pepper.com/web-applications/jalapeno-admin
-// @supportURL   https://gitlab.pepper.com/web-applications/jalapeno-admin/-/issues
-// @updateURL    https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
-// @downloadURL  https://gitlab.pepper.com/web-applications/jalapeno-admin/-/raw/main/jalapeno.user.js
+// @homepageURL  https://github.com/wojciech-g/Jalapeno-Pepper
+// @supportURL   https://github.com/wojciech-g/Jalapeno-Pepper/issues
+// @updateURL    https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
+// @downloadURL  https://raw.githubusercontent.com/wojciech-g/Jalapeno-Pepper/main/jalapeno.user.js
 // @match        *://*.pepper.pl/admin-v2/moderation/*
 // @match        *://*.pepper.pl/admin/inspector/users/*
 // @match        *://*.pepper.pl/promocje/*
